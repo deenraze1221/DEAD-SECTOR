@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="ru">
+<html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -19,13 +19,13 @@
       <div class="menu-actions">
         <button id="start" class="primary" disabled>ЗАГРУЗКА СЕКТОРА…</button>
         <button id="restart" class="secondary" hidden>НАЧАТЬ СНАЧАЛА <span>↺</span></button>
+        <button id="online" class="secondary">ИГРАТЬ ПО СЕТИ · СКОРО</button>
         <button id="settings-button" class="secondary" aria-expanded="false">НАСТРОЙКИ <span>+</span></button>
       </div>
       <section id="settings" class="settings" hidden>
         <label for="sensitivity">Чувствительность мыши <output id="sensitivity-value">1.0</output></label>
         <input id="sensitivity" type="range" min="0.2" max="2" value="1" step="0.1" />
-        <label class="effect-option">Пикселизация экрана <input id="pixels" type="checkbox" checked /></label>
-        <label class="effect-option">PSX · дрожание вершин <input id="vertex-snap" type="checkbox" checked /></label>
+        <label for="language">Language / Язык</label><select id="language"><option value="en">English</option><option value="ru">Русский</option></select>
       </section>
       <p id="message" class="message" role="status">Зачистите сектор. После уничтожения пяти мутантов найдите северный выход.</p>
     </main>
@@ -46,7 +46,7 @@
       <div class="hud-bottom"><div><small>СОСТОЯНИЕ</small><strong><b id="health">100</b> <span>HP</span></strong><div id="health-bar" class="health-bar"></div></div><span id="movement">ПЕШКОМ</span><p>WASD <span>ДВИЖЕНИЕ</span> &nbsp; SHIFT <span>БЕГ</span> &nbsp; SPACE <span>ПРЫЖОК</span> &nbsp; ESC <span>ПАУЗА</span></p></div>
     </div>
     <footer id="footer"><span>RESTRICTED AREA / AUTHORIZED PERSONNEL ONLY</span><span>ОПЕРАЦИЯ / ЗАЧИСТКА</span></footer>
-    <noscript>Для запуска DEAD SECTOR необходимо включить JavaScript.</noscript>
+    <noscript>Enable JavaScript to play DEAD SECTOR.</noscript>
     <script type="module" src="/game.js"></script>
   </body>
 </html>

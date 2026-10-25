@@ -7,22 +7,32 @@ export function obstacleDistance(origin,direction,colliders,max=100){
 export class Enemies {
  constructor(scene,colliders,audio){
   this.colliders=colliders;this.nav=createNavigation(colliders);this.audio=audio;this.items=[];
-  const flesh=new THREE.MeshStandardMaterial({color:'#8a7866',roughness:1,flatShading:true});
+  const flesh=new THREE.MeshStandardMaterial({color:'#8a7866',roughness:1,flatShading:true,vertexColors:true});
   const uniform=new THREE.MeshStandardMaterial({color:'#424b36',roughness:1});
   const wound=new THREE.MeshStandardMaterial({color:'#68352c',roughness:1});
   const eye=new THREE.MeshBasicMaterial({color:'#dbbd71'});
   for(const [i,[x,z]] of [[-5,1],[9,1],[-13,-7],[5,-16],[-9,19]].entries()){
    const rig=new THREE.Group();rig.position.set(x,0,z);scene.add(rig);
-   const mesh=(geo,mat,parent,px,py,pz)=>{const m=new THREE.Mesh(geo,mat);m.position.set(px,py,pz);m.castShadow=m.receiveShadow=true;parent.add(m);return m;};
-   mesh(new THREE.BoxGeometry(.6,.67,.33),uniform,rig,0,1.13,0);
+   const mesh=(geo,mat,parent,px,py,pz)=>{if(mat===flesh){const colors=[];for(let v=0;v<geo.attributes.position.count;v++){const shade=.68+.3*(Math.sin(v*43.7)*.5+.5);colors.push(shade,shade,shade*.92);}geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));}const m=new THREE.Mesh(geo,mat);m.position.set(px,py,pz);m.castShadow=m.receiveShadow=true;parent.add(m);return m;};
+   mesh(new THREE.CapsuleGeometry(.26,.32,3,6),uniform,rig,0,1.13,0);
    mesh(new THREE.IcosahedronGeometry(.23,0),wound,rig,.2,1.42,.06);
    const head=mesh(new THREE.IcosahedronGeometry(.245,1),flesh,rig,0,1.72,.04);head.scale.set(.8,1.15,.9);
    mesh(new THREE.BoxGeometry(.2,.16,.05),wound,rig,0,1.62,.23);
    for(const x of [-.085,.085])mesh(new THREE.BoxGeometry(.04,.028,.025),eye,rig,x,1.78,.24);
+   // Exposed ribs, asymmetric lesions, jaw and broken teeth create a readable silhouette.
+   for(let r=0;r<4;r++)for(const side of [-1,1]){
+    const rib=mesh(new THREE.CapsuleGeometry(.027,.16,2,5),flesh,rig,side*.12,1.32-r*.1,.255);rib.rotation.z=side*1.25;
+   }
+   mesh(new THREE.IcosahedronGeometry(.16,0),wound,rig,-.27,1.43,.03);
+   mesh(new THREE.IcosahedronGeometry(.13,0),flesh,rig,.30,1.39,-.04);
+   const jaw=mesh(new THREE.IcosahedronGeometry(.14,0),wound,rig,0,1.57,.14);jaw.scale.set(1,.65,.75);
+   for(let tooth=0;tooth<6;tooth++){const m=mesh(new THREE.ConeGeometry(.018,.075,4),flesh,rig,(tooth-2.5)*.032,1.61,.274);m.rotation.z=Math.PI;}
+   for(const side of [-1,1]){const brow=mesh(new THREE.BoxGeometry(.12,.045,.07),wound,rig,side*.085,1.83,.2);brow.rotation.z=side*-.25;}
+   for(let spike=0;spike<4;spike++){const bone=mesh(new THREE.ConeGeometry(.045,.18,5),flesh,rig,-.23+spike*.15,1.49,-.17);bone.rotation.x=-.5;}
    const limbs=[];
    for(const side of [-1,1]){
-    const leg=new THREE.Group();leg.position.set(side*.18,.85,0);rig.add(leg);mesh(new THREE.BoxGeometry(.2,.69,.23),uniform,leg,0,-.35,0);mesh(new THREE.BoxGeometry(.22,.15,.34),uniform,leg,0,-.75,.06);limbs.push(leg);
-    const arm=new THREE.Group();arm.position.set(side*.39,1.4,0);arm.rotation.z=side*.13;rig.add(arm);mesh(new THREE.BoxGeometry(.15,.64,.17),flesh,arm,0,-.31,.12);mesh(new THREE.BoxGeometry(.18,.17,.14),wound,arm,0,-.67,.15);
+    const leg=new THREE.Group();leg.position.set(side*.18,.85,0);rig.add(leg);mesh(new THREE.CylinderGeometry(.12,.075,.69,6),uniform,leg,0,-.35,0);mesh(new THREE.BoxGeometry(.22,.15,.34),uniform,leg,0,-.75,.06);limbs.push(leg);
+    const arm=new THREE.Group();arm.position.set(side*.39,1.4,0);arm.rotation.z=side*.13;rig.add(arm);mesh(new THREE.CylinderGeometry(.105,.055,.64,6),flesh,arm,0,-.31,.12);mesh(new THREE.BoxGeometry(.18,.17,.14),wound,arm,0,-.67,.15);
     for(let f=0;f<3;f++)mesh(new THREE.ConeGeometry(.024,.16,4),flesh,arm,(f-1)*.055,-.8,.15).rotation.z=Math.PI;
     limbs.push(arm);
    }

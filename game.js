@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {t,remaining} from './i18n.js';
 import { Player, PLAYER, FIXED_STEP } from './player.js';
 import { createMap } from './map.js';
 import { createPSX } from './psx.js';
@@ -13,19 +14,6 @@ let renderer, scene, camera, player;
 let psx, rifle, enemies, exit;
 const audio = new GameAudio();
 let hp=100, outcome='', shooting=false, triggerPressed=false, aiming=false, hitTime=0, hurtTime=0, elapsed=0;
-const effects = { pixels: true, snapping: true };
-for (const [id, key] of [['pixels', 'pixels'], ['vertex-snap', 'snapping']]) {
-  try {
-    const saved = localStorage.getItem(`dead-sector:${key}`);
-    if (saved !== null) effects[key] = saved !== 'false';
-  } catch { /* Preferences are optional. */ }
-  $(id).checked = effects[key];
-  $(id).addEventListener('change', event => {
-    effects[key] = event.target.checked;
-    try { localStorage.setItem(`dead-sector:${key}`, String(effects[key])); } catch { /* Optional. */ }
-    if (psx) resize();
-  });
-}
 let running = false, started = false, jumpQueued = false, accumulator = 0, previousTime = 0;
 let sensitivity = 1;
 try {
@@ -50,31 +38,31 @@ function setRunning(value) {
   for (const id of ['menu', 'briefing', 'footer']) $(id).hidden = value;
   $('hud').hidden = !value;
   $('restart').hidden = !started;
-  $('start').innerHTML = outcome ? 'НОВАЯ ЗАЧИСТКА <span>↗</span>' : started ? 'ПРОДОЛЖИТЬ <span>↗</span>' : 'ВОЙТИ В СЕКТОР <span>↗</span>';
+  $('start').innerHTML = outcome ? t('НОВАЯ ЗАЧИСТКА <span>↗</span>') : started ? t('ПРОДОЛЖИТЬ <span>↗</span>') : t('ВОЙТИ В СЕКТОР <span>↗</span>');
 }
 
 function resetCombat(){player.reset();rifle.reset();enemies.reset();hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;updateCamera();}
-function finish(result){if(outcome)return;outcome=result;pause();$('message').textContent=result==='win'?'СЕКТОР ЗАЧИЩЕН. Вы добрались до выхода.':'ВЫ ПОГИБЛИ. Начните зачистку заново.';}
+function finish(result){if(outcome)return;outcome=result;pause();$('message').textContent=result==='win'?t('СЕКТОР ЗАЧИЩЕН. Вы добрались до выхода.'):t('ВЫ ПОГИБЛИ. Начните зачистку заново.');}
 async function enter() {
   if(outcome)resetCombat();
   audio.unlock();
   try {
     await $('scene').requestPointerLock();
   } catch {
-    $('message').textContent = 'Браузер не разрешил захват мыши. Нажмите «Войти в сектор» ещё раз или откройте игру в отдельной вкладке.';
+    $('message').textContent = t('Браузер не разрешил захват мыши. Нажмите «Войти в сектор» ещё раз или откройте игру в отдельной вкладке.');
   }
 }
 $('start').addEventListener('click', enter);
 $('restart').addEventListener('click', () => { resetCombat(); enter(); });
 document.addEventListener('pointerlockchange', () => {
   const locked = document.pointerLockElement === $('scene');
-  if (locked) { started = true; $('message').textContent = 'Пауза · движение остановлено. Продолжить — захватить мышь.'; }
+  if (locked) { started = true; $('message').textContent = t('Пауза · движение остановлено. Продолжить — захватить мышь.'); }
   setRunning(locked);
-  if(outcome) $('message').textContent=outcome==='win'?'СЕКТОР ЗАЧИЩЕН. Вы добрались до выхода.':'ВЫ ПОГИБЛИ. Начните зачистку заново.';
+  if(outcome) $('message').textContent=outcome==='win'?t('СЕКТОР ЗАЧИЩЕН. Вы добрались до выхода.'):t('ВЫ ПОГИБЛИ. Начните зачистку заново.');
   if (!locked) $('start').focus({ preventScroll: true });
 });
 document.addEventListener('pointerlockerror', () => {
-  $('message').textContent = 'Не удалось захватить мышь. Повторите вход в сектор в отдельной вкладке браузера.';
+  $('message').textContent = t('Не удалось захватить мышь. Повторите вход в сектор в отдельной вкладке браузера.');
 });
 function pause() { if (document.pointerLockElement) document.exitPointerLock(); setRunning(false); }
 window.addEventListener('blur', pause);
@@ -102,7 +90,7 @@ function updateCamera() {
 function resize() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
   rifle.camera.aspect=camera.aspect;rifle.camera.updateProjectionMatrix();
-  psx.resize(innerWidth, innerHeight, effects.pixels, effects.snapping);
+  psx.resize(innerWidth, innerHeight);
 }
 
 // Read-only snapshot for reproducible browser checks, without allowing state mutation.
@@ -123,7 +111,7 @@ try {
   updateCamera(); resize(); window.addEventListener('resize', resize);
   $('scene').addEventListener('webglcontextlost', event => {
     event.preventDefault(); pause(); $('start').disabled = true;
-    $('message').textContent = 'Графический контекст потерян. Перезагрузите страницу, чтобы восстановить сектор.';
+    $('message').textContent = t('Графический контекст потерян. Перезагрузите страницу, чтобы восстановить сектор.');
   });
   $('start').disabled = false; setRunning(false);
   function frame(time) {
@@ -148,7 +136,7 @@ try {
         hitTime=Math.max(0,hitTime-FIXED_STEP);hurtTime=Math.max(0,hurtTime-FIXED_STEP);
         if(!running)break;
       }
-      $('movement').textContent = !player.grounded ? 'В ВОЗДУХЕ' : keys.has('ShiftLeft') || keys.has('ShiftRight') ? 'БЕГ' : 'ПЕШКОМ';
+      $('movement').textContent = !player.grounded ? t('В ВОЗДУХЕ') : keys.has('ShiftLeft') || keys.has('ShiftRight') ? t('БЕГ') : t('ПЕШКОМ');
       const fov=aiming?55:78;if(camera.fov!==fov){camera.fov=fov;camera.updateProjectionMatrix();}
       updateCamera();
     } else if (!started) {
@@ -156,8 +144,8 @@ try {
     }
     $('health').textContent=hp;$('health-bar').style.width=`${hp*1.35}px`;
     $('ammo').textContent=rifle.ammo;$('reserve').textContent=rifle.reserve;
-    $('weapon-state').textContent=rifle.reloadTime?'ПЕРЕЗАРЯДКА…':!rifle.ammo?'R — ПЕРЕЗАРЯДИТЬ':rifle.config.label;
-    $('objective').textContent=enemies.alive?`ЗАЧИСТИТЕ СЕКТОР · ОСТАЛОСЬ ${enemies.alive}`:'ВЫХОД ОТКРЫТ · СЕВЕРНЫЕ ВОРОТА · E';
+    $('weapon-state').textContent=rifle.reloadTime?t('ПЕРЕЗАРЯДКА…'):!rifle.ammo?t('R — ПЕРЕЗАРЯДИТЬ'):t(rifle.config.label);
+    $('objective').textContent=enemies.alive?remaining(enemies.alive):t('ВЫХОД ОТКРЫТ · СЕВЕРНЫЕ ВОРОТА · E');
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
     exit.material.color.set(enemies.alive?'#873d2b':'#afdb65');
     rifle.pose(elapsed,keys.size>0,aiming);
@@ -167,6 +155,9 @@ try {
   renderer.setAnimationLoop(frame);
 } catch (error) {
   console.error('DEAD SECTOR initialization failed:', error);
-  $('start').disabled = true; $('start').textContent = 'ЗАПУСК НЕДОСТУПЕН';
-  $('message').textContent = 'Не удалось запустить 3D-сцену. Нужен браузер с WebGL 2 и включённым аппаратным ускорением.';
+  $('start').disabled = true; $('start').textContent = t('ЗАПУСК НЕДОСТУПЕН');
+  $('message').textContent = t('Не удалось запустить 3D-сцену. Нужен браузер с WebGL 2 и включённым аппаратным ускорением.');
 }
+
+$('online').addEventListener('click',()=>{$('message').textContent=t('Сетевой режим в разработке. Сейчас доступна одиночная игра.');});
+window.addEventListener('game-language-change',()=>{setRunning(false);$('message').textContent=t($('message').textContent);});

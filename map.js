@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createCity,cityColliders} from './city.js';
 import { createPropModels, propColliders } from './props.js';
 
 export const SPAWN = Object.freeze({ x: 0, y: 0, z: 16 });
@@ -16,13 +17,13 @@ block(-13.5, 3, -2, 3, 2, .5); block(-13, 5, -7, 12.5, .4, 10.5);
 block(18, 0, -21, 14, 9, 11); block(-26, 0, -24, 10, 12, 12);
 block(25, 0, 13, 10, 7, 13); block(-26, 0, 17, 9, 8, 13);
 block(7, 0, -5, 6, 2.5, 2.5, 'rust'); block(12, 0, -5, 2, 3, 2, 'rust');
-block(-4, 0, 6, 4, 1.3, .8); block(6, 0, 10, 4, 1.3, .8);
-block(0, 0, -12, 4, 1.3, .8);
-block(17, 0, 3, 2.5, 1.2, 5, 'rust'); block(17, 1.2, 3, 2.2, .8, 2.5, 'dark');
+
+
+
 
 
 export function getColliders() {
-  return [...propColliders(), ...blocks.filter(b => b.solid).map(b => ({
+  return [...cityColliders(), ...propColliders(), ...blocks.filter(b => b.solid).map(b => ({
     minX: b.x - b.w / 2, maxX: b.x + b.w / 2,
     minY: b.y, maxY: b.y + b.h,
     minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2,
@@ -93,13 +94,7 @@ export function createMap(scene) {
     stripe.rotation.x = -Math.PI / 2; stripe.position.set(2, .015, z); scene.add(stripe);
   }
   const lit = new THREE.MeshBasicMaterial({ color: '#d2dc94' });
-  for (const [x, z] of [[-5, -16], [11, 15], [-21, -1]]) {
-    const pole = new THREE.Mesh(new THREE.CylinderGeometry(.09, .12, 6, 6), mats.rust);
-    pole.position.set(x, 3, z); scene.add(pole);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(1.3, .18, .6), lit); head.position.set(x, 6, z); scene.add(head);
-    const light = new THREE.PointLight('#d9dd8a', 12, 13, 2); light.position.set(x, 5.7, z); scene.add(light);
-    // Include narrow props in physics as well as visible geometry.
-  }
+  createCity(scene);
   // Building windows are emissive surfaces, not expensive individual lights.
   for (const [x, baseZ, width, height] of [[18, -15.45, 14, 9], [-26, -17.95, 10, 12], [25, 19.55, 10, 7], [-26, 23.55, 9, 8]]) {
     for (let floor = 2; floor < height; floor += 2.5) for (let col = -width / 2 + 1.5; col < width / 2 - 1; col += 2.5) {
@@ -111,6 +106,5 @@ export function createMap(scene) {
   sign(scene, 'TRAINING', -13, 4, -1.72, 4.6);
   sign(scene, 'KEEP CLEAR', 7, 1.6, -3.73, 3.8);
   const colliders = getColliders();
-  for (const [x, z] of [[-5, -16], [11, 15], [-21, -1]]) colliders.push({ minX: x - .12, maxX: x + .12, minY: 0, maxY: 6, minZ: z - .12, maxZ: z + .12 });
   return { colliders, spawn: SPAWN };
 }
