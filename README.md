@@ -1,24 +1,70 @@
 # DEAD SECTOR
 
-Single-player browser FPS with randomly generated 200 × 200 m towns and two-player shared rooms. Ten user-provided weapons are available; all environment models are now original procedural geometry. English by default; Russian in Settings.
+Browser wave-survival FPS with seeded 200 × 200 m towns, English/Russian UI and private two-player rooms. All environment models are original procedural geometry. Weapon models come from the user's updated `gunsv2.fbx`, with the original pistol retained.
 
-## Play offline
+## Play
 
-Download ZIP, extract and open `index.html`. No installation or Internet needed for single player. Click Play to capture the mouse. Restart / New run generates a new city and rolls one of ten weapons. Resume preserves the current city and loadout.
+Download ZIP, extract it and open `index.html`. Single player needs no installation, server or Internet connection. A new run generates a town and starts beside SECTOR MART with 100 HP, $0, a pistol, 8 loaded rounds and 64 spare rounds. Starter ammunition makes the first cash earnings possible; there are no free ammunition or medkit boxes in the world.
 
-WASD move; Shift sprint; Space jump; LMB fire; R reload; Esc menu. Survive endless waves from four corner hives. E interacts with supplies and revives a nearby partner; there is no exit victory. Player starts at (0, 85), with 100 HP. Buildings and props have solid colliders; doorways are accessible.
+WASD move; mouse look; Shift sprint; Space jump; LMB fire; R reload; E collect cash, open the terminal or revive a nearby partner. **1 selects the primary weapon; 2 selects the pistol.** There are only these two weapon slots. Buying a different primary replaces the previous primary, returns its remaining magazine rounds to the universal reserve and equips the new empty gun. The pistol, its magazine and its condition remain. Reload the new weapon with R. H uses a small medkit; J uses a large medkit. Esc pauses single player. Resuming preserves the run; Restart starts over.
 
-## Original city models
+Sprinting lasts five seconds from full stamina. Stamina recovers in five seconds at walking speed or while stationary; exhaustion requires full recovery before sprinting resumes. The HUD shows health, stamina, cash, the two slots, weapon condition and ammunition. Static control instructions on the right have been removed. The terminal opens a scrollable shop with owned slot buttons, prices and purchase feedback. Close it using its button or Esc.
 
-The city now uses semantic placement rather than random prop scattering. There are 16 building families and 24 placed outdoor prop/vegetation families, plus furniture and appliances. `asset-catalog.js` describes 1,200 procedural family/variant recipes; these are parameterized designs, not 1,200 separately hand-authored meshes. A connected street grid separates 64 lots (four times the former building count). Every category appears in each town; seeded variation selects buildings and prop arrangements. Main roads remain clear; tests verify routes to every building, enemy spawn and exit across several seeds.
+## Money, shop and condition
 
-`town.js` is the deterministic layout and collision source; `city.js` constructs meshes. No uploaded environment FBX/PNG/JPG is used or retained. `assets/imported/Guns/` and `assets/models/weapons.json` contain the retained Pistol from the original FBX and nine named models from `gunsv2.fbx`. RifleGod, RifleBran and SMG are removed from the playable roster. Re-import with `node scripts/import-weapons.js`, then build.
+A dead enemy leaves a cash bundle on the ground. E collects it within 1.6 m. Rewards derive from maximum HP, clamped to $5–100: runner 125 HP → $5; zombie 250 HP → $30; eye 300 HP → $40; brute 600 HP → $100. Cash remains until collected, and a bundle can be collected once. In co-op, the collector receives the money in their individual wallet.
 
-Pixel rendering is always enabled at 540 pixels vertically; vertex snapping and graphic toggles are removed. Models use original low-poly geometry and flat materials. Mutants have jointed shoulders, elbows, hips, knees and ankles, separate jaws, facial features and clothing. Ordinary zombies use five deterministic outfits: civilian, worker, medic, soldier and hoodie. Outfits change geometry and materials; these are procedural looks rather than imported texture skins. The enlarged brute has connected broad shoulders and arms clear of its belly. Walking uses distance-based opposing strides, knee flexion and planted stance feet; melee has an upper-body attack motion.
+SECTOR MART is a unique grocery building in the central quarter. Its large terminal opens within 2.1 m. The shop contains ten prop families: stocked shelves, produce stand, refrigerated case, freezer, checkout with cash register, shopping cart, basket stand, display rack, stock boxes and the terminal. Entrances and the route to the terminal have physical player-clearance checks.
 
-## Open to network
+| Weapon | Magazine | Damage | Fire interval | Reload | Mode | Price |
+| --- | --- | --- | --- | --- | --- | --- |
+| Pistol | 8 | 45 | 0.28 s | 1.15 s | single press | starter |
+| Helsing | 40 | 30 | 0.075 s | 4 s | automatic | $6,000 |
+| Tikhar | 1 | 55 | 0.45 s | 3 s | single press | $3,500 |
+| Shambler | 5 | 50 | 0.50 s | 3 s | single press | $3,000 |
+| Shotgun | 2 | 80 | 0.60 s | 2 s | single press | $2,000 |
+| Kalash | 30 | 40 | 0.14 s | 3 s | automatic | $4,000 |
+| VSV | 12 | 70 | 0.24 s | 6 s | automatic | $5,500 |
+| Scorpion | 35 | 35 | 0.10 s | 4 s | automatic | $4,500 |
+| Vector | 20 | 35 | 0.09 s | 3 s | automatic | $2,500 |
+| G36 | 30 | 45 | 0.14 s | 4 s | automatic | $5,000 |
 
-A running, reachable Node.js server is required for real rooms:
+Damage includes the latest +15 to every weapon. Pistol also retains the preceding +20 increase (10 + 20 + 15 = 45). Fire intervals resolve qualitative rate requests; Shambler/Shotgun damage is total per shot. There is no aiming mode. Each weapon has a distinct synthesized report.
+
+- Universal ammunition: **30 rounds for $50**. The **500-round limit includes reserve and both loaded magazines**. A full pack is refused if it would exceed the limit; no money is deducted.
+- Small medkit: **$100**, restores **25 HP** when used with H.
+- Large medkit: **$250**, restores **75 HP** when used with J. Health caps at 100; using a kit at full health consumes nothing.
+- Every weapon has **100 condition**, losing **5 condition after each 100 shots actually fired**. Empty clicks do not cause wear. At zero condition it cannot shoot.
+- Repair: **$500 for +50 condition** on the equipped weapon, capped at 100. Repairing an already intact weapon is refused without charging.
+
+The updated FBX uses painted metal, brown stock/grip and blue pneumatic accents on appropriate parts, stored as vertex colors rather than stretched image textures. Authored normals are retained, and each model has individual trigger/support grip anchors and forearm endpoints. New guns are single-piece meshes; reload moves the gun and hand without detaching an invented magazine. Pistol retains its separate original magazine. `node scripts/import-weapons.js` rebuilds normalized geometry, colors and grip metadata.
+
+## City generation
+
+The town has 64 buildings and 20 repeatable architecture families, including the new cinema, fire station, motel and a tower with a 10 m structural height, plus the unique grocery. Ground floors use three floor plans: central spine, front lounge with rear rooms, and open floor with rear service band. Furniture, wall orientation and room use vary deterministically. Wide entrances have clear vestibules. Upper stories are closed architectural volumes; stairs and upper-floor access are not implemented.
+
+Street population is increased by 15% after the baseline placement pass. Added families are traffic cones, street clocks, newspaper stands, public telephones and bus route boards. Reservations reject collisions with buildings, cars and existing props. Benches face pedestrian areas, bins pair with seating/shelters, lamps follow uniform pavement lines, cars fit lanes or marked bays, and fences form connected boundary runs of at least 14.6 m. The five extra prop families and all repeatable architectural families appear in each tested town.
+
+`town.js`/`interiors.js` generate placement and colliders. `city.js` uses instanced primitive construction. Terrain is tiled once; room finishes replace yard patches. Markings/labels have depth bias, wall joints meet at boundaries, and shadow bias and ambient fill improve interior lighting. Solid instanced facades do not receive their own shadow map, eliminating the striped self-shadow acne; cast shadows remain on the ground. Furniture uses compound colliders at actual seat/table heights. Navigation accounts for the height/width of normal, flying and giant enemies. Tests validate overlap/support rules on 24 seeds and physically walk all room routes and the terminal approach on three cities; these checks do not guarantee every possible visual defect on every device.
+
+World pixel rendering remains mandatory at 540 pixels vertically. There is no vertex snapping. Flat colors and original low-poly environment models are retained; no uploaded environment FBX/texture is used.
+
+## Enemies and waves
+
+| Enemy | HP | Speed | Damage | Chance |
+| --- | --- | --- | --- | --- |
+| Zombie | 250 | 2.2 m/s | 25 | 55% |
+| Runner | 125 | 3.6 m/s | 15 | 20% |
+| Flying flesh eye | 300 | 2.3 m/s | projectile 30 | 20% |
+| Brute | 600 | 1.1 m/s | 40 | 5% |
+
+Ordinary zombies have five procedural outfits. Jointed shoulders/elbows/hips/knees/ankles drive opposite strides, planted stance feet and attack motions. Brute arms stay outside the belly. Death immediately hides the model and emits red particles from one bounded pool. There are no falling corpses. Death/outfit/animation state replicates without replaying particles on duplicate packets.
+
+The first wave spawns 30 enemies gradually over 120 seconds from four corner hives. Each later wave adds five. After spawning finishes, **every enemy must die before the 10-second break starts**. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Projectiles are blocked by cover and damage only on body contact. The perimeter is a concrete wall 5.8 m high.
+
+## Network play
+
+Node.js >=22.12 is needed to host rooms:
 
 ```sh
 npm ci
@@ -26,84 +72,30 @@ npm run build
 npm run server
 ```
 
-The server serves the built game on port 3000 and accepts WebSocket rooms. On the host: Open to network → enter server URL (e.g. `ws://192.168.1.10:3000`) → Create room. Give your friend the same server address and the six-character code. The friend uses Join. Both then click Play. A code alone does not make a local server accessible over the Internet. For Internet play deploy the server on an accessible host; HTTPS pages require a `wss://` endpoint. No automatic hosting or port forwarding is performed.
+The server serves the built client and WebSocket rooms on port 3000. Host: Open to network → reachable server URL → Create room. Friend: same URL and six-character code → Join. Both press Play. A room code does not expose a local server to the Internet; public play requires a deployed server and HTTPS/WSS where applicable. No public server is automatically published.
 
-Implemented: two-player limit, matching city seed, visible partner, movement replication, guest shots processed by the host, shared enemy health/deaths, damage to the nearest player and common completion. The host simulates the world; menu does not pause an active network game. At zero HP a network player is downed. A living partner within 2.5 m presses E to revive them with 50 HP. Both downed ends the run. Anti-cheat is not implemented. Starting a new run closes the current session. Unexpected disconnect reserves the seat and world snapshot for two minutes. The client retries automatically; after refreshing the page use Reconnect in the network panel. Explicit Disconnect by the host closes the room; explicit guest Disconnect frees the slot. These are private casual rooms, not a production multiplayer service.
+The host simulates enemies, shooting and waves. The room server tracks cash availability, individual wallets, owned slots, medkits and market transactions. It checks pickup/terminal range and rejects duplicate cash collection or invalid purchases. Transaction revisions prevent delayed combat snapshots from undoing purchases/repairs. As in the existing private-room design, clients are trusted for combat movement/ammunition; this is not an anti-cheat service.
 
-## Development and validation
+At zero HP, a partner within 2.5 m presses E to restore 50 HP. Both downed ends the run. Menu/shop use does not stop an active network world. Unexpected disconnect reserves the seat, account and world snapshot for 120 seconds; Reconnect can restore the same room after reload. Explicit host Disconnect closes it. Rooms are held in memory and disappear on server restart. Public Internet gameplay requires separate deployment; local two-client and real-socket checks cover the provided implementation.
 
-Node.js >=22.12:
+For Docker, first run `npm ci && npm run build`, then `docker build -t dead-sector .` and `docker run --rm -p 3000:3000 dead-sector`. The image runs as an unprivileged user; a public HTTPS site needs a TLS proxy with WebSocket upgrades.
+
+## Development and checks
 
 ```sh
 npm ci
 npm run dev -- --port 5173
-# Open /app.html on the Vite server for source development.
+# Open /app.html for source development; root index.html is the generated standalone build.
 npm test
 npm run build
+CHROMIUM_PATH=/usr/bin/chromium npm run test:geometry:browser
+CHROMIUM_PATH=/usr/bin/chromium npm run test:mutants:browser
+CHROMIUM_PATH=/usr/bin/chromium npm run test:economy:browser
 CHROMIUM_PATH=/usr/bin/chromium npm run test:browser
 CHROMIUM_PATH=/usr/bin/chromium npm run test:combat:browser
-CHROMIUM_PATH=/usr/bin/chromium npm run test:weapons:browser
 CHROMIUM_PATH=/usr/bin/chromium npm run test:city:browser
 ```
 
-Browser tests need a running dev server; use BASE_URL for a different address. Playwright Chromium can be installed with `npx playwright install chromium` on another machine. `npm run build` writes the self-contained root `index.html` and `dist/index.html`; generated files are committed for double-click play. Source changes require a rebuild.
+Browser checks need a running dev server. Override BASE_URL, CHROMIUM_PATH, ARTIFACT_DIR (screenshots), and WS_URL (external server for network/revive scenarios) as needed. `test:economy:browser` starts an isolated local room server and funds its test account server-side to verify purchases; the playable client has no money-grant debug API. `test:weapons:browser` aliases that market/equipment scenario. `test:network:browser` and `test:revive:browser` use a running room server. Tests cover exact stats, slots, wear/breakage, cash, caps, medkits, repairs, stamina, transactions/reconnect, wave completion, collision routes and model bounds. Software headless rendering is not a measurement of desktop GPU FPS.
 
-With both the dev server and `npm run server` running: `CHROMIUM_PATH=/usr/bin/chromium npm run test:network:browser` verifies two browsers joining the same room, matching city seed, visible partners, dynamic enemy replication and matching wave clocks, disconnect handling, city reroll and absence of menu scrollbars. Override WS_URL for another WebSocket server. This has been validated locally; public Internet hosting is a separate deployment step.
-
-## Districts, exploration and combat
-
-Four district identities influence buildings and decoration: industrial, residential, medical and market. Courtyards have entrances in their fences, commercial/industrial lots have parked cars, and five elevated signs identify districts and the north exit. Building positions vary with the seed. All generated medkits/ammunition have tested navigation routes.
-
-E picks up supplies within 1.5 m. Medkits restore 35 HP (maximum 100); ammo adds two magazines to the reserve (maximum twice the starting reserve). Full-health medkits remain available; taken supplies disappear for both players and remain taken after reconnecting. Rooms use host-authoritative pickup availability. The HUD shows interaction hints and nearest enemy distance/bearing.
-
-Weapon tuning (hip fire only; viewmodel moved 20% closer to the camera):
-
-| Weapon | Magazine | Damage per shot | Fire interval | Reload | Mode |
-| --- | --- | --- | --- | --- | --- |
-| Pistol | 8 | 10 | 0.28 s | 1.15 s | single press |
-| Helsing | 40 | 15 | 0.075 s | 4 s | automatic |
-| Tikhar | 1 | 40 | 0.45 s | 3 s | single press |
-| Shambler | 5 | 35 | 0.50 s | 3 s | single press |
-| Shotgun | 2 | 65 | 0.60 s | 2 s | single press |
-| Kalash | 30 | 25 | 0.14 s | 3 s | automatic |
-| VSV | 12 | 55 | 0.24 s | 6 s | automatic |
-| Scorpion | 35 | 20 | 0.10 s | 4 s | automatic |
-| Vector | 20 | 20 | 0.09 s | 3 s | automatic |
-| G36 | 30 | 30 | 0.14 s | 4 s | automatic |
-
-The qualitative fire-rate requests are resolved into the intervals above. Pistol's existing stats are preserved. A new run rolls each of the ten weapons equally. Single-press weapons require releasing LMB between shots. All requested damage is total damage per shot, including Shambler and Shotgun. The FBX's new guns are single-piece meshes: reload moves the gun and support hand to operate the action/load shells rather than detaching a nonexistent separate magazine. Pistol keeps its separately authored magazine. Geometry groups are consolidated by material, and single-material meshes render correctly.
-
-Each sound is a distinct synthesized noise/filter/oscillator envelope, not an external audio file. Right click does not change FOV, camera or weapon pose.
-
-| Enemy | HP | Speed | Damage | Spawn chance |
-| --- | --- | --- | --- | --- |
-| Zombie | 250 | 2.2 m/s | 25 | 55% |
-| Runner | 125 | 3.6 m/s | 15 | 20% |
-| Flying flesh eye | 300 | 2.3 m/s | 30 on projectile hit | 20% |
-| Brute (3× size) | 600 | 1.1 m/s | 40 (default; unspecified in request) | 5% |
-
-Each wave spawns over 120 seconds, then waits for every spawned enemy to die. Only after the last kill does a 10-second intermission begin; its end starts the next wave. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Wave 1 spawns 30 enemies gradually (one every four seconds); wave 2 spawns 35; each later wave adds five. Each event rolls the confirmed type probabilities and a random corner hive. A living enemy blocks the next wave regardless of elapsed time. Enemies actively hunt players, with a shared navigation field cache; brutes use wider clearance. Flying eyes fire visible projectiles that collide with cover and must hit a player's body to deal damage. Deaths instantly hide the model and emit red fragments with gravity and a short fade, using one bounded instanced particle pool. No body falls over or remains on the ground. Death records briefly remain in host snapshots so guests receive the effect once; duplicate packets do not repeat the burst. Host snapshots synchronize wave/clearing phase, dynamic enemy IDs, outfit indices, joint animation phase, deaths and projectiles, including after reconnect.
-
-The perimeter is a visible concrete wall 5.8 m tall. All environment meshes remain original procedural models. Static city geometry is batched by material for denser scenes. HUD panels show wave phase, countdown, spawned/total, alive enemies, health, weapon ammunition and context hints. Gloved hands and reload animation are retained.
-
-
-Additional browser checks: `npm run test:supplies:browser`, `npm run test:revive:browser` (the latter requires the WebSocket server). The revival test may take several minutes while enemies travel from corner hives to down the host, revives them with the guest's E key, reloads the host's browser and reconnects to the saved room.
-
-## Internet deployment
-
-After `npm ci && npm run build`, the Dockerfile packages the verified static client and installed `ws` package and runs the server as an unprivileged user. Image build requires no package-registry access inside containers. Build: `docker build -t dead-sector .`; run: `docker run --rm -p 3000:3000 dead-sector`. Put a TLS reverse proxy in front of port 3000 for an HTTPS site and WSS connections; the proxy must support WebSocket upgrades. In the game enter the public `wss://` endpoint, create a room and give the friend the same endpoint and code. The server keeps snapshots and pickup availability in memory for two-minute reconnects; restarting it clears rooms.
-
-Internet play cannot be validated without an actual public deployment/address. Two-client gameplay, revival, full-page reconnection and snapshot recovery have been validated locally; no public server is automatically published by this repository.
-
-## Semantic placement and furnished interiors
-
-- Fences are continuous 14.6 m boundary runs, joined at shared end posts. All align with the street/lot axes. No loose three-metre sections are scattered. Shared corner posts are drawn once.
-- Benches face open forecourts, and bus shelters face the pedestrian strip beside the road; each bin refers to a specific bench/shelter. There are 68 uniformly spaced streetlights along pavement lines.
-- Traffic cars occupy one marked travel lane and respect its direction. Parking cars are assigned to explicit bays, with their full footprints inside the markings. Crossings and the central survival route remain clear. Service crates may stand on pallets with exact support heights.
-- Each of the 64 buildings has three accessible ground-floor zones: two main rooms plus a washroom. Residential rooms have beds, kitchen equipment and study furniture; clinics have consultation/treatment furniture; workshops, retail, schools, cafes and libraries use appropriate benches, counters, shelves or desks. Doors and the central passage remain clear. Upper stories are closed architectural volumes, not empty accessible floors; stairs and upper-floor access are not implemented.
-- The floor/road/sidewalk mesh is a non-overlapping partition of the 200 × 200 m area. Interior floor finishes replace yard patches rather than stacking on top. Paint and facade lettering use explicit depth bias; trim pieces meet at boundaries. Furniture and benches have compound colliders at actual seat/table heights, avoiding standing above them on an oversized bounding box. Trees and shelters retain walking clearance beneath canopies.
-- Instanced geometry, shared primitives and cached navigation/ray tests keep the increased detail practical. Normal, flying and giant enemies use separate height-clearance navigation layers.
-
-`city-validation.js` checks semantic links, directions, parking containment, grounding/supports, facade and furniture overlap, room containment and connected fence junctions. Unit checks exercise 24 seeds and physically move the player through every room entrance on three cities. `npm run test:geometry:browser` compares rendered bounds against reserved footprints and renders street/interior views. These checks cover the tested geometry rules; they are not a guarantee that no visual defect can ever occur on every device and seed.
-
-Model regression checks: `npm run test:mutants:browser` renders all five zombie outfits, the brute, death fragments and every weapon. `npm run test:weapons:browser` exercises all ten randomized loadouts in gameplay. Unit checks cover exact stats/reload timing, blocking wave progression, grounded gait, brute arm clearance, hive navigation, and one-time replicated deaths. Set `ARTIFACT_DIR` for model preview screenshots.
+`npm run build` writes self-contained `index.html` and `dist/index.html`, including models and styles. Source edits require rebuilding. The committed root file supports double-click offline play.

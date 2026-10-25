@@ -34,22 +34,22 @@
       </section>
       <p id="message" class="message" role="status">120 секунд спавна · Уничтожь всех · 10 секунд перерыва.</p>
     </main>
-    <aside id="briefing" class="briefing">
-      <span class="eyebrow">01 / ПОЛЕВОЙ ИНСТРУКТАЖ</span>
-      <h2>Переживи наступление.</h2>
-      <p>ЛКМ — огонь · R — перезарядка · E — припасы и помощь. Выживай в волнах, зомби выходят из четырёх ульев.</p>
-      <div class="key-row"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Движение</span></div>
-      <div class="key-row"><kbd>МЫШЬ</kbd><span>Обзор</span></div>
-      <div class="key-row"><kbd>SHIFT</kbd><span>Бег</span></div>
-      <div class="key-row"><kbd>SPACE</kbd><span>Прыжок</span></div>
-      <div class="key-row"><kbd>ESC</kbd><span>Пауза</span></div>
-      <div class="briefing-footer"><span>ДОПУСК</span><strong>ЗАЧИСТКА</strong></div>
-    </aside>
+    <aside id="briefing" hidden></aside>
     <div id="hud" hidden>
       <div class="sector-tag"><span class="status-dot"></span> СЕКТОР 00 <small>БОЕВАЯ ЗОНА</small></div>
-      <div class="crosshair" aria-hidden="true"></div><div id="hit-marker" hidden aria-hidden="true">×</div><div id="interaction" class="interaction"></div><div class="wave-panel"><div id="objective" class="objective"></div><div id="wave-details"></div></div><div class="ammo-panel"><small id="weapon-state">ВИНТОВКА / 5.56</small><strong><span id="ammo">30</span> <small>/ <span id="reserve">90</span></small></strong><small>ЛКМ ОГОНЬ · R МАГАЗИН</small></div>
-      <div class="hud-bottom"><div><small>СОСТОЯНИЕ</small><strong><b id="health">100</b> <span>HP</span></strong><div id="health-bar" class="health-bar"></div></div><span id="movement">ПЕШКОМ</span><p>WASD <span>ДВИЖЕНИЕ</span> &nbsp; SHIFT <span>БЕГ</span> &nbsp; SPACE <span>ПРЫЖОК</span> &nbsp; ESC <span>ПАУЗА</span></p></div>
+      <div id="weapon-slots" class="weapon-slots"><span id="slot-primary"></span><span id="slot-pistol"></span></div><div class="crosshair" aria-hidden="true"></div><div id="hit-marker" hidden aria-hidden="true">×</div><div id="interaction" class="interaction"></div><div class="wave-panel"><div id="objective" class="objective"></div><div id="wave-details"></div></div><div class="ammo-panel"><small id="weapon-state">ВИНТОВКА / 5.56</small><strong><span id="ammo">30</span> <small>/ <span id="reserve">90</span></small></strong><small><span id="ammo-total">72/500</span> · ПАТРОНЫ</small></div>
+      <div class="hud-bottom">
+        <div class="vital"><small>ЗДОРОВЬЕ</small><strong><b id="health">100</b><span> HP</span></strong><div class="meter"><div id="health-bar"></div></div></div>
+        <div class="vital"><small>СТАМИНА</small><strong id="stamina">100%</strong><div class="meter"><div id="stamina-bar"></div></div></div>
+        <div class="hud-wallet"><small>ДЕНЬГИ</small><strong id="money">$0</strong></div>
+        <div class="hud-condition"><small>ПРОЧНОСТЬ</small><strong id="durability">100%</strong><small id="medkit-counts">H · 0 / J · 0</small></div>
+        <span id="movement">ПЕШКОМ</span>
+      </div>
     </div>
+    <section id="shop-panel" class="shop-overlay" role="dialog" aria-modal="true" aria-labelledby="shop-title" hidden>
+      <div class="shop-window"><header><div><h2 id="shop-title">ТЕРМИНАЛ · SECTOR MART</h2><p id="shop-balance"></p></div><button id="close-shop" type="button">ЗАКРЫТЬ · ESC</button></header>
+      <div id="shop-owned" class="shop-owned"></div><p id="shop-medkits"></p><div id="shop-products" class="shop-products"></div><p id="shop-status" role="status" aria-live="polite"></p></div>
+    </section>
     <footer id="footer"><span>RESTRICTED AREA / AUTHORIZED PERSONNEL ONLY</span><span>ОПЕРАЦИЯ / ЗАЧИСТКА</span></footer>
     <noscript>Enable JavaScript to play DEAD SECTOR.</noscript>
     <script type="module" src="/game.js"></script>

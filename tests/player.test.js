@@ -53,7 +53,7 @@ test('yaw rotates forward motion and pitch is clamped', () => {
 test('spawn is unobstructed; perimeter contains sprinting player', () => {
   const boxes = getColliders(), a = new Player(SPAWN);
   assert.ok(boxes.every(b => !overlapsBody(a.position, b)));
-  advance(a, 12, { backward: true, sprint: true }, boxes);
+  a.position={x:0,y:0,z:85};advance(a, 12, { backward: true, sprint: true }, boxes);
   near(a.position.z, 99.5 - PLAYER.radius);
 });
 test('generated building doorway admits player and adjacent facade blocks movement',()=>{

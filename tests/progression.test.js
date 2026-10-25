@@ -1,3 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import * as T from 'three';import {Supplies} from '../supplies.js';import {Rifle} from '../weapons.js';
-const audio={play(){},shot(){}};
-test('supplies cap health, add two magazines and consume once; hands animate reload',()=>{const gun=new Rifle(audio,()=>0),s=new Supplies(new T.Scene(),[{type:'health',x:0,z:0},{type:'ammo',x:1,z:0}]);assert.equal(s.apply(0,100,gun),null);assert.equal(s.apply(0,80,gun),100);assert.equal(s.apply(0,50,gun),null);gun.reserve=0;s.apply(1,70,gun);assert.equal(gun.reserve,gun.config.capacity*2);assert.equal(s.apply(1,70,gun),null);gun.pose(0,false);const p=gun.hands[0].position.clone();gun.fire();gun.reload();gun.step(.5);gun.pose(.5,false);assert.ok(p.distanceTo(gun.hands[0].position)>.05);});
+import test from 'node:test';import assert from 'node:assert/strict';import {Rifle} from '../weapons.js';import {createInventory,buy} from '../economy.js';
+test('equipment changes preserve the pistol magazine, and reload hands follow the equipped gun',()=>{
+ const gun=new Rifle({play(){},shot(){}}),a=createInventory();gun.bindInventory(a);gun.fire();a.money=5000;buy(a,'Kalash');gun.bindInventory(a);assert.equal(a.weapons.Pistol.ammo,7);gun.reload();gun.step(.5);gun.pose(.5,false);assert.ok(gun.hands[0].position.y<gun.variant.record.grips.support[1]);assert.equal(gun.hands[1].position.z,gun.variant.record.grips.trigger[2]);
+});

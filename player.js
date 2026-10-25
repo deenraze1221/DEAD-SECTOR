@@ -12,7 +12,7 @@ export class Player {
   constructor(spawn) { this.spawn = { ...spawn }; this.reset(); }
   reset() {
     this.position = { ...this.spawn }; this.yaw = 0; this.pitch = 0;
-    this.velocityY = 0; this.grounded = true; this.distance = 0;
+    this.velocityY = 0; this.grounded = true; this.distance = 0;this.stamina=5;this.exhausted=false;this.sprinting=false;
   }
   look(dx, dy, sensitivity) {
     this.yaw -= dx * 0.002 * sensitivity;
@@ -23,7 +23,10 @@ export class Player {
     let right = Number(input.right) - Number(input.left);
     const magnitude = Math.hypot(forward, right);
     if (magnitude > 0) { forward /= magnitude; right /= magnitude; }
-    const speed = input.sprint ? PLAYER.run : PLAYER.walk;
+    this.sprinting=Boolean(input.sprint&&magnitude>0&&this.stamina>1e-8&&!this.exhausted);
+    if(this.sprinting){this.stamina=Math.max(0,this.stamina-dt);if(this.stamina<1e-8){this.stamina=0;this.exhausted=true;}}
+    else{this.stamina=Math.min(5,this.stamina+dt);if(this.stamina>=5-1e-8){this.stamina=5;this.exhausted=false;}}
+    const speed = this.sprinting ? PLAYER.run : PLAYER.walk;
     const dx = (right * Math.cos(this.yaw) - forward * Math.sin(this.yaw)) * speed * dt;
     const dz = (-right * Math.sin(this.yaw) - forward * Math.cos(this.yaw)) * speed * dt;
     const oldX = this.position.x, oldZ = this.position.z;

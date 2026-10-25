@@ -14,10 +14,10 @@
     "test:city:browser": "node tests/city-ui-browser.js",
     "server": "node server/index.js",
     "test:network:browser": "node tests/network-browser.js",
-    "test:supplies:browser": "node tests/supply-browser.js",
     "test:revive:browser": "node tests/revive-browser.js",
     "test:geometry:browser": "node tests/geometry-browser.js",
-    "test:mutants:browser": "node tests/mutants-browser.js"
+    "test:mutants:browser": "node tests/mutants-browser.js",
+    "test:economy:browser": "node tests/economy-browser.js"
   },
   "dependencies": {
     "three": "0.180.0",

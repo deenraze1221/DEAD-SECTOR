@@ -7,17 +7,20 @@ import { Rifle,WEAPONS } from './weapons.js';
 import { Enemies } from './enemies.js';
 import { GameAudio } from './audio.js';
 import {Session} from './network.js';
-import {Supplies} from './supplies.js';
+import {MoneyDrops} from './loot.js';
+import {createInventory,totalAmmo,buy,equipWeapon,useMedkit,nearTerminal,STORE} from './economy.js';
+import {ShopUI} from './shop-ui.js';
 import {Waves} from './waves.js';
 
 const $ = id => document.getElementById(id);
 const keys = new Set();
 const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space']);
 let renderer, scene, camera, player;
-let psx, rifle, enemies, colliders=[], world, waves, peer, peerPose=null, netTime=0,supplies,footstep=0,downed=false;
+let psx, rifle, enemies, colliders=[], world, waves, peer, peerPose=null, netTime=0,loot,account=createInventory(),shopOpen=false,footstep=0,downed=false;
 let seed=crypto.getRandomValues(new Uint32Array(1))[0];
 const session=new Session(receiveNetwork,text=>{$('network-status').textContent=text;});
 const audio = new GameAudio();
+const shop=new ShopUI(submitAction,closeShop);
 let hp=100, outcome='', shooting=false, triggerPressed=false, hitTime=0, hurtTime=0, elapsed=0;
 let running = false, started = false, jumpQueued = false, accumulator = 0, previousTime = 0;
 let sensitivity = 1;
@@ -40,23 +43,25 @@ $('settings-button').addEventListener('click', () => {
 function clearInput() { keys.clear(); shooting=false; triggerPressed=false; jumpQueued = false; accumulator = 0; }
 function setRunning(value) {
   running = value; clearInput();
-  document.body.classList.toggle('playing', value);
-  for (const id of ['menu', 'briefing', 'footer']) $(id).hidden = value;
-  $('hud').hidden = !value;
+  document.body.classList.toggle('playing', value||shopOpen);
+  for (const id of ['menu', 'briefing', 'footer']) $(id).hidden = value||shopOpen;
+  $('hud').hidden = !value&& !shopOpen;
   $('restart').hidden = !started;
   $('start').innerHTML = outcome ? t('НОВЫЙ ЗАБЕГ <span>↗</span>') : started ? t('ПРОДОЛЖИТЬ <span>↗</span>') : t('ИГРАТЬ <span>↗</span>');
 }
 
 function rebuild(seedValue){
+  if(shopOpen){shopOpen=false;shop.hide();}
   if(scene){scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m){m.map?.dispose();m.dispose();}});}
   scene=new THREE.Scene();world=createMap(scene,seedValue);seed=world.seed;colliders=world.colliders;
-  player=new Player(world.spawn);supplies=new Supplies(scene,world.supplies);enemies=new Enemies(scene,colliders,audio);waves=new Waves(seed);
+  player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);
   peer=new THREE.Group();const material=new THREE.MeshStandardMaterial({color:'#7d9676'});const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,3,6),material);body.position.y=1;peer.add(body);const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),material);head.position.y=1.75;peer.add(head);peer.visible=false;scene.add(peer);peerPose=null;
 }
-function resetCombat(){session.close();rebuild(crypto.getRandomValues(new Uint32Array(1))[0]);rifle.reset();hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;footstep=0;downed=false;updateCamera();}
-function receiveDamage(damage){if(hp<=0)return;hp=Math.max(0,hp-damage);hurtTime=.3;audio.play('hurt');if(!hp){if(session.active){downed=true;pause();$('message').textContent=t('Ожидайте помощи напарника · E рядом с раненым');}else finish('dead');}}
+function resetCombat(){session.close();rebuild(crypto.getRandomValues(new Uint32Array(1))[0]);account=createInventory();rifle.bindInventory(account);hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;footstep=0;downed=false;updateCamera();}
+function receiveDamage(damage){if(hp<=0)return;hp=Math.max(0,hp-damage);account.health=hp;hurtTime=.3;audio.play('hurt');if(!hp){if(session.active){downed=true;pause();$('message').textContent=t('Ожидайте помощи напарника · E рядом с раненым');}else finish('dead');}}
 function finish(result){if(outcome)return;outcome=result;if(session.active&&session.host)session.send({type:'end',result});pause();$('message').textContent=result==='win'?t('СЕКТОР ЗАЧИЩЕН. Вы добрались до выхода.'):t('ВЫ ПОГИБЛИ. Начните зачистку заново.');}
 async function enter() {
+  if(shopOpen)return;
   if(session.reconnecting||session.hostAway){$('message').textContent=t('Переподключение. Дождитесь хозяина комнаты.');return;}
   if(session.active&&hp<=0){$('message').textContent=t('Ожидайте помощи напарника · E рядом с раненым');return;}
   if(outcome)resetCombat();
@@ -83,11 +88,16 @@ function pause() { if (document.pointerLockElement) document.exitPointerLock(); 
 window.addEventListener('blur', pause);
 document.addEventListener('visibilitychange', () => { if (document.hidden) pause(); });
 document.addEventListener('keydown', event => {
+  if(shopOpen){if(event.code==='Escape'||event.code==='KeyE'){event.preventDefault();closeShop();}return;}
+  if(running&&(event.code==='Digit1'||event.code==='Digit2')){const id=event.code==='Digit2'?'Pistol':Object.keys(account.weapons).find(id=>id!=='Pistol');if(id)submitAction('equip',id);event.preventDefault();return;}
+  if(running&&(event.code==='KeyH'||event.code==='KeyJ')){submitAction('use',event.code==='KeyH'?'smallMedkit':'largeMedkit');return;}
   if (event.code === 'Escape' && running) { pause(); return; }
   if(running && event.code==='KeyE'){
     if(session.active&&peerPose?.hp<=0&&Math.hypot(peerPose.x-player.position.x,peerPose.z-player.position.z)<2.5){session.send({type:'revive'});return;}
-    const supply=supplies.nearby(player.position);
-    if(supply){if(session.active&&!session.host)session.send({type:'pickup',id:supply.id});else{const next=supplies.apply(supply.id,hp,rifle);if(next!==null){hp=next;audio.play('reload');}}return;}
+    const cash=loot.nearby(player.position);
+    if(cash){if(session.active)session.send({type:'pickup',id:cash.id,health:hp,inventory:account});else{loot.collect(cash.id,account);audio.play('reload');}return;}
+    if(nearTerminal(player.position)){openShop();return;}
+
   }
   if(running && event.code==='KeyR'){rifle.reload();event.preventDefault();return;}
   if (!running || !movementKeys.has(event.code)) return;
@@ -114,7 +124,7 @@ function resize() {
 
 // Read-only snapshot for reproducible browser checks, without allowing state mutation.
 export function getSnapshot() {
-  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded,fov:camera?.fov,wave:waves?.snapshot(), hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, seed,room:session.code,networkActive:session.active,peerVisible:peer?.visible,downed,supplies:supplies?.items.map(s=>({id:s.id,type:s.type,x:s.x,z:s.z,taken:s.taken})),remaining:enemies?.alive, enemies:enemies?.items.map(e=>({id:e.id,type:e.type,hp:e.hp,fast:e.type==='runner',x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z})) };
+  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded,fov:camera?.fov,wave:waves?.snapshot(), hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, seed,room:session.code,networkActive:session.active,peerVisible:peer?.visible,downed,shopOpen,inventory:account,money:account.money,totalAmmo:totalAmmo(account),durability:rifle?.durability,stamina:player?.stamina,terminal:world?.shop.terminal,streetDensity:world?.streetDensity,drops:loot?.snapshot(),supplies:[],remaining:enemies?.alive, enemies:enemies?.items.map(e=>({id:e.id,type:e.type,hp:e.hp,fast:e.type==='runner',x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z})) };
 }
 
 try {
@@ -123,7 +133,7 @@ try {
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
   scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(78, 1, .1, 260);
-  rebuild(seed);rifle=new Rifle(audio);
+  rebuild(seed);rifle=new Rifle(audio);rifle.bindInventory(account);
   psx = createPSX(scene, renderer);
   updateCamera(); resize(); window.addEventListener('resize', resize);
   $('scene').addEventListener('webglcontextlost', event => {
@@ -145,7 +155,7 @@ try {
         updateCamera();camera.updateMatrixWorld();
         if(hp>0&&((shooting && rifle.config.automatic)||triggerPressed) && rifle.fire()){
           const direction=camera.getWorldDirection(new THREE.Vector3());
-          if(session.active&&!session.host)session.send({type:'shot',direction:direction.toArray(),weapon:rifle.config.id});else if(enemies.shoot(camera.position,direction,rifle.config.damage))hitTime=.15;
+          if(session.active&&!session.host)session.send({type:'shot',direction:direction.toArray(),weapon:rifle.config.id,inventory:account});else if(enemies.shoot(camera.position,direction,rifle.config.damage))hitTime=.15;
           player.pitch=Math.min(Math.PI/2-.02,player.pitch+.008);
         }
         triggerPressed=false;
@@ -156,24 +166,27 @@ try {
         hitTime=Math.max(0,hitTime-FIXED_STEP);hurtTime=Math.max(0,hurtTime-FIXED_STEP);
         if(!running&&!session.active)break;
       }
-      $('movement').textContent = !player.grounded ? t('В ВОЗДУХЕ') : keys.has('ShiftLeft') || keys.has('ShiftRight') ? t('БЕГ') : t('ПЕШКОМ');
+      $('movement').textContent = !player.grounded ? t('В ВОЗДУХЕ') : player.sprinting ? t('БЕГ') : t('ПЕШКОМ');
       if(running&&player.grounded&&player.distance-footstep>1.7){audio.play('step');footstep=player.distance;}
       updateCamera();
     } else if (!started) {
       camera.position.set(36, 28, 95); camera.lookAt(0, 2, 40);
     }
-    $('health').textContent=hp;$('health-bar').style.width=`${hp*1.35}px`;
+    $('health').textContent=hp;$('health-bar').style.width=`${hp}%`;
+    $('stamina-bar').style.width=`${player.stamina/5*100}%`;$('stamina').textContent=`${Math.ceil(player.stamina/5*100)}%`;
+    const primary=Object.keys(account.weapons).find(id=>id!=='Pistol');$('slot-primary').textContent=`1 · ${primary||t('ПУСТО')}`;$('slot-pistol').textContent=`2 · ${t('ПИСТОЛЕТ')}`;$('slot-primary').classList.toggle('active',account.equipped!=='Pistol');$('slot-pistol').classList.toggle('active',account.equipped==='Pistol');
+    $('money').textContent=`$${account.money}`;$('durability').textContent=`${rifle.durability}%`;$('ammo-total').textContent=`${totalAmmo(account)}/500`;$('medkit-counts').textContent=`H · ${account.smallMedkit} / J · ${account.largeMedkit}`;
     $('ammo').textContent=rifle.ammo;$('reserve').textContent=rifle.reserve;
-    $('weapon-state').textContent=rifle.reloadTime?t('ПЕРЕЗАРЯДКА…'):!rifle.ammo?t('R — ПЕРЕЗАРЯДИТЬ'):t(rifle.config.label);
+    $('weapon-state').textContent=rifle.durability<=0?t('ОРУЖИЕ СЛОМАНО'):rifle.reloadTime?t('ПЕРЕЗАРЯДКА…'):!rifle.ammo?t('R — ПЕРЕЗАРЯДИТЬ'):t(rifle.config.label);
     $('objective').textContent=`${t('ВОЛНА')} ${waves.number} · ${waves.clearing?t('ДОБЕЙТЕ ОСТАВШИХСЯ'):waves.rest?t('ПЕРЕРЫВ'):t('НАСТУПЛЕНИЕ')}${waves.clearing?'':` ${Math.ceil((waves.rest?10:120)-waves.time)}s`}`;
     $('wave-details').textContent=`${t('ЖИВЫХ')}: ${enemies.alive} · ${t('ВЫШЛО')}: ${waves.spawned}/${waves.total}`;
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
-    supplies.tick(elapsed);
-    const near=supplies.nearby(player.position);const living=enemies.items.filter(e=>e.hp>0);const nearest=living.sort((a,b)=>a.rig.position.distanceTo(camera.position)-b.rig.position.distanceTo(camera.position))[0];
-    $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&peerPose?.hp<=0&&Math.hypot(peerPose.x-player.position.x,peerPose.z-player.position.z)<2.5?t('E · Поднять напарника'):near?t(near.type==='health'?'E · Аптечка +35 HP':'E · Патроны'):nearest?`${t('Ближайший враг')} · ${Math.round(Math.hypot(nearest.rig.position.x-player.position.x,nearest.rig.position.z-player.position.z))} m · ${Math.atan2(nearest.rig.position.x-player.position.x,player.position.z-nearest.rig.position.z)*180/Math.PI|0}° N`:t('Выживайте. Ульи находятся в четырёх углах города.');
+    const near=loot.nearby(player.position);const living=enemies.items.filter(e=>e.hp>0);const nearest=living.sort((a,b)=>a.rig.position.distanceTo(camera.position)-b.rig.position.distanceTo(camera.position))[0];
+    $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&peerPose?.hp<=0&&Math.hypot(peerPose.x-player.position.x,peerPose.z-player.position.z)<2.5?t('E · Поднять напарника'):near?`${t('E · Подобрать')} $${near.value}`:nearTerminal(player.position)?t('E · Открыть магазин'):nearest?`${t('Ближайший враг')} · ${Math.round(Math.hypot(nearest.rig.position.x-player.position.x,nearest.rig.position.z-player.position.z))} m · ${Math.atan2(nearest.rig.position.x-player.position.x,player.position.z-nearest.rig.position.z)*180/Math.PI|0}° N`:t('Выживайте. Ульи находятся в четырёх углах города.');
     enemies.updateEffects((running||(session.active&&started&&!outcome))?delta:0,session.active&&!session.host);
     rifle.pose(elapsed,keys.size>0);
-    if(session.active){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id});if(session.host)session.send({type:'state',wave:waves.snapshot(),taken:supplies.items.filter(s=>s.taken).map(s=>s.id),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
+    account.health=hp;
+    if(session.active){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id,inventory:account});if(session.host)session.send({type:'state',wave:waves.snapshot(),cash:loot.snapshot(),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
     renderer.autoClear=true;renderer.render(scene, camera);
     if(started&&!outcome){renderer.autoClear=false;renderer.clearDepth();renderer.render(rifle.scene,rifle.camera);}
   }
@@ -184,16 +197,17 @@ try {
   $('message').textContent = t('Не удалось запустить 3D-сцену. Нужен браузер с WebGL 2 и включённым аппаратным ускорением.');
 }
 
-function applyState(m){if(m.wave)waves.restore(m.wave);for(const id of m.taken||[])if(supplies.items[id])supplies.items[id].taken=true;enemies.apply(m.enemies);
+function applyState(m){if(m.wave)waves.restore(m.wave);loot.apply(m.cash||[]);enemies.apply(m.enemies);
  if(!session.host){for(const p of enemies.projectiles)scene.remove(p.mesh);enemies.projectiles=(m.projectiles||[]).map(pos=>({mesh:enemies.mesh(scene,'sphere',[.2,0],'bullet',...pos),life:6,velocity:new THREE.Vector3()}));}}
 function receiveNetwork(m){
  if(m.type==='transport-lost'||(m.type==='away'&&m.role==='host')){pause();$('message').textContent=t('Переподключение. Дождитесь хозяина комнаты.');}
 
- if(m.type==='room'&&(!m.host||m.resume)){
+ if(m.type==='room'){
+   if(!m.resume){account=createInventory();hp=100;outcome='';started=false;}
    if(!m.resume||seed!==m.seed)rebuild(m.seed);
-   if(!m.resume){player.position.x=2;hp=100;outcome='';started=false;}
+   if(!m.resume&&!m.host)player.position.x=world.spawn.x+.9;
    if(m.selfPose){Object.assign(player.position,{x:m.selfPose.x,y:m.selfPose.y,z:m.selfPose.z});hp=m.selfPose.hp;player.yaw=m.selfPose.yaw;rifle.reset(m.selfPose.weapon);rifle.ammo=m.selfPose.ammo??rifle.ammo;rifle.reserve=m.selfPose.reserve??rifle.reserve;}
-   if(m.snapshot)applyState(m.snapshot);setRunning(false);downed=hp<=0;if(m.result)finish(m.result);
+   if(m.account){account=m.account;hp=account.health;}rifle.bindInventory(account);if(m.snapshot)applyState(m.snapshot);setRunning(false);downed=hp<=0;if(m.result)finish(m.result);
  }
 
  if(m.type==='pose'){peerPose=m;peer.visible=true;peer.position.set(m.x,m.y,m.z);peer.rotation.y=m.yaw;}
@@ -201,9 +215,9 @@ function receiveNetwork(m){
  if(m.type==='state'&&!session.host)applyState(m);
  if(m.type==='shot'&&session.host){const direction=new THREE.Vector3(...m.direction);if(direction.lengthSq()>.1)enemies.shoot(new THREE.Vector3(...m.origin),direction.normalize(),m.damage);}
  if(m.type==='damage')receiveDamage(m.amount);
- if(m.type==='revived'){hp=m.hp;downed=false;outcome='';$('message').textContent=t('Напарник помог. Продолжайте игру.');}
- if(m.type==='pickup'&&session.host&&peerPose){const s=supplies.items[m.id];if(s&&!s.taken&&Math.hypot(s.x-peerPose.x,s.z-peerPose.z)<1.6&&peerPose.hp>0&&((s.type==='health'&&peerPose.hp<100)||(s.type==='ammo'&&peerPose.reserve<(WEAPONS.find(w=>w.id===peerPose.weapon)?.reserve||90)*2))){s.taken=true;session.send({type:'grant',id:s.id,kind:s.type});}}
- if(m.type==='grant'){if(m.kind==='health')hp=Math.min(100,hp+35);else rifle.reserve=Math.min(rifle.config.reserve*2,rifle.reserve+rifle.config.capacity*2);supplies.items[m.id].taken=true;audio.play('reload');}
+ if(m.type==='revived'){hp=m.hp;account.health=hp;downed=false;outcome='';$('message').textContent=t('Напарник помог. Продолжайте игру.');}
+ if(m.type==='economy'){account=m.account;hp=account.health;rifle.bindInventory(account);shop.pending=false;shop.message(m.reason||'');if(shopOpen)shop.render(account);}
+ if(m.type==='loot-state')loot.apply(m.cash);
  if(m.type==='end'&&!session.host)finish(m.result);
 }
 $('online').addEventListener('click',()=>{$('settings').hidden=true;$('network-panel').hidden=!$('network-panel').hidden;});
@@ -213,3 +227,15 @@ $('resume-room').addEventListener('click',()=>session.resumeSaved());
 $('close-room').addEventListener('click',()=>{session.close();peer.visible=false;$('network-status').textContent=t('Сессия закрыта');});
 $('server-url').value=location.protocol==='https:'?`wss://${location.host}`:location.protocol==='http:'?`ws://${location.hostname}:3000`:'ws://localhost:3000';
 window.addEventListener('game-language-change',()=>{setRunning(false);$('message').textContent=t($('message').textContent);});
+
+function openShop(){shopOpen=true;pause();shop.message('');shop.show(account);}
+function closeShop(){shopOpen=false;shop.hide();setRunning(false);enter();}
+function submitAction(action,id){
+ if(session.active){if(shop.pending)return;shop.pending=true;shop.render(account);session.send({type:'market',action,id,health:hp,inventory:account});return;}
+ let result;
+ if(action==='buy'){if(!nearTerminal(player.position))return;result=buy(account,id);}
+ else if(action==='equip')result={ok:equipWeapon(account,id),reason:''};
+ else{account.health=hp;result={ok:useMedkit(account,id),reason:''};hp=account.health;}
+ if(result.ok){rifle.bindInventory(account);audio.play('reload');}
+ shop.message(result.reason);if(shopOpen)shop.render(account);
+}

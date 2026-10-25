@@ -24,7 +24,7 @@ export class Enemies{
   const e={id,type,skin,...stats,maxHp:stats.hp,rig,visual,limbs:visual.limbs,phase:id*1.37,motion:0,attackTime:0,attack:1,repath:0,path:[],aggro:true,stagger:0,sound:2+id%3,corpse:0,dead:false};
   this.items.push(e);this.nextId=Math.max(this.nextId,id+1);poseMutant(e);return e;
  }
- die(enemy,emit=true){if(enemy.dead)return;enemy.dead=true;enemy.hp=0;enemy.corpse=0;enemy.rig.visible=false;if(emit)this.blood.burst(enemy);}
+ die(enemy,emit=true,notify=true){if(enemy.dead)return;enemy.dead=true;enemy.hp=0;enemy.corpse=0;enemy.rig.visible=false;if(emit){this.blood.burst(enemy);if(notify)this.onDeath?.(enemy);}}
  updateEffects(dt,remote=false){
   this.blood.step(dt);
   if(remote)for(const e of this.items){if(e.hp<=0)continue;e.phase+=dt*e.speed/(e.scale*.9)*Math.PI*2*e.motion;e.attackTime=Math.max(0,e.attackTime-dt);poseMutant(e);}
@@ -62,7 +62,7 @@ export class Enemies{
   for(const v of records){
    const existing=this.items.find(e=>e.id===v.id),e=existing||this.spawn(v.type,v.x,v.z,v.id,v.skin);
    const wasAlive=existing?.hp>0;e.hp=v.hp;e.rig.position.set(v.x,v.y??0,v.z);if(v.rotation)e.rig.rotation.fromArray(v.rotation);
-   if(e.hp<=0){this.die(e,wasAlive||(v.corpse??0)<.3);e.corpse=v.corpse??0;}
+   if(e.hp<=0){this.die(e,wasAlive||(v.corpse??0)<.3,false);e.corpse=v.corpse??0;}
    else{e.rig.visible=true;e.dead=false;e.phase=v.phase??e.phase;e.motion=v.motion??0;e.attackTime=v.attackTime??0;poseMutant(e);}
   }
  }

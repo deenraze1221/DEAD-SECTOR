@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
 import {mergeGroups} from 'three/addons/utils/BufferGeometryUtils.js';
 import {WEAPONS} from '../weapon-config.js';
+import {paintWeapon,GRIPS} from './weapon-materials.js';
 
 async function load(file){
   const bytes=await readFile(file);
@@ -26,13 +27,14 @@ for(const {id,label} of WEAPONS){
     geometry.rotateY(id==='Pistol'?Math.PI:Math.PI/2);
     if(!geometry.groups.length)geometry.addGroup(0,geometry.index?.count??geometry.attributes.position.count,0);
     if(geometry.groups.length>1)mergeGroups(geometry);
-    const materials=(Array.isArray(mesh.material)?mesh.material:[mesh.material]).map(m=>({name:m.name,color:m.color.getHex()}));
+    const materials=id==='Pistol'?(Array.isArray(mesh.material)?mesh.material:[mesh.material]).map(m=>({name:m.name,color:m.color.getHex()})):paintWeapon(geometry,id,length);
+    for(const attribute of Object.values(geometry.attributes))for(let i=0;i<attribute.array.length;i++)attribute.array[i]=Math.round(attribute.array[i]*1e5)/1e5;
     return {geometry:geometry.toJSON(),materials};
   }
   const bodyPart=convert(body),positions=bodyPart.geometry.data.attributes.position.array;
   let lo=Infinity,hi=-Infinity;
   for(let i=0;i<positions.length;i+=3)if(positions[i+2]<-length*.49){lo=Math.min(lo,positions[i+1]);hi=Math.max(hi,positions[i+1]);}
-  records.push({id,label,length,muzzleY:(lo+hi)/2,source:id==='Pistol'?'SciFi_gun_2-2.fbx':'gunsv2.fbx',body:bodyPart,magazine:mag?convert(mag):null});
+  records.push({id,label,length,grips:GRIPS[id],muzzleY:(lo+hi)/2,source:id==='Pistol'?'SciFi_gun_2-2.fbx':'gunsv2.fbx',body:bodyPart,magazine:mag?convert(mag):null});
 }
 await writeFile('assets/models/weapons.json',JSON.stringify(records));
-console.log('Converted retained pistol and all 9 gunsv2 weapons. New weapons use their embedded material colors.');
+console.log('Converted retained pistol and all 9 gunsv2 weapons. New weapons use mechanical steel, brown and blue vertex-color finishes.');
