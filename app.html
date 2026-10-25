@@ -5,13 +5,13 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#111612" />
     <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111612'/%3E%3Cpath d='M9 7h8l7 9-7 9H9z' fill='%23c6db78'/%3E%3C/svg%3E" />
-    <title>DEAD SECTOR — тренировочный сектор</title>
+    <title>DEAD SECTOR — зачистка сектора</title>
     <link rel="stylesheet" href="/style.css" />
   </head>
   <body>
-    <canvas id="scene" aria-label="Трёхмерный тренировочный сектор"></canvas>
+    <canvas id="scene" aria-label="Трёхмерный зачистка сектора"></canvas>
     <div class="grain" aria-hidden="true"></div>
-    <header class="topline"><span>DS / FIELD SYSTEMS</span><span>BUILD 0.1 · ОДИНОЧНЫЙ ПРОТОТИП</span></header>
+    <header class="topline"><span>DS / FIELD SYSTEMS</span><span>BUILD 0.2 · ОДИНОЧНЫЙ ПРОТОТИП</span></header>
     <main id="menu" class="menu">
       <div class="eyebrow"><span class="status-dot"></span> СВЯЗЬ УСТАНОВЛЕНА / СЕКТОР 00</div>
       <h1>DEAD<br /><span>SECTOR</span><i>®</i></h1>
@@ -27,25 +27,25 @@
         <label class="effect-option">Пикселизация экрана <input id="pixels" type="checkbox" checked /></label>
         <label class="effect-option">PSX · дрожание вершин <input id="vertex-snap" type="checkbox" checked /></label>
       </section>
-      <p id="message" class="message" role="status">Тренировочная площадка · без противников и стрельбы</p>
+      <p id="message" class="message" role="status">Зачистите сектор. После уничтожения пяти мутантов найдите северный выход.</p>
     </main>
     <aside id="briefing" class="briefing">
       <span class="eyebrow">01 / ПОЛЕВОЙ ИНСТРУКТАЖ</span>
-      <h2>Освой территорию.</h2>
-      <p>Пройди между укрытиями, зайди в здание и проверь прыжок. Это безопасный сектор для проверки движения.</p>
+      <h2>Зачисти территорию.</h2>
+      <p>ЛКМ — огонь · ПКМ — прицел · R — перезарядка. Уничтожь пять мутантов и доберись до северных ворот. E — выйти.</p>
       <div class="key-row"><span><kbd>W</kbd><kbd>A</kbd><kbd>S</kbd><kbd>D</kbd></span><span>Движение</span></div>
       <div class="key-row"><kbd>МЫШЬ</kbd><span>Обзор</span></div>
       <div class="key-row"><kbd>SHIFT</kbd><span>Бег</span></div>
       <div class="key-row"><kbd>SPACE</kbd><span>Прыжок</span></div>
       <div class="key-row"><kbd>ESC</kbd><span>Пауза</span></div>
-      <div class="briefing-footer"><span>ДОПУСК</span><strong>ТРЕНИРОВКА</strong></div>
+      <div class="briefing-footer"><span>ДОПУСК</span><strong>ЗАЧИСТКА</strong></div>
     </aside>
     <div id="hud" hidden>
-      <div class="sector-tag"><span class="status-dot"></span> СЕКТОР 00 <small>ТРЕНИРОВОЧНАЯ ЗОНА</small></div>
-      <div class="crosshair" aria-hidden="true"></div>
-      <div class="hud-bottom"><div><small>СОСТОЯНИЕ</small><strong>100 <span>HP</span></strong><div class="health-bar"></div></div><span id="movement">ПЕШКОМ</span><p>WASD <span>ДВИЖЕНИЕ</span> &nbsp; SHIFT <span>БЕГ</span> &nbsp; SPACE <span>ПРЫЖОК</span> &nbsp; ESC <span>ПАУЗА</span></p></div>
+      <div class="sector-tag"><span class="status-dot"></span> СЕКТОР 00 <small>БОЕВАЯ ЗОНА</small></div>
+      <div class="crosshair" aria-hidden="true"></div><div id="hit-marker" hidden aria-hidden="true">×</div><div id="objective" class="objective"></div><div class="ammo-panel"><small id="weapon-state">ВИНТОВКА / 5.56</small><strong><span id="ammo">30</span> <small>/ <span id="reserve">90</span></small></strong><small>ЛКМ ОГОНЬ · ПКМ ПРИЦЕЛ · R МАГАЗИН</small></div>
+      <div class="hud-bottom"><div><small>СОСТОЯНИЕ</small><strong><b id="health">100</b> <span>HP</span></strong><div id="health-bar" class="health-bar"></div></div><span id="movement">ПЕШКОМ</span><p>WASD <span>ДВИЖЕНИЕ</span> &nbsp; SHIFT <span>БЕГ</span> &nbsp; SPACE <span>ПРЫЖОК</span> &nbsp; ESC <span>ПАУЗА</span></p></div>
     </div>
-    <footer id="footer"><span>RESTRICTED AREA / AUTHORIZED PERSONNEL ONLY</span><span>ЭТАП 02 / БАЗОВАЯ ПОДГОТОВКА</span></footer>
+    <footer id="footer"><span>RESTRICTED AREA / AUTHORIZED PERSONNEL ONLY</span><span>ОПЕРАЦИЯ / ЗАЧИСТКА</span></footer>
     <noscript>Для запуска DEAD SECTOR необходимо включить JavaScript.</noscript>
     <script type="module" src="/game.js"></script>
   </body>
