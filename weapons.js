@@ -1,11 +1,7 @@
 import * as THREE from 'three';
 import weaponModels from './assets/models/weapons.json' with { type: 'json' };
-export const WEAPONS = Object.freeze([
- {id:'RifleGod',label:'GOD / ШТУРМОВАЯ',capacity:15,reserve:180,damage:35,interval:.10,reload:1.7,automatic:true},
- {id:'RifleBran',label:'BRAN / ВИНТОВКА',capacity:24,reserve:192,damage:25,interval:.24,reload:2,automatic:true},
- {id:'SMG',label:'SMG / ПИСТОЛЕТ-ПУЛЕМЁТ',capacity:35,reserve:350,damage:8,interval:.065,reload:1.5,automatic:true},
- {id:'Pistol',label:'ПИСТОЛЕТ',capacity:8,reserve:160,damage:10,interval:.28,reload:1.15,automatic:false},
-]);
+import {WEAPONS} from './weapon-config.js';
+export {WEAPONS};
 export class Rifle {
   constructor(audio, random = Math.random) {
     this.audio=audio;this.random=random;this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(65,1,.01,10);
@@ -16,12 +12,13 @@ export class Rifle {
       const group=new THREE.Group();group.name=record.id;
       const make=part=>{
         const materials=part.materials.map((m,i)=>new THREE.MeshStandardMaterial({
-          color:m.name==='Gun_metal'?'#495654':i===1?'#77816e':'#bd9254',
-          metalness:m.name==='Gun_metal'?.65:.25,roughness:m.name==='Gun_metal'?.5:.8,flatShading:true,
+          color:record.id==='Pistol'?(m.name==='Gun_metal'?'#495654':i===1?'#77816e':'#bd9254'):new THREE.Color(m.color).lerp(new THREE.Color('#73776d'),.08),
+          metalness:.5,roughness:.7,flatShading:true,
         }));
-        return new THREE.Mesh(new THREE.BufferGeometryLoader().parse(part.geometry),materials);
+        return new THREE.Mesh(new THREE.BufferGeometryLoader().parse(part.geometry),materials.length===1?materials[0]:materials);
       };
-      const body=make(record.body),magazine=make(record.magazine);body.name=record.id;magazine.name=record.id+'Magazine';
+      // gunsv2 supplies single-piece guns; never detach an invented magazine.
+      const body=make(record.body),magazine=record.magazine?make(record.magazine):new THREE.Group();body.name=record.id;magazine.name=record.id+'Magazine';
       group.add(body,magazine);this.model.add(group);return {group,body,magazine,record};
     });
     this.hands=[-1,1].map(side=>{
@@ -37,8 +34,8 @@ export class Rifle {
   }
   reset(id){
     const selected=WEAPONS.findIndex(w=>w.id===id);
-    const index=selected>=0?selected:Math.min(3,Math.max(0,Math.floor(this.random()*4)));
-    this.config=WEAPONS[index];this.variant=this.variants[index];this.gun=this.variant.body;this.magazine=this.variant.magazine;
+    const index=selected>=0?selected:Math.min(WEAPONS.length-1,Math.max(0,Math.floor(this.random()*WEAPONS.length)));
+    this.config=WEAPONS[index];this.variant=this.variants.find(v=>v.record.id===this.config.id);this.gun=this.variant.body;this.magazine=this.variant.magazine;
     this.variants.forEach(v=>{v.group.visible=v===this.variant;v.magazine.position.set(0,0,0);v.magazine.rotation.set(0,0,0);});
     this.flash.position.set(0,this.variant.record.muzzleY,-this.variant.record.length/2-.08);
     this.ammo=this.config.capacity;this.reserve=this.config.reserve;this.cooldown=0;this.reloadTime=0;this.recoil=0;this.flashTime=0;this.flash.visible=false;
@@ -52,11 +49,12 @@ export class Rifle {
   pose(time,moving){
     const progress=this.reloadTime?1-this.reloadTime/this.config.reload:0,drop=this.reloadTime?Math.sin(progress*Math.PI):0;
     this.model.position.set(.23,(-.22)-drop*.15,-.48+this.recoil);this.model.rotation.set(this.recoil*.8,0,-drop*.25);
-    // Animate the matching, separately authored magazine; top-fed BRAN lifts upwards.
-    this.magazine.position.y=(this.config.id==='RifleBran'?1:-1)*drop*.22;this.magazine.rotation.x=drop*.2;
+    this.magazine.position.y=-drop*.22;this.magazine.rotation.x=drop*.2;
+    const loading=this.reloadTime&&this.config.reloadStyle!=='magazine'?Math.sin(progress*Math.PI*6)*drop:0;
+    if(this.reloadTime)this.model.rotation.x+=drop*(this.config.reloadStyle==='breech'?.4:.12);
     const length=this.variant.record.length;
     this.hands[1].position.set(.055,-.12,length*.23);
-    this.hands[0].position.set(-.065-drop*.1,-.09+this.magazine.position.y,-length*.13+drop*.16);
+    this.hands[0].position.set(-.065-drop*.1,-.09+this.magazine.position.y+loading*.025,-length*.13+drop*.16+loading*.04);
     this.hands[0].rotation.z=drop*.4;
     if(moving){this.model.position.y+=Math.sin(time*10)*.007;this.model.position.x+=Math.cos(time*5)*.006;}
   }

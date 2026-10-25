@@ -1,16 +1,38 @@
 import {readFile,writeFile} from 'node:fs/promises';
 import * as THREE from 'three';
 import {FBXLoader} from 'three/addons/loaders/FBXLoader.js';
-const bytes=await readFile('assets/imported/Guns/SciFi_gun_2-2.fbx');
-const root=new FBXLoader().parse(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');root.updateMatrixWorld(true);
-const records=[];
-for(const [id,label,length] of [['RifleGod','GOD / ШТУРМОВАЯ',.95],['RifleBran','BRAN / ВИНТОВКА',.95],['SMG','SMG / ПИСТОЛЕТ-ПУЛЕМЁТ',.75],['Pistol','ПИСТОЛЕТ',.48]]){
- const body=root.getObjectByName(id),mag=root.getObjectByName(id+'Magazine');if(!body?.isMesh||!mag?.isMesh)throw Error('Missing weapon or matching magazine: '+id);
- const bounds=new THREE.Box3().setFromObject(body),center=bounds.getCenter(new THREE.Vector3()),scale=length/(bounds.max.z-bounds.min.z);
- function convert(mesh){const g=mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);g.translate(0,-center.y,-center.z);g.scale(scale,scale,scale);g.rotateY(Math.PI);return {geometry:g.toJSON(),materials:(Array.isArray(mesh.material)?mesh.material:[mesh.material]).map(m=>({name:m.name,color:m.color.getHex()}))};}
- const bodyPart=convert(body),magPart=convert(mag);
- const positions=bodyPart.geometry.data.attributes.position.array;let lo=Infinity,hi=-Infinity;
- for(let i=0;i<positions.length;i+=3)if(positions[i+2]<-length*.49){lo=Math.min(lo,positions[i+1]);hi=Math.max(hi,positions[i+1]);}
- records.push({id,label,length,muzzleY:(lo+hi)/2,body:bodyPart,magazine:magPart});
+import {mergeGroups} from 'three/addons/utils/BufferGeometryUtils.js';
+import {WEAPONS} from '../weapon-config.js';
+
+async function load(file){
+  const bytes=await readFile(file);
+  const root=new FBXLoader().parse(bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength),'');
+  root.updateMatrixWorld(true);return root;
 }
-await writeFile('assets/models/weapons.json',JSON.stringify(records));console.log('Converted 4 weapons and 4 named magazines.');
+const old=await load('assets/imported/Guns/SciFi_gun_2-2.fbx');
+const current=await load('assets/imported/Guns/gunsv2.fbx');
+const lengths={Pistol:.48,Helsing:.93,Tikhar:1.12,Shambler:.92,Shotgun:.88,Kalash:.96,VSV:1,Scorpion:.63,Vector:.68,G36:.88};
+const records=[];
+for(const {id,label} of WEAPONS){
+  const body=(id==='Pistol'?old:current).getObjectByName(id);
+  if(!body?.isMesh)throw Error('Missing named weapon: '+id);
+  const mag=id==='Pistol'?old.getObjectByName(id+'Magazine'):null;
+  const bounds=new THREE.Box3().setFromObject(body),center=bounds.getCenter(new THREE.Vector3()),length=lengths[id];
+  // Original pistol points +Z; the new FBX's barrels point +X. Both become -Z.
+  const scale=length/(id==='Pistol'?bounds.max.z-bounds.min.z:bounds.max.x-bounds.min.x);
+  function convert(mesh){
+    const geometry=mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+    geometry.translate(-center.x,-center.y,-center.z);geometry.scale(scale,scale,scale);
+    geometry.rotateY(id==='Pistol'?Math.PI:Math.PI/2);
+    if(!geometry.groups.length)geometry.addGroup(0,geometry.index?.count??geometry.attributes.position.count,0);
+    if(geometry.groups.length>1)mergeGroups(geometry);
+    const materials=(Array.isArray(mesh.material)?mesh.material:[mesh.material]).map(m=>({name:m.name,color:m.color.getHex()}));
+    return {geometry:geometry.toJSON(),materials};
+  }
+  const bodyPart=convert(body),positions=bodyPart.geometry.data.attributes.position.array;
+  let lo=Infinity,hi=-Infinity;
+  for(let i=0;i<positions.length;i+=3)if(positions[i+2]<-length*.49){lo=Math.min(lo,positions[i+1]);hi=Math.max(hi,positions[i+1]);}
+  records.push({id,label,length,muzzleY:(lo+hi)/2,source:id==='Pistol'?'SciFi_gun_2-2.fbx':'gunsv2.fbx',body:bodyPart,magazine:mag?convert(mag):null});
+}
+await writeFile('assets/models/weapons.json',JSON.stringify(records));
+console.log('Converted retained pistol and all 9 gunsv2 weapons. New weapons use their embedded material colors.');

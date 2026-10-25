@@ -1,4 +1,5 @@
 const entries={
+'ДОБЕЙТЕ ОСТАВШИХСЯ':'CLEAR REMAINING','120 секунд спавна · Уничтожь всех · 10 секунд перерыва.':'120 seconds of spawns · Kill all enemies · 10-second break',
 'BUILD 0.4 · ВЫЖИВАНИЕ В ВОЛНАХ':'BUILD 0.4 · WAVE SURVIVAL','НОВЫЙ ЗАБЕГ <span>↗</span>':'NEW RUN <span>↗</span>',
 'ВОЛНА':'WAVE','ПЕРЕРЫВ':'INTERMISSION','НАСТУПЛЕНИЕ':'ASSAULT','ЖИВЫХ':'ALIVE','ВЫШЛО':'SPAWNED','Выживайте. Ульи находятся в четырёх углах города.':'Survive. Hives occupy the four city corners.','Переживи наступление.':'Survive the assault.','ЛКМ ОГОНЬ · R МАГАЗИН':'LMB FIRE · R RELOAD','ЛКМ — огонь · R — перезарядка · E — припасы и помощь. Выживай в волнах, зомби выходят из четырёх ульев.':'LMB — fire · R — reload · E — supplies and revive. Survive waves emerging from four hives.','Волны зомби · 120 секунд наступления · 10 секунд перерыва.':'Zombie waves · 120-second assault · 10-second intermission.',
 'Переподключение. Дождитесь хозяина комнаты.':'Reconnecting. Please wait for the room host.',

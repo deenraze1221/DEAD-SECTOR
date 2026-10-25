@@ -1,10 +1,10 @@
 # DEAD SECTOR
 
-Single-player browser FPS with randomly generated 200 × 200 m towns and two-player shared rooms. Four user-provided weapons are retained; all environment models are now original procedural geometry. English by default; Russian in Settings.
+Single-player browser FPS with randomly generated 200 × 200 m towns and two-player shared rooms. Ten user-provided weapons are available; all environment models are now original procedural geometry. English by default; Russian in Settings.
 
 ## Play offline
 
-Download ZIP, extract and open `index.html`. No installation or Internet needed for single player. Click Play to capture the mouse. Restart / New run generates a new city and rolls one of four weapons. Resume preserves the current city and loadout.
+Download ZIP, extract and open `index.html`. No installation or Internet needed for single player. Click Play to capture the mouse. Restart / New run generates a new city and rolls one of ten weapons. Resume preserves the current city and loadout.
 
 WASD move; Shift sprint; Space jump; LMB fire; R reload; Esc menu. Survive endless waves from four corner hives. E interacts with supplies and revives a nearby partner; there is no exit victory. Player starts at (0, 85), with 100 HP. Buildings and props have solid colliders; doorways are accessible.
 
@@ -12,9 +12,9 @@ WASD move; Shift sprint; Space jump; LMB fire; R reload; Esc menu. Survive endle
 
 The city now uses semantic placement rather than random prop scattering. There are 16 building families and 24 placed outdoor prop/vegetation families, plus furniture and appliances. `asset-catalog.js` describes 1,200 procedural family/variant recipes; these are parameterized designs, not 1,200 separately hand-authored meshes. A connected street grid separates 64 lots (four times the former building count). Every category appears in each town; seeded variation selects buildings and prop arrangements. Main roads remain clear; tests verify routes to every building, enemy spawn and exit across several seeds.
 
-`town.js` is the deterministic layout and collision source; `city.js` constructs meshes. No uploaded environment FBX/PNG/JPG is used or retained. `assets/imported/Guns/` and `assets/models/weapons.json` contain the four user-supplied weapons and matching magazines. Re-import with `node scripts/import-weapons.js`, then build.
+`town.js` is the deterministic layout and collision source; `city.js` constructs meshes. No uploaded environment FBX/PNG/JPG is used or retained. `assets/imported/Guns/` and `assets/models/weapons.json` contain the retained Pistol from the original FBX and nine named models from `gunsv2.fbx`. RifleGod, RifleBran and SMG are removed from the playable roster. Re-import with `node scripts/import-weapons.js`, then build.
 
-Pixel rendering is always enabled at 540 pixels vertically; vertex snapping and graphic toggles are removed. Models use original low-poly geometry and flat materials. Mutants have articulated limbs, ribs, jaws and skin detail.
+Pixel rendering is always enabled at 540 pixels vertically; vertex snapping and graphic toggles are removed. Models use original low-poly geometry and flat materials. Mutants have jointed shoulders, elbows, hips, knees and ankles, separate jaws, facial features and clothing. Ordinary zombies use five deterministic outfits: civilian, worker, medic, soldier and hoodie. Outfits change geometry and materials; these are procedural looks rather than imported texture skins. The enlarged brute has connected broad shoulders and arms clear of its belly. Walking uses distance-based opposing strides, knee flexion and planted stance feet; melee has an upper-body attack motion.
 
 ## Open to network
 
@@ -58,12 +58,20 @@ E picks up supplies within 1.5 m. Medkits restore 35 HP (maximum 100); ammo adds
 
 Weapon tuning (hip fire only; viewmodel moved 20% closer to the camera):
 
-| Weapon | Magazine | Damage | Fire interval | Sound |
-| --- | --- | --- | --- | --- |
-| Pistol | 8 | 10 | 0.28 s, single press | short sharp report |
-| RifleBran | 24 | 25 | 0.24 s | deeper, longer report |
-| RifleGod | 15 | 35 | 0.10 s | punchy medium report |
-| SMG | 35 | 8 | 0.065 s | short high-frequency report |
+| Weapon | Magazine | Damage per shot | Fire interval | Reload | Mode |
+| --- | --- | --- | --- | --- | --- |
+| Pistol | 8 | 10 | 0.28 s | 1.15 s | single press |
+| Helsing | 40 | 15 | 0.075 s | 4 s | automatic |
+| Tikhar | 1 | 40 | 0.45 s | 3 s | single press |
+| Shambler | 5 | 35 | 0.50 s | 3 s | single press |
+| Shotgun | 2 | 65 | 0.60 s | 2 s | single press |
+| Kalash | 30 | 25 | 0.14 s | 3 s | automatic |
+| VSV | 12 | 55 | 0.24 s | 6 s | automatic |
+| Scorpion | 35 | 20 | 0.10 s | 4 s | automatic |
+| Vector | 20 | 20 | 0.09 s | 3 s | automatic |
+| G36 | 30 | 30 | 0.14 s | 4 s | automatic |
+
+The qualitative fire-rate requests are resolved into the intervals above. Pistol's existing stats are preserved. A new run rolls each of the ten weapons equally. Single-press weapons require releasing LMB between shots. All requested damage is total damage per shot, including Shambler and Shotgun. The FBX's new guns are single-piece meshes: reload moves the gun and support hand to operate the action/load shells rather than detaching a nonexistent separate magazine. Pistol keeps its separately authored magazine. Geometry groups are consolidated by material, and single-material meshes render correctly.
 
 Each sound is a distinct synthesized noise/filter/oscillator envelope, not an external audio file. Right click does not change FOV, camera or weapon pose.
 
@@ -74,7 +82,7 @@ Each sound is a distinct synthesized noise/filter/oscillator envelope, not an ex
 | Flying flesh eye | 300 | 2.3 m/s | 30 on projectile hit | 20% |
 | Brute (3× size) | 600 | 1.1 m/s | 40 (default; unspecified in request) | 5% |
 
-Waves last 120 seconds, followed by 10-second intermissions. Wave 1 spawns 30 enemies gradually (one every four seconds); wave 2 spawns 35; each later wave adds five. Each event rolls the confirmed type probabilities and a random corner hive. Existing enemies persist across waves. Enemies actively hunt players, with a shared navigation field cache; brutes use wider clearance. Flying eyes fire visible projectiles that collide with cover and must hit a player's body to deal damage. Corpses fade after eight seconds. Host snapshots synchronize the wave clock, dynamic enemy IDs and projectiles, including after reconnect.
+Each wave spawns over 120 seconds, then waits for every spawned enemy to die. Only after the last kill does a 10-second intermission begin; its end starts the next wave. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Wave 1 spawns 30 enemies gradually (one every four seconds); wave 2 spawns 35; each later wave adds five. Each event rolls the confirmed type probabilities and a random corner hive. A living enemy blocks the next wave regardless of elapsed time. Enemies actively hunt players, with a shared navigation field cache; brutes use wider clearance. Flying eyes fire visible projectiles that collide with cover and must hit a player's body to deal damage. Deaths instantly hide the model and emit red fragments with gravity and a short fade, using one bounded instanced particle pool. No body falls over or remains on the ground. Death records briefly remain in host snapshots so guests receive the effect once; duplicate packets do not repeat the burst. Host snapshots synchronize wave/clearing phase, dynamic enemy IDs, outfit indices, joint animation phase, deaths and projectiles, including after reconnect.
 
 The perimeter is a visible concrete wall 5.8 m tall. All environment meshes remain original procedural models. Static city geometry is batched by material for denser scenes. HUD panels show wave phase, countdown, spawned/total, alive enemies, health, weapon ammunition and context hints. Gloved hands and reload animation are retained.
 
@@ -97,3 +105,5 @@ Internet play cannot be validated without an actual public deployment/address. T
 - Instanced geometry, shared primitives and cached navigation/ray tests keep the increased detail practical. Normal, flying and giant enemies use separate height-clearance navigation layers.
 
 `city-validation.js` checks semantic links, directions, parking containment, grounding/supports, facade and furniture overlap, room containment and connected fence junctions. Unit checks exercise 24 seeds and physically move the player through every room entrance on three cities. `npm run test:geometry:browser` compares rendered bounds against reserved footprints and renders street/interior views. These checks cover the tested geometry rules; they are not a guarantee that no visual defect can ever occur on every device and seed.
+
+Model regression checks: `npm run test:mutants:browser` renders all five zombie outfits, the brute, death fragments and every weapon. `npm run test:weapons:browser` exercises all ten randomized loadouts in gameplay. Unit checks cover exact stats/reload timing, blocking wave progression, grounded gait, brute arm clearance, hive navigation, and one-time replicated deaths. Set `ARTIFACT_DIR` for model preview screenshots.

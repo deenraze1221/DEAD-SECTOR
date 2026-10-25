@@ -150,7 +150,7 @@ try {
         }
         triggerPressed=false;
         if(!session.active||session.host){
-          waves.step(FIXED_STEP,(type,index)=>{const h=world.hives[index];enemies.spawn(type,h.x-Math.sign(h.x)*1.5,h.z-Math.sign(h.z)*1.5);});
+          waves.step(FIXED_STEP,(type,index)=>{const h=world.hives[index];enemies.spawn(type,h.x-Math.sign(h.x)*1.5,h.z-Math.sign(h.z)*1.5);},()=>enemies.alive);
           player.hp=hp;if(hp>0||peerPose?.hp>0)enemies.step(FIXED_STEP,player,receiveDamage,peerPose&&peerPose.hp>0?{position:peerPose}:null,amount=>session.send({type:'damage',amount}));else if(peerPose)finish('dead');
         }
         hitTime=Math.max(0,hitTime-FIXED_STEP);hurtTime=Math.max(0,hurtTime-FIXED_STEP);
@@ -165,12 +165,13 @@ try {
     $('health').textContent=hp;$('health-bar').style.width=`${hp*1.35}px`;
     $('ammo').textContent=rifle.ammo;$('reserve').textContent=rifle.reserve;
     $('weapon-state').textContent=rifle.reloadTime?t('ПЕРЕЗАРЯДКА…'):!rifle.ammo?t('R — ПЕРЕЗАРЯДИТЬ'):t(rifle.config.label);
-    $('objective').textContent=`${t('ВОЛНА')} ${waves.number} · ${waves.rest?t('ПЕРЕРЫВ'):t('НАСТУПЛЕНИЕ')} ${Math.ceil((waves.rest?10:120)-waves.time)}s`;
+    $('objective').textContent=`${t('ВОЛНА')} ${waves.number} · ${waves.clearing?t('ДОБЕЙТЕ ОСТАВШИХСЯ'):waves.rest?t('ПЕРЕРЫВ'):t('НАСТУПЛЕНИЕ')}${waves.clearing?'':` ${Math.ceil((waves.rest?10:120)-waves.time)}s`}`;
     $('wave-details').textContent=`${t('ЖИВЫХ')}: ${enemies.alive} · ${t('ВЫШЛО')}: ${waves.spawned}/${waves.total}`;
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
     supplies.tick(elapsed);
     const near=supplies.nearby(player.position);const living=enemies.items.filter(e=>e.hp>0);const nearest=living.sort((a,b)=>a.rig.position.distanceTo(camera.position)-b.rig.position.distanceTo(camera.position))[0];
     $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&peerPose?.hp<=0&&Math.hypot(peerPose.x-player.position.x,peerPose.z-player.position.z)<2.5?t('E · Поднять напарника'):near?t(near.type==='health'?'E · Аптечка +35 HP':'E · Патроны'):nearest?`${t('Ближайший враг')} · ${Math.round(Math.hypot(nearest.rig.position.x-player.position.x,nearest.rig.position.z-player.position.z))} m · ${Math.atan2(nearest.rig.position.x-player.position.x,player.position.z-nearest.rig.position.z)*180/Math.PI|0}° N`:t('Выживайте. Ульи находятся в четырёх углах города.');
+    enemies.updateEffects((running||(session.active&&started&&!outcome))?delta:0,session.active&&!session.host);
     rifle.pose(elapsed,keys.size>0);
     if(session.active){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id});if(session.host)session.send({type:'state',wave:waves.snapshot(),taken:supplies.items.filter(s=>s.taken).map(s=>s.id),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
     renderer.autoClear=true;renderer.render(scene, camera);

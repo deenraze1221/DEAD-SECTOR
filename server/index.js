@@ -1,4 +1,5 @@
 import {createServer} from 'node:http';import {readFile} from 'node:fs/promises';import {resolve,extname} from 'node:path';import {randomBytes} from 'node:crypto';import {WebSocketServer,WebSocket} from 'ws';
+import {WEAPON_BY_ID} from '../weapon-config.js';
 const GRACE=120000;
 export function createGameServer(){const root=resolve('dist');const server=createServer(async(req,res)=>{try{const pathname=new URL(req.url,'http://local').pathname,file=resolve(root,'.'+decodeURIComponent(pathname==='/'?'/index.html':pathname));if(!file.startsWith(root+'/'))return res.writeHead(403).end();const bytes=await readFile(file);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css'})[extname(file)]||'application/octet-stream');res.end(bytes);}catch{res.writeHead(404).end('Build the game with npm run build.');}});
 const wss=new WebSocketServer({server,maxPayload:524288}),rooms=new Map(),send=(s,m)=>{if(s?.readyState===WebSocket.OPEN)s.send(JSON.stringify(m));};
@@ -12,7 +13,7 @@ else if(m.type==='resume'){const room=rooms.get(String(m.code).toUpperCase()),ro
 else if(r&&m.type==='leave')remove(s,true);
 else if(r&&m.type==='pose'&&[m.x,m.y,m.z,m.yaw,m.hp].every(Number.isFinite)&&Math.abs(m.x)<101&&Math.abs(m.z)<101&&m.y>=0&&m.y<30){r[s.role].pose=m;send(other(r,s.role)?.socket,m);}
 else if(r&&m.type==='state'&&s.role==='host'&&Array.isArray(m.enemies)&&m.enemies.length<=1000){r.snapshot=m;send(r.guest?.socket,m);}
-else if(r&&m.type==='shot'&&s.role==='guest'&&r.guest.pose?.hp>0&&Array.isArray(m.direction)&&m.direction.length===3&&m.direction.every(Number.isFinite)){const damage={RifleGod:35,RifleBran:25,SMG:8,Pistol:10}[m.weapon],p=r.guest.pose;if(damage)send(r.host.socket,{type:'shot',origin:[p.x,p.y+1.65,p.z],direction:m.direction,damage});}
+else if(r&&m.type==='shot'&&s.role==='guest'&&r.guest.pose?.hp>0&&Array.isArray(m.direction)&&m.direction.length===3&&m.direction.every(Number.isFinite)){const damage=WEAPON_BY_ID[m.weapon]?.damage,p=r.guest.pose;if(damage)send(r.host.socket,{type:'shot',origin:[p.x,p.y+1.65,p.z],direction:m.direction,damage});}
 else if(r&&m.type==='damage'&&s.role==='host')send(r.guest?.socket,{type:'damage',amount:[15,25,30,40].includes(m.amount)?m.amount:25});
 else if(r&&m.type==='end'&&s.role==='host'){r.result=m.result;send(r.guest?.socket,m);}
 else if(r&&m.type==='pickup'&&s.role==='guest')send(r.host.socket,{type:'pickup',id:m.id});
