@@ -5,8 +5,8 @@ import assert from 'node:assert/strict';
  await p.goto(process.env.BASE_URL || 'http://127.0.0.1:5173/app.html');await p.waitForFunction(()=>!document.getElementById('start').disabled);
  await p.evaluate(async()=>{window.readGame=(await import('/game.js')).getSnapshot;window.THREE=await import('/node_modules/.vite/deps/three.js');window.collision=(await import('/map.js')).getColliders();window.nav=(await import('/navigation.js')).createNavigation(window.collision);window.wallDistance=(await import('/enemies.js')).obstacleDistance;});
  await p.locator('#start').click();await p.locator('#hud .sector-tag').waitFor({state:'visible'});
- await p.mouse.down();await p.waitForTimeout(500);await p.mouse.up();const ammo=await p.evaluate(()=>readGame().ammo);assert.ok(ammo<30);await p.keyboard.press('KeyR');
- for(let i=0;i<60;i++){if(!(await p.evaluate(()=>readGame().reloading)))break;await p.waitForTimeout(100);}assert.equal(await p.evaluate(()=>readGame().ammo),30);
+ await p.mouse.down();await p.waitForTimeout(500);await p.mouse.up();const ammo=await p.evaluate(()=>readGame().ammo);assert.ok(ammo<(await p.evaluate(()=>readGame().capacity)));await p.keyboard.press('KeyR');
+ for(let i=0;i<60;i++){if(!(await p.evaluate(()=>readGame().reloading)))break;await p.waitForTimeout(100);}assert.equal(await p.evaluate(()=>readGame().ammo),await p.evaluate(()=>readGame().capacity));
  let last=-1;
  for(let i=0;i<1100;i++){
   const command=await p.evaluate(()=>{
@@ -22,7 +22,7 @@ import assert from 'node:assert/strict';
   if(command.done){assert.equal(command.done,'win');console.log('PASS: real keyboard/mouse bot cleared five mutants and reached exit');break;}
   if(command.remaining!==last){console.log('Remaining:',command.remaining,'HP:',command.hp);last=command.remaining;}
   if(command.exit)await p.keyboard.press('KeyE');
-  if(command.fire){await p.keyboard.up('KeyW');await p.mouse.down();}else{await p.mouse.up();await p.keyboard.down('KeyW');}
+  if(command.fire){await p.keyboard.up('KeyW');await p.mouse.up();await p.mouse.down();}else{await p.mouse.up();await p.keyboard.down('KeyW');}
   if(command.reload)await p.keyboard.press('KeyR');await p.waitForTimeout(70);
  }
  await p.mouse.up();await p.keyboard.up('KeyW');assert.equal(await p.evaluate(()=>readGame().outcome),'win');assert.deepEqual(errors,[]);

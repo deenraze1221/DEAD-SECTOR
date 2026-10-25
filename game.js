@@ -12,7 +12,7 @@ const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'Shif
 let renderer, scene, camera, player;
 let psx, rifle, enemies, exit;
 const audio = new GameAudio();
-let hp=100, outcome='', shooting=false, aiming=false, hitTime=0, hurtTime=0, elapsed=0;
+let hp=100, outcome='', shooting=false, triggerPressed=false, aiming=false, hitTime=0, hurtTime=0, elapsed=0;
 const effects = { pixels: true, snapping: true };
 for (const [id, key] of [['pixels', 'pixels'], ['vertex-snap', 'snapping']]) {
   try {
@@ -43,7 +43,7 @@ $('settings-button').addEventListener('click', () => {
   $('settings-button').setAttribute('aria-expanded', String(!$('settings').hidden));
 });
 
-function clearInput() { keys.clear(); shooting=false; aiming=false; jumpQueued = false; accumulator = 0; }
+function clearInput() { keys.clear(); shooting=false; triggerPressed=false; aiming=false; jumpQueued = false; accumulator = 0; }
 function setRunning(value) {
   running = value; clearInput();
   document.body.classList.toggle('playing', value);
@@ -91,7 +91,7 @@ document.addEventListener('keydown', event => {
 document.addEventListener('keyup', event => { keys.delete(event.code); });
 document.addEventListener('mousemove', event => { if (running) player.look(event.movementX, event.movementY, sensitivity); });
 
-document.addEventListener('mousedown', event=>{if(!running)return;if(event.button===0)shooting=true;if(event.button===2)aiming=true;});
+document.addEventListener('mousedown', event=>{if(!running)return;if(event.button===0){shooting=true;triggerPressed=true;}if(event.button===2)aiming=true;});
 document.addEventListener('mouseup', event=>{if(event.button===0)shooting=false;if(event.button===2)aiming=false;});
 $('scene').addEventListener('contextmenu',event=>event.preventDefault());
 
@@ -107,7 +107,7 @@ function resize() {
 
 // Read-only snapshot for reproducible browser checks, without allowing state mutation.
 export function getSnapshot() {
-  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded, hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, remaining:enemies?.alive, enemies:enemies?.items.map(e=>({hp:e.hp,x:e.rig.position.x,z:e.rig.position.z})) };
+  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded, hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, remaining:enemies?.alive, enemies:enemies?.items.map(e=>({hp:e.hp,x:e.rig.position.x,z:e.rig.position.z})) };
 }
 
 try {
@@ -138,11 +138,12 @@ try {
         jumpQueued = false; accumulator -= FIXED_STEP;
         elapsed+=FIXED_STEP;rifle.step(FIXED_STEP);
         updateCamera();camera.updateMatrixWorld();
-        if(shooting && rifle.fire()){
+        if(((shooting && rifle.config.automatic)||triggerPressed) && rifle.fire()){
           const direction=camera.getWorldDirection(new THREE.Vector3());
-          if(enemies.shoot(camera.position,direction))hitTime=.15;
+          if(enemies.shoot(camera.position,direction,rifle.config.damage))hitTime=.15;
           player.pitch=Math.min(Math.PI/2-.02,player.pitch+.008);
         }
+        triggerPressed=false;
         enemies.step(FIXED_STEP,player,damage=>{hp=Math.max(0,hp-damage);hurtTime=.3;audio.play('hurt');if(!hp)finish('dead');});
         hitTime=Math.max(0,hitTime-FIXED_STEP);hurtTime=Math.max(0,hurtTime-FIXED_STEP);
         if(!running)break;
@@ -155,7 +156,7 @@ try {
     }
     $('health').textContent=hp;$('health-bar').style.width=`${hp*1.35}px`;
     $('ammo').textContent=rifle.ammo;$('reserve').textContent=rifle.reserve;
-    $('weapon-state').textContent=rifle.reloadTime?'ПЕРЕЗАРЯДКА…':!rifle.ammo?'R — ПЕРЕЗАРЯДИТЬ':'ВИНТОВКА / 5.56';
+    $('weapon-state').textContent=rifle.reloadTime?'ПЕРЕЗАРЯДКА…':!rifle.ammo?'R — ПЕРЕЗАРЯДИТЬ':rifle.config.label;
     $('objective').textContent=enemies.alive?`ЗАЧИСТИТЕ СЕКТОР · ОСТАЛОСЬ ${enemies.alive}`:'ВЫХОД ОТКРЫТ · СЕВЕРНЫЕ ВОРОТА · E';
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
     exit.material.color.set(enemies.alive?'#873d2b':'#afdb65');

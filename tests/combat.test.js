@@ -7,7 +7,7 @@ import { createNavigation } from '../navigation.js';
 import { getColliders } from '../map.js';
 const audio={play(){}};
 test('rifle enforces fire rate, magazine size, reserve and reload timing',()=>{
- const gun=new Rifle(audio);for(let i=0;i<30;i++){assert.equal(gun.fire(),true);assert.equal(gun.fire(),false);gun.step(.12);}assert.equal(gun.ammo,0);assert.equal(gun.fire(),false);
+ const gun=new Rifle(audio,()=>0);for(let i=0;i<30;i++){assert.equal(gun.fire(),true);assert.equal(gun.fire(),false);gun.step(.12);}assert.equal(gun.ammo,0);assert.equal(gun.fire(),false);
  gun.reload();gun.step(.8);assert.equal(gun.fire(),false);assert.equal(gun.ammo,0);gun.step(1);assert.equal(gun.ammo,30);assert.equal(gun.reserve,60);
  gun.fire();gun.step(.12);gun.reload();gun.step(2);assert.equal(gun.ammo,30);assert.equal(gun.reserve,59);gun.reset();assert.equal(gun.reserve,90);
 });
@@ -35,4 +35,19 @@ test('navigation routes through building doorway and around cover without inters
   for(const p of path)assert.equal(colliders.some(b=>b.minY<1.8&&p.x>b.minX-.4&&p.x<b.maxX+.4&&p.z>b.minZ-.4&&p.z<b.maxZ+.4),false);
  }
  { const d=obstacleDistance(new THREE.Vector3(0,1,0),new THREE.Vector3(0,0,-1),[{minX:-1,maxX:1,minY:0,maxY:3,minZ:-5,maxZ:-4}]);assert.equal(d,4); }
+});
+
+test('random loadout covers all four authored weapon/magazine pairs, with independent capacities and damage',()=>{
+ for(let i=0;i<4;i++){
+  const gun=new Rifle(audio,()=>(i+.1)/4);assert.equal(gun.config.id,['RifleGod','RifleBran','SMG','Pistol'][i]);
+  assert.equal(gun.magazine.name,gun.config.id+'Magazine');assert.equal(gun.gun.name,gun.config.id);
+  assert.equal(gun.variants.filter(v=>v.group.visible).length,1);assert.equal(gun.ammo,gun.config.capacity);
+  gun.fire();gun.reload();gun.pose(0,false,false);assert.notEqual(gun.reloadTime,0);gun.step(gun.config.reload+.1);assert.equal(gun.ammo,gun.config.capacity);assert.equal(gun.reserve,gun.config.reserve-1);
+  const enemies=new Enemies(new THREE.Scene(),[],audio),e=enemies.items[0],origin=new THREE.Vector3(-5,1.5,5),direction=new THREE.Vector3(0,0,-1);
+  enemies.shoot(origin,direction,gun.config.damage);assert.equal(e.hp,100-gun.config.damage);
+ }
+});
+test('a new run rerolls the weapon, clears previous reload and resets only the chosen magazine',()=>{
+ let roll=0;const gun=new Rifle(audio,()=>roll);gun.fire();gun.reload();gun.pose(0,false,false);roll=.99;gun.reset();
+ assert.equal(gun.config.id,'Pistol');assert.equal(gun.reloadTime,0);assert.equal(gun.ammo,12);assert.equal(gun.reserve,60);assert.equal(gun.magazine.position.y,0);
 });

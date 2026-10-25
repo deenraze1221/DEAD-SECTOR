@@ -47,9 +47,9 @@ export class Enemies {
    e.limbs.forEach((l,i)=>{l.rotation.x=Math.sin(e.phase+(i%2)*Math.PI)*.4+(i%2===1?-.5:0);});
   }
  }
- shoot(origin,direction){
+ shoot(origin,direction,damage=34){
   const wall=obstacleDistance(origin,direction,this.colliders);const ray=new THREE.Ray(origin,direction),point=new THREE.Vector3();let hit=null,nearest=wall;
   for(const e of this.items){if(e.hp<=0)continue;const p=e.rig.position;const box=new THREE.Box3(new THREE.Vector3(p.x-.43,p.y,p.z-.43),new THREE.Vector3(p.x+.43,p.y+2,p.z+.43));if(ray.intersectBox(box,point)){const d=point.distanceTo(origin);if(d<nearest){nearest=d;hit=e;}}}
-  if(hit){hit.hp=Math.max(0,hit.hp-34);hit.aggro=true;this.audio.play('hit');if(!hit.hp){hit.rig.rotation.x=-Math.PI/2;hit.rig.position.y=.25;}return true;}return false;
+  if(hit){hit.hp=Math.max(0,hit.hp-damage);hit.aggro=true;this.audio.play('hit');if(!hit.hp){hit.rig.rotation.x=-Math.PI/2;hit.rig.position.y=.25;}return true;}return false;
  }
 }
