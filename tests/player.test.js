@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {generateTown} from '../town.js';
 import assert from 'node:assert/strict';
 import { Player, PLAYER, FIXED_STEP, overlapsBody } from '../player.js';
 import { getColliders, SPAWN } from '../map.js';
@@ -53,12 +54,13 @@ test('spawn is unobstructed; perimeter contains sprinting player', () => {
   const boxes = getColliders(), a = new Player(SPAWN);
   assert.ok(boxes.every(b => !overlapsBody(a.position, b)));
   advance(a, 12, { backward: true, sprint: true }, boxes);
-  near(a.position.z, 34.5 - PLAYER.radius);
+  near(a.position.z, 99.5 - PLAYER.radius);
 });
-test('training building doorway admits player; adjacent wall blocks passage', () => {
-  const boxes = getColliders(), a = new Player({ x: -13.5, y: 0, z: 1 }), b = new Player({ x: -17, y: 0, z: 1 });
-  advance(a, 1.5, { forward: true }, boxes); advance(b, 1.5, { forward: true }, boxes);
-  assert.ok(a.position.z < -3); assert.ok(b.position.z > -2);
+test('generated building doorway admits player and adjacent facade blocks movement',()=>{
+ const layout=generateTown(1),b=layout.buildings[0],front=b.z+b.d/2;
+ const a=new Player({x:b.x,y:0,z:front+2}),c=new Player({x:b.x+b.w*.35,y:0,z:front+2});
+ advance(a,1,{forward:true},layout.colliders);advance(c,1,{forward:true},layout.colliders);
+ assert.ok(a.position.z<front-1);assert.ok(c.position.z>front);
 });
 test('fixed step produces the same movement at 30, 60 and 144 rendered frames/sec', () => {
   const positions = [30, 60, 144].map(fps => {

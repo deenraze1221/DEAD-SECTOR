@@ -11,10 +11,13 @@
     "test:browser": "node tests/browser-smoke.js",
     "test:combat:browser": "node tests/combat-browser.js",
     "test:weapons:browser": "node tests/weapons-browser.js",
-    "test:city:browser": "node tests/city-ui-browser.js"
+    "test:city:browser": "node tests/city-ui-browser.js",
+    "server": "node server/index.js",
+    "test:network:browser": "node tests/network-browser.js"
   },
   "dependencies": {
-    "three": "0.180.0"
+    "three": "0.180.0",
+    "ws": "8.18.3"
   },
   "devDependencies": {
     "playwright": "1.56.1",

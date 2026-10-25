@@ -12,12 +12,12 @@ import assert from 'node:assert/strict';
   const command=await p.evaluate(()=>{
    const s=readGame();if(s.outcome)return {done:s.outcome};const origin=new THREE.Vector3(s.position.x,s.position.y+1.65,s.position.z);
    const alive=s.enemies.filter(e=>e.hp>0).sort((a,b)=>Math.hypot(a.x-s.position.x,a.z-s.position.z)-Math.hypot(b.x-s.position.x,b.z-s.position.z));
-   let target=alive.find(e=>{const d=new THREE.Vector3(e.x,1.2,e.z).sub(origin),len=d.length();return wallDistance(origin,d.normalize(),collision,len)>=len-.1;});const fire=!!target;
-   if(!target){const goal=alive[0]||{x:0,z:-32};target=nav.path(s.position,goal)[0]||goal;}
+   let target=alive.find(e=>{const d=new THREE.Vector3(e.x,1.2,e.z).sub(origin),len=d.length();return len<80&&wallDistance(origin,d.normalize(),collision,len)>=len-.1;});const fire=!!target;
+   if(!target){const goal=alive[0]||{x:0,z:-95};target=nav.path(s.position,goal)[0]||goal;}
    const dx=target.x-s.position.x,dz=target.z-s.position.z;const yaw=Math.atan2(-dx,-dz),pitch=fire?Math.atan2(1.2-origin.y,Math.hypot(dx,dz)):0;
    let delta=yaw-s.yaw;while(delta>Math.PI)delta-=Math.PI*2;while(delta<-Math.PI)delta+=Math.PI*2;
    document.dispatchEvent(new MouseEvent('mousemove',{movementX:-delta/.002,movementY:-(pitch-s.pitch)/.002}));
-   return {fire,remaining:s.remaining,hp:s.hp,reload:!s.ammo,exit:!alive.length&&Math.hypot(s.position.x,s.position.z+32)<2.4};
+   return {fire,remaining:s.remaining,hp:s.hp,reload:!s.ammo,exit:!alive.length&&Math.hypot(s.position.x,s.position.z+95)<2.4};
   });
   if(command.done){assert.equal(command.done,'win');console.log('PASS: real keyboard/mouse bot cleared five mutants and reached exit');break;}
   if(command.remaining!==last){console.log('Remaining:',command.remaining,'HP:',command.hp);last=command.remaining;}

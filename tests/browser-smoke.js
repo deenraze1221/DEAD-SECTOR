@@ -46,7 +46,7 @@ import assert from 'node:assert/strict';
 
     await page.keyboard.press('Escape');await page.waitForTimeout(100);
     await page.locator('#restart').click();await waitForState(state => state.running);
-    assert.deepEqual((await snapshot()).position,{x:0,y:0,z:16});
+    assert.deepEqual((await snapshot()).position,{x:0,y:0,z:85});
     await page.keyboard.press('Escape');await page.waitForTimeout(100);
     await page.setViewportSize({width:800,height:600});
 

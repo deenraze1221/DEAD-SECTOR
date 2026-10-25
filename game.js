@@ -6,12 +6,15 @@ import { createPSX } from './psx.js';
 import { Rifle } from './weapons.js';
 import { Enemies } from './enemies.js';
 import { GameAudio } from './audio.js';
+import {Session} from './network.js';
 
 const $ = id => document.getElementById(id);
 const keys = new Set();
 const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space']);
 let renderer, scene, camera, player;
-let psx, rifle, enemies, exit;
+let psx, rifle, enemies, exit, colliders=[], world, peer, peerPose=null, netTime=0;
+let seed=crypto.getRandomValues(new Uint32Array(1))[0];
+const session=new Session(receiveNetwork,text=>{$('network-status').textContent=text;});
 const audio = new GameAudio();
 let hp=100, outcome='', shooting=false, triggerPressed=false, aiming=false, hitTime=0, hurtTime=0, elapsed=0;
 let running = false, started = false, jumpQueued = false, accumulator = 0, previousTime = 0;
@@ -27,6 +30,7 @@ $('sensitivity').addEventListener('input', event => {
   try { localStorage.setItem('dead-sector:sensitivity', sensitivity); } catch { /* Optional preference. */ }
 });
 $('settings-button').addEventListener('click', () => {
+  $('network-panel').hidden=true;
   $('settings').hidden = !$('settings').hidden;
   $('settings-button').setAttribute('aria-expanded', String(!$('settings').hidden));
 });
@@ -38,11 +42,18 @@ function setRunning(value) {
   for (const id of ['menu', 'briefing', 'footer']) $(id).hidden = value;
   $('hud').hidden = !value;
   $('restart').hidden = !started;
-  $('start').innerHTML = outcome ? t('НОВАЯ ЗАЧИСТКА <span>↗</span>') : started ? t('ПРОДОЛЖИТЬ <span>↗</span>') : t('ВОЙТИ В СЕКТОР <span>↗</span>');
+  $('start').innerHTML = outcome ? t('НОВАЯ ЗАЧИСТКА <span>↗</span>') : started ? t('ПРОДОЛЖИТЬ <span>↗</span>') : t('ИГРАТЬ <span>↗</span>');
 }
 
-function resetCombat(){player.reset();rifle.reset();enemies.reset();hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;updateCamera();}
-function finish(result){if(outcome)return;outcome=result;pause();$('message').textContent=result==='win'?t('СЕКТОР ЗАЧИЩЕН. Вы добрались до выхода.'):t('ВЫ ПОГИБЛИ. Начните зачистку заново.');}
+function rebuild(seedValue){
+  if(scene){scene.traverse(o=>{o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))m?.dispose();});}
+  scene=new THREE.Scene();world=createMap(scene,seedValue);seed=world.seed;colliders=world.colliders;
+  player=new Player(world.spawn);enemies=new Enemies(scene,colliders,audio,world.enemySpawns);
+  exit=new THREE.Mesh(new THREE.BoxGeometry(4,3,.3),new THREE.MeshBasicMaterial({color:'#873d2b'}));exit.position.set(world.exit.x,1.5,world.exit.z);scene.add(exit);
+  peer=new THREE.Group();const material=new THREE.MeshStandardMaterial({color:'#7d9676'});const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,3,6),material);body.position.y=1;peer.add(body);const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),material);head.position.y=1.75;peer.add(head);peer.visible=false;scene.add(peer);peerPose=null;
+}
+function resetCombat(){session.close();rebuild(crypto.getRandomValues(new Uint32Array(1))[0]);rifle.reset();hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;updateCamera();}
+function finish(result){if(outcome)return;outcome=result;if(session.active&&session.host)session.send({type:'end',result});pause();$('message').textContent=result==='win'?t('СЕКТОР ЗАЧИЩЕН. Вы добрались до выхода.'):t('ВЫ ПОГИБЛИ. Начните зачистку заново.');}
 async function enter() {
   if(outcome)resetCombat();
   audio.unlock();
@@ -70,7 +81,7 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 document.addEventListener('keydown', event => {
   if (event.code === 'Escape' && running) { pause(); return; }
   if(running && event.code==='KeyR'){rifle.reload();event.preventDefault();return;}
-  if(running && event.code==='KeyE' && !enemies.alive && Math.hypot(player.position.x,player.position.z+32)<2.5 && player.position.y<1){finish('win');return;}
+  if(running && event.code==='KeyE' && !enemies.alive && Math.hypot(player.position.x,player.position.z-world.exit.z)<2.5 && player.position.y<1){if(session.active&&!session.host)session.send({type:'exit'});else finish('win');return;}
   if (!running || !movementKeys.has(event.code)) return;
   event.preventDefault();
   if (event.code === 'Space' && !keys.has('Space') && !event.repeat) jumpQueued = true;
@@ -95,7 +106,7 @@ function resize() {
 
 // Read-only snapshot for reproducible browser checks, without allowing state mutation.
 export function getSnapshot() {
-  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded, hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, remaining:enemies?.alive, enemies:enemies?.items.map(e=>({hp:e.hp,x:e.rig.position.x,z:e.rig.position.z})) };
+  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded, hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, seed,room:session.code,networkActive:session.active,peerVisible:peer?.visible,remaining:enemies?.alive, enemies:enemies?.items.map(e=>({hp:e.hp,x:e.rig.position.x,z:e.rig.position.z})) };
 }
 
 try {
@@ -103,10 +114,8 @@ try {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
-  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(78, 1, .1, 130);
-  const { colliders, spawn } = createMap(scene); player = new Player(spawn);
-  rifle=new Rifle(audio);enemies=new Enemies(scene,colliders,audio);
-  exit=new THREE.Mesh(new THREE.BoxGeometry(3,3,.15),new THREE.MeshBasicMaterial({color:'#873d2b'}));exit.position.set(0,1.5,-34.35);scene.add(exit);
+  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(78, 1, .1, 260);
+  rebuild(seed);rifle=new Rifle(audio);
   psx = createPSX(scene, renderer);
   updateCamera(); resize(); window.addEventListener('resize', resize);
   $('scene').addEventListener('webglcontextlost', event => {
@@ -116,7 +125,7 @@ try {
   $('start').disabled = false; setRunning(false);
   function frame(time) {
     const delta = Math.min(Math.max((time - previousTime) / 1000, 0), .1); previousTime = time;
-    if (running) {
+    if (running || (session.active && started && !outcome)) {
       accumulator += delta;
       while (accumulator >= FIXED_STEP) {
         player.step(FIXED_STEP, {
@@ -128,19 +137,21 @@ try {
         updateCamera();camera.updateMatrixWorld();
         if(((shooting && rifle.config.automatic)||triggerPressed) && rifle.fire()){
           const direction=camera.getWorldDirection(new THREE.Vector3());
-          if(enemies.shoot(camera.position,direction,rifle.config.damage))hitTime=.15;
+          if(session.active&&!session.host)session.send({type:'shot',direction:direction.toArray(),weapon:rifle.config.id});else if(enemies.shoot(camera.position,direction,rifle.config.damage))hitTime=.15;
           player.pitch=Math.min(Math.PI/2-.02,player.pitch+.008);
         }
         triggerPressed=false;
-        enemies.step(FIXED_STEP,player,damage=>{hp=Math.max(0,hp-damage);hurtTime=.3;audio.play('hurt');if(!hp)finish('dead');});
+        if(!session.active||session.host){
+          enemies.step(FIXED_STEP,player,damage=>{hp=Math.max(0,hp-damage);hurtTime=.3;audio.play('hurt');if(!hp)finish('dead');},peerPose&&peerPose.hp>0?{position:peerPose}:null,()=>session.send({type:'damage'}));
+        }
         hitTime=Math.max(0,hitTime-FIXED_STEP);hurtTime=Math.max(0,hurtTime-FIXED_STEP);
-        if(!running)break;
+        if(!running&&!session.active)break;
       }
       $('movement').textContent = !player.grounded ? t('В ВОЗДУХЕ') : keys.has('ShiftLeft') || keys.has('ShiftRight') ? t('БЕГ') : t('ПЕШКОМ');
       const fov=aiming?55:78;if(camera.fov!==fov){camera.fov=fov;camera.updateProjectionMatrix();}
       updateCamera();
     } else if (!started) {
-      camera.position.set(24, 10, 27); camera.lookAt(-5, 1, -8);
+      camera.position.set(36, 28, 95); camera.lookAt(0, 2, 40);
     }
     $('health').textContent=hp;$('health-bar').style.width=`${hp*1.35}px`;
     $('ammo').textContent=rifle.ammo;$('reserve').textContent=rifle.reserve;
@@ -149,6 +160,7 @@ try {
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
     exit.material.color.set(enemies.alive?'#873d2b':'#afdb65');
     rifle.pose(elapsed,keys.size>0,aiming);
+    if(session.active){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,hp});if(session.host)session.send({type:'state',enemies:enemies.items.map(e=>({hp:e.hp,x:e.rig.position.x,z:e.rig.position.z,rotation:e.rig.rotation.toArray()}))});}}
     renderer.autoClear=true;renderer.render(scene, camera);
     if(started&&!outcome){renderer.autoClear=false;renderer.clearDepth();renderer.render(rifle.scene,rifle.camera);}
   }
@@ -159,5 +171,19 @@ try {
   $('message').textContent = t('Не удалось запустить 3D-сцену. Нужен браузер с WebGL 2 и включённым аппаратным ускорением.');
 }
 
-$('online').addEventListener('click',()=>{$('message').textContent=t('Сетевой режим в разработке. Сейчас доступна одиночная игра.');});
+function receiveNetwork(m){
+ if(m.type==='room'&&!m.host){rebuild(m.seed);player.position.x=2;hp=100;outcome='';started=false;setRunning(false);}
+ if(m.type==='pose'){peerPose=m;peer.visible=true;peer.position.set(m.x,m.y,m.z);peer.rotation.y=m.yaw;}
+ if(m.type==='closed'||m.type==='left'){peerPose=null;if(peer)peer.visible=false;}
+ if(m.type==='state'&&!session.host){m.enemies.forEach((v,i)=>{const e=enemies.items[i];if(!e)return;e.hp=v.hp;e.rig.position.set(v.x,v.hp?0:.25,v.z);e.rig.rotation.fromArray(v.rotation);});}
+ if(m.type==='shot'&&session.host){const direction=new THREE.Vector3(...m.direction);if(direction.lengthSq()>.1)enemies.shoot(new THREE.Vector3(...m.origin),direction.normalize(),m.damage);}
+ if(m.type==='damage'){hp=Math.max(0,hp-m.amount);hurtTime=.3;if(!hp)finish('dead');}
+ if(m.type==='end'&&!session.host)finish(m.result);
+ if(m.type==='exit'&&session.host&&!enemies.alive)finish('win');
+}
+$('online').addEventListener('click',()=>{$('settings').hidden=true;$('network-panel').hidden=!$('network-panel').hidden;});
+$('host-room').addEventListener('click',()=>session.connect($('server-url').value,'create',seed));
+$('join-room').addEventListener('click',()=>session.connect($('server-url').value,'join',seed,$('room-code').value.trim()));
+$('close-room').addEventListener('click',()=>{session.close();peer.visible=false;$('network-status').textContent=t('Сессия закрыта');});
+$('server-url').value=location.protocol.startsWith('http')?`${location.protocol==='https:'?'wss':'ws'}://${location.hostname}:3000`:'ws://localhost:3000';
 window.addEventListener('game-language-change',()=>{setRunning(false);$('message').textContent=t($('message').textContent);});

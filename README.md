@@ -1,115 +1,51 @@
 # DEAD SECTOR
 
-Браузерный low-poly FPS. Готов одиночный боевой прототип: случайное оружие из четырёх моделей, пять мутантов, зачистка сектора, выход и поражение. Полные правила: [docs/GAME_DESIGN.md](docs/GAME_DESIGN.md).
+Single-player browser FPS with randomly generated 200 × 200 m towns and two-player shared rooms. Four user-provided weapons are retained; all environment models are now original procedural geometry. English by default; Russian in Settings.
 
-## Играть без установки
+## Play offline
 
-Скачать репозиторий через Code → Download ZIP, распаковать архив и открыть корневой `index.html` двойным щелчком. Это самодостаточная сборка: стили и Three.js встроены, Node.js и сервер не нужны. Нажать «Войти в сектор».
+Download ZIP, extract and open `index.html`. No installation or Internet needed for single player. Click Play to capture the mouse. Restart / New run generates a new city and rolls one of four weapons. Resume preserves the current city and loadout.
 
-## Разработка
+WASD move; Shift sprint; Space jump; LMB fire; RMB aim; R reload; Esc menu. Clear five mutants, reach the north exit at (0, −95), press E. Player starts at (0, 85), with 100 HP. Buildings and props have solid colliders; doorways are accessible.
 
-Нужен Node.js 22.12+ (проверено на Node 24). В каталоге проекта:
+## Original city models
+
+15 prop categories: bench, bin, dumpster, lamp, car, concrete barrier, fence, barrel, crate, hydrant, electrical cabinet, bus shelter, pallet, street sign and bollard. Five building archetypes: apartment, office, shop, garage and clinic. Six connected avenues separate 16 lots. Every category appears in each town; seeded variation selects buildings and prop arrangements. Main roads remain clear; tests verify routes to every building, enemy spawn and exit across several seeds.
+
+`town.js` is the deterministic layout and collision source; `city.js` constructs meshes. No uploaded environment FBX/PNG/JPG is used or retained. `assets/imported/Guns/` and `assets/models/weapons.json` contain the four user-supplied weapons and matching magazines. Re-import with `node scripts/import-weapons.js`, then build.
+
+Pixel rendering is always enabled at 270 pixels vertically; vertex snapping and graphic toggles are removed. Models use original low-poly geometry and flat materials. Mutants have articulated limbs, ribs, jaws and skin detail.
+
+## Open to network
+
+A running, reachable Node.js server is required for real rooms:
+
+```sh
+npm ci
+npm run build
+npm run server
+```
+
+The server serves the built game on port 3000 and accepts WebSocket rooms. On the host: Open to network → enter server URL (e.g. `ws://192.168.1.10:3000`) → Create room. Give your friend the same server address and the six-character code. The friend uses Join. Both then click Play. A code alone does not make a local server accessible over the Internet. For Internet play deploy the server on an accessible host; HTTPS pages require a `wss://` endpoint. No automatic hosting or port forwarding is performed.
+
+Implemented: two-player limit, matching city seed, visible partner, movement replication, guest shots processed by the host, shared enemy health/deaths, damage to the nearest player and common completion. The host simulates the world; menu does not pause an active network game. Host death ends the shared run. Guest death requires restarting/rejoining; revival/reconnection and anti-cheat are not implemented. Starting a new run closes the current session. Host disconnect closes the room; guest disconnect frees its slot. These are private casual rooms, not a production multiplayer service.
+
+## Development and validation
+
+Node.js >=22.12:
 
 ```sh
 npm ci
 npm run dev -- --port 5173
-```
-
-Открыть `/app.html` по адресу dev-сервера Vite в настольном браузере. Для управления нажать «Войти в сектор» и разрешить захват мыши. `app.html` — исходный шаблон для разработки, ему нужен Vite; корневой `index.html` — готовая автономная игра. После изменения исходников выполнить `npm run build`, чтобы обновить его. При работе через удалённую среду использовать предоставленный платформой проброс порта 5173. Игра не требует CDN, ключей или игрового сервера.
-
-```sh
+# Open /app.html on the Vite server for source development.
 npm test
 npm run build
-npm run preview -- --port 4173
-```
-
-`dist/` — готовый статический клиент. Его можно обслуживать любым статическим HTTP(S)-сервером. Для загрузки зависимостей нужен registry.npmjs.org; после установки игра работает без внешних сетевых запросов.
-
-## Что работает
-
-- Меню, пауза, повторный старт, сохраняемая чувствительность мыши.
-- Обзор с ограничением вертикального угла, WASD независимо от раскладки, Shift для бега, Space для прыжка.
-- Физика с фиксированным шагом 1/120 с, одинаковая скорость по диагонали, столкновения со стенами, потолком и препятствиями. Прыжок только с опоры; удержание Space не вызывает автопрыжки.
-- Тренировочная карта 70 × 70 м: периметр, бетонные укрытия, ящики, здание с проходом, фонари и фоновая застройка. Низкий ящик рядом с центром подходит для проверки приземления сверху.
-- Туман, процедурные пиксельные материалы, освещение, тени и минимальный HUD.
-- Постоянная пикселизация сцены с высотой 270 пикселей и масштабированием без сглаживания. Vertex snapping полностью удалён; графических переключателей нет. Интерфейс остаётся чётким.
-- Повторение текстур стен, препятствий и земли с одинаковым масштабом 1,5 м на тайл.
-- Восемь составных low-poly моделей: деревянные ящики с досками, распорками, лентами и заклёпками; ржавые и зелёные бочки с профилированным корпусом, обручами, крышками и пробками. Модели создаются в `props.js`, их коллайдеры используют те же размеры.
-- При Esc, потере фокуса или переключении вкладки движение останавливается и ввод сбрасывается.
-
-## Бой и прохождение
-
-ЛКМ — огонь; ПКМ — прицеливание; R — перезарядка. В начале нового забега (включая повтор после победы или смерти) случайно выбирается одно из четырёх оружий с равной вероятностью. Оружие может повториться. Пауза и обычная перезарядка оружие не меняют. Название и боезапас видны в HUD.
-
-| Оружие | Магазин / резерв | Урон | Интервал выстрелов | Перезарядка |
-| --- | --- | --- | --- | --- |
-| RifleGod | 30 / 90 | 34 | 0,11 с | 1,7 с |
-| RifleBran | 20 / 80 | 50 | 0,20 с | 2,0 с |
-| SMG | 32 / 128 | 25 | 0,075 с | 1,5 с |
-| Pistol | 12 / 60 | 50 | 0,25 с | 1,15 с |
-
-Винтовки и SMG стреляют при удержании ЛКМ; пистолет — один выстрел на нажатие. У мутанта 100 HP. Стены блокируют попадания и обнаружение игрока.
-
-На карте пять мутантов с процедурными low-poly моделями, анимацией ходьбы и атак. Обнаружив игрока в пределах 25 м при прямой видимости, они преследуют его по навигационной сетке, обходят здания и укрытия. Атака вблизи наносит 12 HP с интервалом 0,95 с. При 0 HP появляется экран поражения; новая зачистка полностью сбрасывает врагов, здоровье и боезапас.
-
-После уничтожения всех пяти мутантов северные ворота становятся зелёными. Подойти к ним (координаты примерно 0, −32) и нажать E: появится экран успешной зачистки. Это один законченный уровень; процедурная генерация, следующий уровень, аптечки, дробовик и кооператив пока не реализованы.
-
-Звуки выстрелов, перезарядки, попаданий и получения урона синтезируются через Web Audio после клика «Войти в сектор». Никаких внешних аудиофайлов не требуется. Винтовка отображается отдельным проходом рендера, с отдачей, вспышкой и анимацией перезарядки.
-
-
-## Структура
-
-- `app.html`, `style.css` — исходники интерфейса; `index.html` — автоматически собранная автономная версия.
-- `game.js` — инициализация, события ввода, состояния меню/паузы, отрисовка.
-- `player.js` — независимая от отрисовки физика и обзор.
-- `map.js` — геометрия тренировочного сектора и коллайдеры.
-- `weapons.js`, `enemies.js`, `navigation.js`, `audio.js` — винтовка, мутанты, поиск пути и звуковые эффекты.
-- `psx.js` — низкое разрешение и шейдер привязки вершин к экранной сетке.
-- `props.js` — переиспользуемые модели бочек и ящиков, материалы и размещение.
-- `tests/player.test.js` — физические и геометрические регрессии.
-- `docs/GAME_DESIGN.md` — правила и план.
-
-## Ручная проверка в браузере
-
-1. Войти в сектор; мышь управляет обзором, WASD — движением, Shift ускоряет.
-2. Подойти к стенам и укрытиям прямо и по диагонали: нельзя пройти насквозь, вдоль стены можно скользить.
-3. Найти здание с табличкой TRAINING слева впереди от старта, зайти через дверной проём и выйти.
-4. Прыгнуть на низкий ящик, сойти с него; проверить, что удержание Space не повторяет прыжок.
-5. Нажать Esc во время движения; продолжить — игрок не должен двигаться сам. Повторить с переключением вкладки.
-6. Изменить чувствительность и перезагрузить страницу; значение сохраняется, если браузер разрешает localStorage.
-7. «Начать сначала» возвращает в исходную точку. Проверить также production-сборку через `npm run preview`.
-
-Pointer Lock требует явного клика и может ограничиваться браузером или iframe. При отсутствии WebGL 2 отображается сообщение об ошибке. Телефонное сенсорное управление не реализовано.
-
-## Автоматическая проверка браузера
-
-При запущенном dev-сервере можно проверить настоящую WebGL-сцену и события управления через Playwright:
-
-```sh
-# В этой облачной среде Chromium уже установлен:
 CHROMIUM_PATH=/usr/bin/chromium npm run test:browser
+CHROMIUM_PATH=/usr/bin/chromium npm run test:combat:browser
+CHROMIUM_PATH=/usr/bin/chromium npm run test:weapons:browser
+CHROMIUM_PATH=/usr/bin/chromium npm run test:city:browser
 ```
 
-На другой машине установить браузер командой `npx playwright install chromium`, затем выполнить `npm run test:browser`. При нестандартном порте задать `BASE_URL`. Этот тест работает с dev-сервером: он использует экспортируемый снимок состояния для проверки движения и паузы. Проверяет запуск WebGL, захват мыши, движение, прыжок и приземление, обзор, остановку во время паузы, сброс ввода при продолжении, повторный старт и сохранение чувствительности; ошибки браузера приводят к падению проверки. Программный WebGL используется только для тестирования, он не измеряет производительность на пользовательской видеокарте.
+Browser tests need a running dev server; use BASE_URL for a different address. Playwright Chromium can be installed with `npx playwright install chromium` on another machine. `npm run build` writes the self-contained root `index.html` and `dist/index.html`; generated files are committed for double-click play. Source changes require a rebuild.
 
-Боевые регрессии входят в `npm test`: магазин, скорострельность, перезарядка, попадания и укрытия, смерть всех врагов, атаки и маршруты через дверной проём.
-
-Полное автоматическое прохождение в браузере (с запущенным dev-сервером): `CHROMIUM_PATH=/usr/bin/chromium npm run test:combat:browser`. Бот использует только чтение состояния и ввод мышью/клавиатурой: стреляет, перезаряжается, убивает пять мутантов, идёт к выходу и нажимает E; затем начинает новый забег и проверяет поражение от атак. Для другого порта задать `BASE_URL`. Проверка занимает около минуты.
-
-## Модели из assets.zip
-
-Оригиналы архива сохранены в `assets/imported/`, оба TXT прочитаны. `Guns/SciFi_gun_2-2.fbx` содержит четыре оружия и четыре соответствующих магазина: RifleGod, RifleBran, SMG, Pistol и одноимённые объекты с суффиксом Magazine. Каждое оружие импортируется вместе со своим магазином и исходным распределением материалов; магазин отдельно двигается при перезарядке (верхний у BRAN извлекается вверх).
-
-`node scripts/import-weapons.js` конвертирует FBX в `assets/models/weapons.json`: сохраняет геометрию и относительные позиции магазинов, нормализует размеры и направляет стволы вперёд. Затем `npm run build` встраивает все четыре модели в автономный `index.html` без внешних запросов. Прежняя одиночная модель в игре больше не используется.
-
-У оружейного FBX в архиве нет текстурных PNG/JPG: используются назначенные материалы. В архиве также есть автомобиль, заграждение, мусорный контейнер, два уличных фонаря и набор скамеек/урн/фонаря. Соответствующие PNG/JPG сохранены рядом с исходными FBX; все перечисленные модели окружения теперь размещены на карте с текстурами и коллайдерами.
-
-Проверка всех четырёх вариантов в Chromium: `CHROMIUM_PATH=/usr/bin/chromium npm run test:weapons:browser` при запущенном dev-сервере; при другом адресе задать `BASE_URL` с `/app.html`.
-
-## Город, языки и меню
-
-`node scripts/import-city.js` собирает `assets/models/city.json` из оригинальных FBX. Встроенные data URI сохраняют автономный запуск всех PNG/JPG без сетевых запросов. `city.js` размещает две машины, три заграждения, два контейнера, три фонаря, две скамейки и две урны. Их реальные размеры используются для столкновений и навигации. Дополнительно созданы три собственных электрощита/технических блока и мелкий мусор.
-
-Мутанты получили объёмный торс, сужающиеся конечности, рёбра, челюсть, зубы, надбровья, костяные выступы и пятнистую окраску кожи. Логика боя и анимации сохранена.
-
-Английский — язык по умолчанию. Settings → Language / Язык переключает English / Русский; выбор сохраняется локально. Переводится меню, HUD, подсказки, названия оружия и сообщения победы/поражения. Кнопка Play online / Играть по сети показывает честное сообщение о разработке режима; сетевого подключения пока нет.
+With both the dev server and `npm run server` running: `CHROMIUM_PATH=/usr/bin/chromium npm run test:network:browser` verifies two browsers joining the same room, matching city seed, visible partners, a guest killing an enemy on the host, disconnect handling, city reroll and absence of menu scrollbars. Override WS_URL for another WebSocket server. This has been validated locally; public Internet hosting is a separate deployment step.

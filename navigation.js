@@ -1,6 +1,6 @@
 // One-metre navigation grid shared by all enemies. Expanded obstacles keep bodies clear.
 export function createNavigation(colliders) {
-  const size = 69, offset = 34;
+  const size = 199, offset = 99;
   const blocked = new Uint8Array(size * size);
   const index = (x, z) => (z + offset) * size + x + offset;
   const free = (x, z) => x >= -offset && x <= offset && z >= -offset && z <= offset && !blocked[index(x,z)];

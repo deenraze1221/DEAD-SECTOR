@@ -19,9 +19,14 @@
       <div class="menu-actions">
         <button id="start" class="primary" disabled>ЗАГРУЗКА СЕКТОРА…</button>
         <button id="restart" class="secondary" hidden>НАЧАТЬ СНАЧАЛА <span>↺</span></button>
-        <button id="online" class="secondary">ИГРАТЬ ПО СЕТИ · СКОРО</button>
+        <button id="online" class="secondary">ОТКРЫТЬ ДЛЯ СЕТИ</button>
         <button id="settings-button" class="secondary" aria-expanded="false">НАСТРОЙКИ <span>+</span></button>
       </div>
+      <section id="network-panel" class="settings" hidden>
+        <label for="server-url">Server / Сервер</label><input id="server-url" placeholder="ws://server:3000" />
+        <div class="network-actions"><button id="host-room">Create room / Создать</button><input id="room-code" placeholder="Code / Код" maxlength="6" /><button id="join-room">Join / Войти</button><button id="close-room">Disconnect / Отключиться</button></div>
+        <p id="network-status" role="status">Node.js server required / Требуется Node.js сервер</p>
+      </section>
       <section id="settings" class="settings" hidden>
         <label for="sensitivity">Чувствительность мыши <output id="sensitivity-value">1.0</output></label>
         <input id="sensitivity" type="range" min="0.2" max="2" value="1" step="0.1" />

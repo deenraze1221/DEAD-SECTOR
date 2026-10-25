@@ -5,13 +5,13 @@ export function obstacleDistance(origin,direction,colliders,max=100){
  for(const b of colliders){const box=new THREE.Box3(new THREE.Vector3(b.minX,b.minY,b.minZ),new THREE.Vector3(b.maxX,b.maxY,b.maxZ));if(ray.intersectBox(box,point))nearest=Math.min(nearest,point.distanceTo(origin));}return nearest;
 }
 export class Enemies {
- constructor(scene,colliders,audio){
+ constructor(scene,colliders,audio,spawns=[[-5,1],[9,1],[-13,-7],[5,-16],[-9,19]]){this.spawns=spawns;
   this.colliders=colliders;this.nav=createNavigation(colliders);this.audio=audio;this.items=[];
   const flesh=new THREE.MeshStandardMaterial({color:'#8a7866',roughness:1,flatShading:true,vertexColors:true});
   const uniform=new THREE.MeshStandardMaterial({color:'#424b36',roughness:1});
   const wound=new THREE.MeshStandardMaterial({color:'#68352c',roughness:1});
   const eye=new THREE.MeshBasicMaterial({color:'#dbbd71'});
-  for(const [i,[x,z]] of [[-5,1],[9,1],[-13,-7],[5,-16],[-9,19]].entries()){
+  for(const [i,[x,z]] of this.spawns.entries()){
    const rig=new THREE.Group();rig.position.set(x,0,z);scene.add(rig);
    const mesh=(geo,mat,parent,px,py,pz)=>{if(mat===flesh){const colors=[];for(let v=0;v<geo.attributes.position.count;v++){const shade=.68+.3*(Math.sin(v*43.7)*.5+.5);colors.push(shade,shade,shade*.92);}geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));}const m=new THREE.Mesh(geo,mat);m.position.set(px,py,pz);m.castShadow=m.receiveShadow=true;parent.add(m);return m;};
    mesh(new THREE.CapsuleGeometry(.26,.32,3,6),uniform,rig,0,1.13,0);
@@ -40,20 +40,21 @@ export class Enemies {
   }
  }
  get alive(){return this.items.filter(e=>e.hp>0).length;}
- reset(){const positions=[[-5,1],[9,1],[-13,-7],[5,-16],[-9,19]];this.items.forEach((e,i)=>{e.hp=100;e.rig.position.set(positions[i][0],0,positions[i][1]);e.rig.rotation.set(0,0,0);e.attack=0;e.repath=0;e.path=[];e.aggro=false;e.limbs.forEach(l=>l.rotation.x=0);});}
- step(dt,player,hurt){
+ reset(){const positions=this.spawns;this.items.forEach((e,i)=>{e.hp=100;e.rig.position.set(positions[i][0],0,positions[i][1]);e.rig.rotation.set(0,0,0);e.attack=0;e.repath=0;e.path=[];e.aggro=false;e.limbs.forEach(l=>l.rotation.x=0);});}
+ step(dt,player,hurt,other=null,hurtOther=()=>{}){
   for(const e of this.items){if(e.hp<=0)continue;e.attack-=dt;e.repath-=dt;const p=e.rig.position;
-   const distance=Math.hypot(player.position.x-p.x,player.position.z-p.z);
-   if(!e.aggro&&distance<25){const origin=p.clone().add(new THREE.Vector3(0,1.5,0)),target=new THREE.Vector3(player.position.x,player.position.y+1.5,player.position.z);const dir=target.sub(origin);const length=dir.length();if(obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.1)e.aggro=true;}
+   const target=other&&Math.hypot(other.position.x-p.x,other.position.z-p.z)<Math.hypot(player.position.x-p.x,player.position.z-p.z)?other:player;
+   const distance=Math.hypot(target.position.x-p.x,target.position.z-p.z);
+   if(!e.aggro&&distance<25){const origin=p.clone().add(new THREE.Vector3(0,1.5,0)),eyeTarget=new THREE.Vector3(target.position.x,target.position.y+1.5,target.position.z);const dir=eyeTarget.sub(origin);const length=dir.length();if(obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.1)e.aggro=true;}
    if(!e.aggro)continue;
-   if(distance<1.25&&Math.abs(player.position.y-p.y)<1.3){
-    const origin=p.clone().add(new THREE.Vector3(0,1,0)),dir=new THREE.Vector3(player.position.x,player.position.y+1,player.position.z).sub(origin);const length=dir.length();
-    if(e.attack<=0&&obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.05){hurt(12);e.attack=.95;}
+   if(distance<1.25&&Math.abs(target.position.y-p.y)<1.3){
+    const origin=p.clone().add(new THREE.Vector3(0,1,0)),dir=new THREE.Vector3(target.position.x,target.position.y+1,target.position.z).sub(origin);const length=dir.length();
+    if(e.attack<=0&&obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.05){if(target===other)hurtOther(12);else hurt(12);e.attack=.95;}
    }else{
-    if(e.repath<=0){e.path=this.nav.path(p,player.position);e.repath=.65;}
-    const target=e.path[0];if(target){const dx=target.x-p.x,dz=target.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,dt*1.5);if(len>.001){p.x+=dx/len*step;p.z+=dz/len*step;}if(len<.12)e.path.shift();}
+    if(e.repath<=0){e.path=this.nav.path(p,target.position);e.repath=.65;}
+    const waypoint=e.path[0];if(waypoint){const dx=waypoint.x-p.x,dz=waypoint.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,dt*1.5);if(len>.001){p.x+=dx/len*step;p.z+=dz/len*step;}if(len<.12)e.path.shift();}
    }
-   e.phase+=dt*5;e.rig.rotation.y=Math.atan2(player.position.x-p.x,player.position.z-p.z);
+   e.phase+=dt*5;e.rig.rotation.y=Math.atan2(target.position.x-p.x,target.position.z-p.z);
    e.limbs.forEach((l,i)=>{l.rotation.x=Math.sin(e.phase+(i%2)*Math.PI)*.4+(i%2===1?-.5:0);});
   }
  }
