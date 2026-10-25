@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { createPropModels, propColliders } from './props.js';
 
 export const SPAWN = Object.freeze({ x: 0, y: 0, z: 16 });
 // Static training layout. Dimensions are metres, y is the bottom of an object.
@@ -16,16 +17,16 @@ block(18, 0, -21, 14, 9, 11); block(-26, 0, -24, 10, 12, 12);
 block(25, 0, 13, 10, 7, 13); block(-26, 0, 17, 9, 8, 13);
 block(7, 0, -5, 6, 2.5, 2.5, 'rust'); block(12, 0, -5, 2, 3, 2, 'rust');
 block(-4, 0, 6, 4, 1.3, .8); block(6, 0, 10, 4, 1.3, .8);
-block(0, 0, -12, 4, 1.3, .8); block(-1, 0, -1, 1.6, .65, 1.6, 'rust');
+block(0, 0, -12, 4, 1.3, .8);
 block(17, 0, 3, 2.5, 1.2, 5, 'rust'); block(17, 1.2, 3, 2.2, .8, 2.5, 'dark');
-block(-21, 0, 4, 1.3, 1.2, 1.3, 'rust'); block(-22.5, 0, 4, 1.3, 1.2, 1.3, 'rust');
+
 
 export function getColliders() {
-  return blocks.filter(b => b.solid).map(b => ({
+  return [...propColliders(), ...blocks.filter(b => b.solid).map(b => ({
     minX: b.x - b.w / 2, maxX: b.x + b.w / 2,
     minY: b.y, maxY: b.y + b.h,
     minZ: b.z - b.d / 2, maxZ: b.z + b.d / 2,
-  }));
+  }))];
 }
 
 function texture(base, variation) {
@@ -63,17 +64,29 @@ export function createMap(scene) {
   Object.assign(sun.shadow.camera, { left: -38, right: 38, top: 38, bottom: -38, near: 1, far: 100 });
   sun.shadow.bias = -.001; scene.add(sun);
   const mats = {
-    concrete: new THREE.MeshStandardMaterial({ map: texture([103, 108, 92], 35), roughness: 1 }),
-    rust: new THREE.MeshStandardMaterial({ map: texture([91, 69, 47], 45), roughness: .95 }),
+    concrete: new THREE.MeshStandardMaterial({ map: texture([103, 108, 92], 18), roughness: 1 }),
+    rust: new THREE.MeshStandardMaterial({ map: texture([91, 69, 47], 25), roughness: .95 }),
     dark: new THREE.MeshStandardMaterial({ color: '#232c27', roughness: .8 }),
   };
-  const groundMap = texture([66, 73, 60], 36); groundMap.repeat.set(36, 36);
+  const groundMap = texture([66, 73, 60], 20); groundMap.repeat.set(220 / 1.5, 220 / 1.5);
   const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), new THREE.MeshStandardMaterial({ map: groundMap, roughness: 1 }));
   ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
   for (const b of blocks) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(b.w, b.h, b.d), mats[b.material]);
+    const geometry = new THREE.BoxGeometry(b.w, b.h, b.d);
+    // BoxGeometry's default UVs stretch one tile across an entire wall.
+    // Project metres onto each face: every 1.5 m uses one texture tile.
+    const positions = geometry.attributes.position, normals = geometry.attributes.normal, uv = geometry.attributes.uv;
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i), y = positions.getY(i), z = positions.getZ(i);
+      const nx = normals.getX(i), ny = normals.getY(i), nz = normals.getZ(i);
+      if (Math.abs(nx) > .5) uv.setXY(i, -Math.sign(nx) * z / 1.5, y / 1.5);
+      else if (Math.abs(ny) > .5) uv.setXY(i, x / 1.5, -Math.sign(ny) * z / 1.5);
+      else uv.setXY(i, Math.sign(nz) * x / 1.5, y / 1.5);
+    }
+    const mesh = new THREE.Mesh(geometry, mats[b.material]);
     mesh.position.set(b.x, b.y + b.h / 2, b.z); mesh.castShadow = mesh.receiveShadow = true; scene.add(mesh);
   }
+  createPropModels(scene);
   const paint = new THREE.MeshStandardMaterial({ color: '#b4b18a', roughness: 1 });
   for (let z = -28; z < 30; z += 6) {
     const stripe = new THREE.Mesh(new THREE.PlaneGeometry(.12, 2.5), paint);
