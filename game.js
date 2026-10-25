@@ -1,11 +1,26 @@
 import * as THREE from 'three';
 import { Player, PLAYER, FIXED_STEP } from './player.js';
 import { createMap } from './map.js';
+import { createPSX } from './psx.js';
 
 const $ = id => document.getElementById(id);
 const keys = new Set();
 const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space']);
 let renderer, scene, camera, player;
+let psx;
+const effects = { pixels: true, snapping: true };
+for (const [id, key] of [['pixels', 'pixels'], ['vertex-snap', 'snapping']]) {
+  try {
+    const saved = localStorage.getItem(`dead-sector:${key}`);
+    if (saved !== null) effects[key] = saved !== 'false';
+  } catch { /* Preferences are optional. */ }
+  $(id).checked = effects[key];
+  $(id).addEventListener('change', event => {
+    effects[key] = event.target.checked;
+    try { localStorage.setItem(`dead-sector:${key}`, String(effects[key])); } catch { /* Optional. */ }
+    if (psx) resize();
+  });
+}
 let running = false, started = false, jumpQueued = false, accumulator = 0, previousTime = 0;
 let sensitivity = 1;
 try {
@@ -70,7 +85,7 @@ function updateCamera() {
 }
 function resize() {
   camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
-  renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5)); renderer.setSize(innerWidth, innerHeight);
+  psx.resize(innerWidth, innerHeight, effects.pixels, effects.snapping);
 }
 
 // Read-only snapshot for reproducible browser checks, without allowing state mutation.
@@ -85,6 +100,7 @@ try {
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
   scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(78, 1, .1, 130);
   const { colliders, spawn } = createMap(scene); player = new Player(spawn);
+  psx = createPSX(scene, renderer);
   updateCamera(); resize(); window.addEventListener('resize', resize);
   $('scene').addEventListener('webglcontextlost', event => {
     event.preventDefault(); pause(); $('start').disabled = true;
