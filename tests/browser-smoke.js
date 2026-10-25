@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
     const page = await browser.newPage({ viewport: {width:1440,height:900} });
     const errors=[];page.on('pageerror',e=>errors.push(e.message));
     page.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-    await page.goto(process.env.BASE_URL || 'http://127.0.0.1:5173/');
+    await page.goto(process.env.BASE_URL || 'http://127.0.0.1:5173/app.html');
     await page.waitForFunction(()=>!document.getElementById('start').disabled);
 
     const snapshot=()=>page.evaluate(async()=> (await import('/game.js')).getSnapshot());
