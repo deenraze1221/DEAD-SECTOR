@@ -6,15 +6,15 @@ Single-player browser FPS with randomly generated 200 × 200 m towns and two-pla
 
 Download ZIP, extract and open `index.html`. No installation or Internet needed for single player. Click Play to capture the mouse. Restart / New run generates a new city and rolls one of four weapons. Resume preserves the current city and loadout.
 
-WASD move; Shift sprint; Space jump; LMB fire; RMB aim; R reload; Esc menu. Clear five mutants, reach the north exit at (0, −95), press E. Player starts at (0, 85), with 100 HP. Buildings and props have solid colliders; doorways are accessible.
+WASD move; Shift sprint; Space jump; LMB fire; R reload; Esc menu. Survive endless waves from four corner hives. E interacts with supplies and revives a nearby partner; there is no exit victory. Player starts at (0, 85), with 100 HP. Buildings and props have solid colliders; doorways are accessible.
 
 ## Original city models
 
-15 prop categories: bench, bin, dumpster, lamp, car, concrete barrier, fence, barrel, crate, hydrant, electrical cabinet, bus shelter, pallet, street sign and bollard. Five building archetypes: apartment, office, shop, garage and clinic. Six connected avenues separate 16 lots. Every category appears in each town; seeded variation selects buildings and prop arrangements. Main roads remain clear; tests verify routes to every building, enemy spawn and exit across several seeds.
+15 prop categories: bench, bin, dumpster, lamp, car, concrete barrier, fence, barrel, crate, hydrant, electrical cabinet, bus shelter, pallet, street sign and bollard. Five building archetypes: apartment, office, shop, garage and clinic. A connected street grid separates 64 lots (four times the former building count). Every category appears in each town; seeded variation selects buildings and prop arrangements. Main roads remain clear; tests verify routes to every building, enemy spawn and exit across several seeds.
 
 `town.js` is the deterministic layout and collision source; `city.js` constructs meshes. No uploaded environment FBX/PNG/JPG is used or retained. `assets/imported/Guns/` and `assets/models/weapons.json` contain the four user-supplied weapons and matching magazines. Re-import with `node scripts/import-weapons.js`, then build.
 
-Pixel rendering is always enabled at 270 pixels vertically; vertex snapping and graphic toggles are removed. Models use original low-poly geometry and flat materials. Mutants have articulated limbs, ribs, jaws and skin detail.
+Pixel rendering is always enabled at 540 pixels vertically; vertex snapping and graphic toggles are removed. Models use original low-poly geometry and flat materials. Mutants have articulated limbs, ribs, jaws and skin detail.
 
 ## Open to network
 
@@ -28,7 +28,7 @@ npm run server
 
 The server serves the built game on port 3000 and accepts WebSocket rooms. On the host: Open to network → enter server URL (e.g. `ws://192.168.1.10:3000`) → Create room. Give your friend the same server address and the six-character code. The friend uses Join. Both then click Play. A code alone does not make a local server accessible over the Internet. For Internet play deploy the server on an accessible host; HTTPS pages require a `wss://` endpoint. No automatic hosting or port forwarding is performed.
 
-Implemented: two-player limit, matching city seed, visible partner, movement replication, guest shots processed by the host, shared enemy health/deaths, damage to the nearest player and common completion. The host simulates the world; menu does not pause an active network game. Host death ends the shared run. Guest death requires restarting/rejoining; revival/reconnection and anti-cheat are not implemented. Starting a new run closes the current session. Host disconnect closes the room; guest disconnect frees its slot. These are private casual rooms, not a production multiplayer service.
+Implemented: two-player limit, matching city seed, visible partner, movement replication, guest shots processed by the host, shared enemy health/deaths, damage to the nearest player and common completion. The host simulates the world; menu does not pause an active network game. At zero HP a network player is downed. A living partner within 2.5 m presses E to revive them with 50 HP. Both downed ends the run. Anti-cheat is not implemented. Starting a new run closes the current session. Unexpected disconnect reserves the seat and world snapshot for two minutes. The client retries automatically; after refreshing the page use Reconnect in the network panel. Explicit Disconnect by the host closes the room; explicit guest Disconnect frees the slot. These are private casual rooms, not a production multiplayer service.
 
 ## Development and validation
 
@@ -48,4 +48,41 @@ CHROMIUM_PATH=/usr/bin/chromium npm run test:city:browser
 
 Browser tests need a running dev server; use BASE_URL for a different address. Playwright Chromium can be installed with `npx playwright install chromium` on another machine. `npm run build` writes the self-contained root `index.html` and `dist/index.html`; generated files are committed for double-click play. Source changes require a rebuild.
 
-With both the dev server and `npm run server` running: `CHROMIUM_PATH=/usr/bin/chromium npm run test:network:browser` verifies two browsers joining the same room, matching city seed, visible partners, a guest killing an enemy on the host, disconnect handling, city reroll and absence of menu scrollbars. Override WS_URL for another WebSocket server. This has been validated locally; public Internet hosting is a separate deployment step.
+With both the dev server and `npm run server` running: `CHROMIUM_PATH=/usr/bin/chromium npm run test:network:browser` verifies two browsers joining the same room, matching city seed, visible partners, dynamic enemy replication and matching wave clocks, disconnect handling, city reroll and absence of menu scrollbars. Override WS_URL for another WebSocket server. This has been validated locally; public Internet hosting is a separate deployment step.
+
+## Districts, exploration and combat
+
+Four district identities influence buildings and decoration: industrial, residential, medical and market. Courtyards have entrances in their fences, commercial/industrial lots have parked cars, and five elevated signs identify districts and the north exit. Building positions vary with the seed. All generated medkits/ammunition have tested navigation routes.
+
+E picks up supplies within 1.5 m. Medkits restore 35 HP (maximum 100); ammo adds two magazines to the reserve (maximum twice the starting reserve). Full-health medkits remain available; taken supplies disappear for both players and remain taken after reconnecting. Rooms use host-authoritative pickup availability. The HUD shows interaction hints and nearest enemy distance/bearing.
+
+Weapon tuning (hip fire only; viewmodel moved 20% closer to the camera):
+
+| Weapon | Magazine | Damage | Fire interval | Sound |
+| --- | --- | --- | --- | --- |
+| Pistol | 8 | 10 | 0.28 s, single press | short sharp report |
+| RifleBran | 24 | 25 | 0.24 s | deeper, longer report |
+| RifleGod | 15 | 35 | 0.10 s | punchy medium report |
+| SMG | 35 | 8 | 0.065 s | short high-frequency report |
+
+Each sound is a distinct synthesized noise/filter/oscillator envelope, not an external audio file. Right click does not change FOV, camera or weapon pose.
+
+| Enemy | HP | Speed | Damage | Spawn chance |
+| --- | --- | --- | --- | --- |
+| Zombie | 250 | 2.2 m/s | 25 | 55% |
+| Runner | 125 | 3.6 m/s | 15 | 20% |
+| Flying flesh eye | 300 | 2.3 m/s | 30 on projectile hit | 20% |
+| Brute (3× size) | 600 | 1.1 m/s | 40 (default; unspecified in request) | 5% |
+
+Waves last 120 seconds, followed by 10-second intermissions. Wave 1 spawns 30 enemies gradually (one every four seconds); wave 2 spawns 35; each later wave adds five. Each event rolls the confirmed type probabilities and a random corner hive. Existing enemies persist across waves. Enemies actively hunt players, with a shared navigation field cache; brutes use wider clearance. Flying eyes fire visible projectiles that collide with cover and must hit a player's body to deal damage. Corpses fade after eight seconds. Host snapshots synchronize the wave clock, dynamic enemy IDs and projectiles, including after reconnect.
+
+The perimeter is a visible concrete wall 5.8 m tall. All environment meshes remain original procedural models. Static city geometry is batched by material for denser scenes. HUD panels show wave phase, countdown, spawned/total, alive enemies, health, weapon ammunition and context hints. Gloved hands and reload animation are retained.
+
+
+Additional browser checks: `npm run test:supplies:browser`, `npm run test:revive:browser` (the latter requires the WebSocket server). The revival test may take several minutes while enemies travel from corner hives to down the host, revives them with the guest's E key, reloads the host's browser and reconnects to the saved room.
+
+## Internet deployment
+
+After `npm ci && npm run build`, the Dockerfile packages the verified static client and installed `ws` package and runs the server as an unprivileged user. Image build requires no package-registry access inside containers. Build: `docker build -t dead-sector .`; run: `docker run --rm -p 3000:3000 dead-sector`. Put a TLS reverse proxy in front of port 3000 for an HTTPS site and WSS connections; the proxy must support WebSocket upgrades. In the game enter the public `wss://` endpoint, create a room and give the friend the same endpoint and code. The server keeps snapshots and pickup availability in memory for two-minute reconnects; restarting it clears rooms.
+
+Internet play cannot be validated without an actual public deployment/address. Two-client gameplay, revival, full-page reconnection and snapshot recovery have been validated locally; no public server is automatically published by this repository.

@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
 // All meshes are original procedural models; no imported environment assets.
 export function createCity(scene,layout){
 const mats={concrete:new T.MeshStandardMaterial({color:'#777b69',roughness:1}),dark:new T.MeshStandardMaterial({color:'#29352f',roughness:.9}),wood:new T.MeshStandardMaterial({color:'#756047',roughness:1}),steel:new T.MeshStandardMaterial({color:'#556259',metalness:.4,roughness:.75}),rust:new T.MeshStandardMaterial({color:'#86583d',roughness:.9}),light:new T.MeshBasicMaterial({color:'#d5dea5'}),glass:new T.MeshStandardMaterial({color:'#384b49',metalness:.3,roughness:.4})};
@@ -31,4 +32,9 @@ else if(type==='bollard')cyl(g,.12,h,'rust',0,h/2,0);
 else if(type==='sign'){cyl(g,.04,h,'steel',0,h/2,0);box(g,.8,.5,.06,'dark',0,h-.3,0);box(g,.6,.08,.07,'light',0,h-.3,-.02);}
 else {box(g,w,h,d,'steel',0,h/2,0);for(let i=0;i<7;i++)box(g,w*.75,.04,.05,'dark',0,.35+i*.15,-d/2-.02);box(g,.1,.1,.06,'light',w*.3,h*.8,-d/2-.02);}
 }
+// Bake static geometry by material to keep the denser city inexpensive to draw.
+scene.updateMatrixWorld(true);const batches=new Map(),originals=[];
+scene.traverse(o=>{if(!o.isMesh||Array.isArray(o.material))return;const key=o.material;if(!batches.has(key))batches.set(key,{material:o.material,geometry:[]});let geo=o.geometry.clone().applyMatrix4(o.matrixWorld);if(geo.index)geo=geo.toNonIndexed();batches.get(key).geometry.push(geo);originals.push(o);});
+for(const o of originals)o.removeFromParent();for(const batch of batches.values()){const geometry=mergeGeometries(batch.geometry,false);const mesh=new T.Mesh(geometry,batch.material);mesh.name='city-batch';scene.add(mesh);for(const g of batch.geometry)g.dispose();}
+
 }

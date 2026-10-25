@@ -1,66 +1,40 @@
-import * as THREE from 'three';
-import { createNavigation } from './navigation.js';
-export function obstacleDistance(origin,direction,colliders,max=100){
- const ray=new THREE.Ray(origin,direction),point=new THREE.Vector3();let nearest=max;
- for(const b of colliders){const box=new THREE.Box3(new THREE.Vector3(b.minX,b.minY,b.minZ),new THREE.Vector3(b.maxX,b.maxY,b.maxZ));if(ray.intersectBox(box,point))nearest=Math.min(nearest,point.distanceTo(origin));}return nearest;
-}
-export class Enemies {
- constructor(scene,colliders,audio,spawns=[[-5,1],[9,1],[-13,-7],[5,-16],[-9,19]]){this.spawns=spawns;
-  this.colliders=colliders;this.nav=createNavigation(colliders);this.audio=audio;this.items=[];
-  const flesh=new THREE.MeshStandardMaterial({color:'#8a7866',roughness:1,flatShading:true,vertexColors:true});
-  const uniform=new THREE.MeshStandardMaterial({color:'#424b36',roughness:1});
-  const wound=new THREE.MeshStandardMaterial({color:'#68352c',roughness:1});
-  const eye=new THREE.MeshBasicMaterial({color:'#dbbd71'});
-  for(const [i,[x,z]] of this.spawns.entries()){
-   const rig=new THREE.Group();rig.position.set(x,0,z);scene.add(rig);
-   const mesh=(geo,mat,parent,px,py,pz)=>{if(mat===flesh){const colors=[];for(let v=0;v<geo.attributes.position.count;v++){const shade=.68+.3*(Math.sin(v*43.7)*.5+.5);colors.push(shade,shade,shade*.92);}geo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));}const m=new THREE.Mesh(geo,mat);m.position.set(px,py,pz);m.castShadow=m.receiveShadow=true;parent.add(m);return m;};
-   mesh(new THREE.CapsuleGeometry(.26,.32,3,6),uniform,rig,0,1.13,0);
-   mesh(new THREE.IcosahedronGeometry(.23,0),wound,rig,.2,1.42,.06);
-   const head=mesh(new THREE.IcosahedronGeometry(.245,1),flesh,rig,0,1.72,.04);head.scale.set(.8,1.15,.9);
-   mesh(new THREE.BoxGeometry(.2,.16,.05),wound,rig,0,1.62,.23);
-   for(const x of [-.085,.085])mesh(new THREE.BoxGeometry(.04,.028,.025),eye,rig,x,1.78,.24);
-   // Exposed ribs, asymmetric lesions, jaw and broken teeth create a readable silhouette.
-   for(let r=0;r<4;r++)for(const side of [-1,1]){
-    const rib=mesh(new THREE.CapsuleGeometry(.027,.16,2,5),flesh,rig,side*.12,1.32-r*.1,.255);rib.rotation.z=side*1.25;
-   }
-   mesh(new THREE.IcosahedronGeometry(.16,0),wound,rig,-.27,1.43,.03);
-   mesh(new THREE.IcosahedronGeometry(.13,0),flesh,rig,.30,1.39,-.04);
-   const jaw=mesh(new THREE.IcosahedronGeometry(.14,0),wound,rig,0,1.57,.14);jaw.scale.set(1,.65,.75);
-   for(let tooth=0;tooth<6;tooth++){const m=mesh(new THREE.ConeGeometry(.018,.075,4),flesh,rig,(tooth-2.5)*.032,1.61,.274);m.rotation.z=Math.PI;}
-   for(const side of [-1,1]){const brow=mesh(new THREE.BoxGeometry(.12,.045,.07),wound,rig,side*.085,1.83,.2);brow.rotation.z=side*-.25;}
-   for(let spike=0;spike<4;spike++){const bone=mesh(new THREE.ConeGeometry(.045,.18,5),flesh,rig,-.23+spike*.15,1.49,-.17);bone.rotation.x=-.5;}
-   const limbs=[];
-   for(const side of [-1,1]){
-    const leg=new THREE.Group();leg.position.set(side*.18,.85,0);rig.add(leg);mesh(new THREE.CylinderGeometry(.12,.075,.69,6),uniform,leg,0,-.35,0);mesh(new THREE.BoxGeometry(.22,.15,.34),uniform,leg,0,-.75,.06);limbs.push(leg);
-    const arm=new THREE.Group();arm.position.set(side*.39,1.4,0);arm.rotation.z=side*.13;rig.add(arm);mesh(new THREE.CylinderGeometry(.105,.055,.64,6),flesh,arm,0,-.31,.12);mesh(new THREE.BoxGeometry(.18,.17,.14),wound,arm,0,-.67,.15);
-    for(let f=0;f<3;f++)mesh(new THREE.ConeGeometry(.024,.16,4),flesh,arm,(f-1)*.055,-.8,.15).rotation.z=Math.PI;
-    limbs.push(arm);
-   }
-   this.items.push({rig,limbs,hp:100,attack:0,repath:0,path:[],phase:i,aggro:false,flash:0});
-  }
- }
- get alive(){return this.items.filter(e=>e.hp>0).length;}
- reset(){const positions=this.spawns;this.items.forEach((e,i)=>{e.hp=100;e.rig.position.set(positions[i][0],0,positions[i][1]);e.rig.rotation.set(0,0,0);e.attack=0;e.repath=0;e.path=[];e.aggro=false;e.limbs.forEach(l=>l.rotation.x=0);});}
+import * as T from 'three';
+import {createNavigation} from './navigation.js';
+import {ENEMY_TYPES} from './waves.js';
+export function obstacleDistance(origin,direction,colliders,max=100){const ray=new T.Ray(origin,direction),point=new T.Vector3();let nearest=max;for(const b of colliders){const box=new T.Box3(new T.Vector3(b.minX,b.minY,b.minZ),new T.Vector3(b.maxX,b.maxY,b.maxZ));if(ray.intersectBox(box,point))nearest=Math.min(nearest,point.distanceTo(origin));}return nearest;}
+export class Enemies{
+ constructor(scene,colliders,audio,spawns=[]){this.scene=scene;this.colliders=colliders;this.audio=audio;this.items=[];this.projectiles=[];this.nextId=0;this.nav=createNavigation(colliders);this.fatNav=createNavigation(colliders,1.2);this.geometry=new Map();this.materials={flesh:new T.MeshStandardMaterial({color:'#8f7060',roughness:1,flatShading:true}),uniform:new T.MeshStandardMaterial({color:'#454f36',roughness:1}),wound:new T.MeshStandardMaterial({color:'#773d37',roughness:1}),bone:new T.MeshStandardMaterial({color:'#b5b49b'}),iris:new T.MeshBasicMaterial({color:'#cb9d35'}),black:new T.MeshBasicMaterial({color:'#17201c'}),bullet:new T.MeshBasicMaterial({color:'#ee9360'})};for(const [x,z]of spawns)this.spawn('zombie',x,z);}
+ mesh(parent,kind,size,material,x,y,z){const key=kind+size.join(',');if(!this.geometry.has(key))this.geometry.set(key,kind==='box'?new T.BoxGeometry(...size):kind==='sphere'?new T.IcosahedronGeometry(...size):kind==='capsule'?new T.CapsuleGeometry(...size):new T.ConeGeometry(...size));const m=new T.Mesh(this.geometry.get(key),this.materials[material]);m.position.set(x,y,z);parent.add(m);return m;}
+ spawn(type,x,z,id=this.nextId++){const stats=ENEMY_TYPES[type],rig=new T.Group(),limbs=[];rig.position.set(x,type==='eye'?4.5:0,z);rig.name='mutant-'+type;this.scene.add(rig);
+ if(type==='eye'){this.mesh(rig,'sphere',[.8,1],'wound',0,0,0);this.mesh(rig,'sphere',[.55,1],'bone',0,0,.48);this.mesh(rig,'sphere',[.32,1],'iris',0,0,.88);this.mesh(rig,'sphere',[.15,1],'black',0,0,1.1);for(let n=0;n<6;n++){const a=n*Math.PI/3;this.mesh(rig,'cone',[.1,.45,5],'flesh',Math.cos(a)*.64,Math.sin(a)*.64,-.2);}}
+ else{rig.scale.setScalar(stats.scale);this.mesh(rig,'capsule',[.26,.32,3,6],'uniform',0,1.13,0);this.mesh(rig,'sphere',[.24,1],'flesh',0,1.72,0);this.mesh(rig,'box',[.2,.13,.08],'wound',0,1.6,.22);for(const side of [-1,1]){this.mesh(rig,'box',[.05,.035,.04],'iris',side*.085,1.78,.22);const leg=new T.Group();leg.position.set(side*.18,.85,0);rig.add(leg);this.mesh(leg,'capsule',[.09,.5,2,5],'uniform',0,-.35,0);limbs.push(leg);const arm=new T.Group();arm.position.set(side*.36,1.4,0);rig.add(arm);this.mesh(arm,'capsule',[.08,.55,2,5],'flesh',0,-.35,.1);for(let f=0;f<3;f++)this.mesh(arm,'cone',[.02,.16,4],'bone',(f-1)*.05,-.75,.14).rotation.z=Math.PI;limbs.push(arm);}for(let n=0;n<4;n++){this.mesh(rig,'box',[.4,.035,.06],'bone',0,1.3-n*.1,.26);}if(type==='brute'){const belly=this.mesh(rig,'sphere',[.42,1],'flesh',0,1.05,.1);belly.scale.set(1.3,1.1,1);}}
+ const e={id,type,...stats,maxHp:stats.hp,rig,limbs,phase:id,attack:1,repath:0,path:[],aggro:true,stagger:0,sound:2+id%3,corpse:0};this.items.push(e);this.nextId=Math.max(this.nextId,id+1);return e;}
+ get alive(){return this.items.reduce((n,e)=>n+(e.hp>0),0);}
+ reset(){for(const e of this.items){e.hp=e.maxHp;e.stagger=0;e.corpse=0;e.rig.visible=true;e.rig.rotation.set(0,0,0);}}
  step(dt,player,hurt,other=null,hurtOther=()=>{}){
-  for(const e of this.items){if(e.hp<=0)continue;e.attack-=dt;e.repath-=dt;const p=e.rig.position;
-   const target=other&&Math.hypot(other.position.x-p.x,other.position.z-p.z)<Math.hypot(player.position.x-p.x,player.position.z-p.z)?other:player;
-   const distance=Math.hypot(target.position.x-p.x,target.position.z-p.z);
-   if(!e.aggro&&distance<25){const origin=p.clone().add(new THREE.Vector3(0,1.5,0)),eyeTarget=new THREE.Vector3(target.position.x,target.position.y+1.5,target.position.z);const dir=eyeTarget.sub(origin);const length=dir.length();if(obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.1)e.aggro=true;}
-   if(!e.aggro)continue;
-   if(distance<1.25&&Math.abs(target.position.y-p.y)<1.3){
-    const origin=p.clone().add(new THREE.Vector3(0,1,0)),dir=new THREE.Vector3(target.position.x,target.position.y+1,target.position.z).sub(origin);const length=dir.length();
-    if(e.attack<=0&&obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.05){if(target===other)hurtOther(12);else hurt(12);e.attack=.95;}
-   }else{
-    if(e.repath<=0){e.path=this.nav.path(p,target.position);e.repath=.65;}
-    const waypoint=e.path[0];if(waypoint){const dx=waypoint.x-p.x,dz=waypoint.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,dt*1.5);if(len>.001){p.x+=dx/len*step;p.z+=dz/len*step;}if(len<.12)e.path.shift();}
-   }
-   e.phase+=dt*5;e.rig.rotation.y=Math.atan2(target.position.x-p.x,target.position.z-p.z);
-   e.limbs.forEach((l,i)=>{l.rotation.x=Math.sin(e.phase+(i%2)*Math.PI)*.4+(i%2===1?-.5:0);});
-  }
+ const living=[{p:player,hurt},...(other?[{p:other,hurt:hurtOther}]:[])].filter(v=>v.p.hp!==0);
+ for(const e of this.items){if(e.hp<=0){e.corpse+=dt;if(e.corpse>8)e.rig.visible=false;continue;}e.attack-=dt;e.repath-=dt;e.stagger=Math.max(0,e.stagger-dt);e.sound-=dt;if(!living.length)continue;
+ const p=e.rig.position,target=living.reduce((a,b)=>Math.hypot(a.p.position.x-p.x,a.p.position.z-p.z)<Math.hypot(b.p.position.x-p.x,b.p.position.z-p.z)?a:b),goal=target.p.position,distance=Math.hypot(goal.x-p.x,goal.z-p.z);
+ if(e.sound<=0){if(distance<25)this.audio.play('growl',1-distance/28);e.sound=3+e.id%3;}e.phase+=dt*(e.type==='runner'?10:5);e.rig.rotation.y=Math.atan2(goal.x-p.x,goal.z-p.z);
+ if(e.stagger>0){e.rig.rotation.z=Math.sin(e.stagger*45)*.06;continue;}e.rig.rotation.z=0;
+ if(e.type==='eye')p.y=4.5+Math.sin(e.phase*.4)*.3;
+ const melee=e.type!=='eye'&&distance<e.radius+.85&&Math.abs(goal.y-p.y)<e.height;
+ if(melee&&e.attack<=0){const origin=p.clone().add(new T.Vector3(0,Math.min(1.5,e.height*.7),0)),dir=new T.Vector3(goal.x,goal.y+1,goal.z).sub(origin),length=dir.length();if(obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.05){target.hurt(e.damage);e.attack=e.type==='runner'?.65:.85;}}
+ if(e.type==='eye'&&distance<40&&e.attack<=0){const origin=p.clone(),direction=new T.Vector3(goal.x,goal.y+1,goal.z).sub(origin),len=direction.length();if(obstacleDistance(origin,direction.normalize(),this.colliders,len)>=len-.1){const mesh=this.mesh(this.scene,'sphere',[.2,0],'bullet',p.x,p.y,p.z);this.projectiles.push({mesh,velocity:direction.multiplyScalar(10),life:6});e.attack=2.2;}}
+ if(!melee&&(e.type!=='eye'||distance>16)){
+  if(e.repath<=0){e.path=(e.type==='brute'?this.fatNav:this.nav).path(p,goal);e.repath=.6;}
+  const point=e.path[0];if(point){const dx=point.x-p.x,dz=point.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,e.speed*dt);if(len>.001){p.x+=dx/len*step;p.z+=dz/len*step;}if(len<.15)e.path.shift();}
  }
- shoot(origin,direction,damage=34){
-  const wall=obstacleDistance(origin,direction,this.colliders);const ray=new THREE.Ray(origin,direction),point=new THREE.Vector3();let hit=null,nearest=wall;
-  for(const e of this.items){if(e.hp<=0)continue;const p=e.rig.position;const box=new THREE.Box3(new THREE.Vector3(p.x-.43,p.y,p.z-.43),new THREE.Vector3(p.x+.43,p.y+2,p.z+.43));if(ray.intersectBox(box,point)){const d=point.distanceTo(origin);if(d<nearest){nearest=d;hit=e;}}}
-  if(hit){hit.hp=Math.max(0,hit.hp-damage);hit.aggro=true;this.audio.play('hit');if(!hit.hp){hit.rig.rotation.x=-Math.PI/2;hit.rig.position.y=.25;}return true;}return false;
+ e.limbs.forEach((limb,i)=>limb.rotation.x=Math.sin(e.phase+(i%2)*Math.PI)*.45+(i%2?-.45:0));
  }
+ for(const shot of this.projectiles){shot.life-=dt;const origin=shot.mesh.position,delta=shot.velocity.clone().multiplyScalar(dt),length=delta.length(),direction=delta.clone().normalize(),ray=new T.Ray(origin.clone(),direction);let travel=obstacleDistance(origin,direction,this.colliders,length);
+ for(const target of living){const p=target.p.position,hit=ray.intersectBox(new T.Box3(new T.Vector3(p.x-.32,p.y,p.z-.32),new T.Vector3(p.x+.32,p.y+1.8,p.z+.32)),new T.Vector3());if(hit&&hit.distanceTo(origin)<=travel){target.hurt(30);shot.life=0;}}
+ if(travel<length-.001)shot.life=0;origin.add(delta);}
+ this.items=this.items.filter(e=>{if(e.hp>0||e.corpse<8)return true;this.scene.remove(e.rig);return false;});
+ this.projectiles=this.projectiles.filter(s=>{if(s.life<=0){this.scene.remove(s.mesh);return false;}return true;});
+ }
+ shoot(origin,direction,damage=35){const wall=obstacleDistance(origin,direction,this.colliders),ray=new T.Ray(origin,direction);let nearest=wall,hit=null;for(const e of this.items){if(e.hp<=0)continue;const p=e.rig.position,r=e.radius,box=new T.Box3(new T.Vector3(p.x-r,p.y-(e.type==='eye'?r:0),p.z-r),new T.Vector3(p.x+r,p.y+(e.type==='eye'?r:e.height),p.z+r)),point=ray.intersectBox(box,new T.Vector3());if(point&&point.distanceTo(origin)<nearest){nearest=point.distanceTo(origin);hit=e;}}
+ if(!hit)return false;hit.hp=Math.max(0,hit.hp-damage);hit.stagger=.10;this.audio.play('hit');if(!hit.hp){hit.rig.rotation.x=-Math.PI/2;hit.rig.position.y=.25;}return true;}
+ snapshot(){return this.items.filter(e=>e.hp>0||e.corpse<8).map(e=>({id:e.id,type:e.type,hp:e.hp,x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z,rotation:e.rig.rotation.toArray(),limbs:e.limbs.map(l=>l.rotation.x)}));}
+ apply(records){const keep=new Set(records.map(v=>v.id));this.items=this.items.filter(e=>{if(keep.has(e.id))return true;this.scene.remove(e.rig);return false;});for(const v of records){const e=this.items.find(e=>e.id===v.id)||this.spawn(v.type,v.x,v.z,v.id);e.hp=v.hp;e.rig.position.set(v.x,v.y??0,v.z);e.rig.rotation.fromArray(v.rotation);if(v.limbs)e.limbs.forEach((l,i)=>l.rotation.x=v.limbs[i]||0);}}
 }
