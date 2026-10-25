@@ -48,7 +48,7 @@ function setRunning(value) {
 }
 
 function rebuild(seedValue){
-  if(scene){scene.traverse(o=>{o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m){m.map?.dispose();m.dispose();}});}
+  if(scene){scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m){m.map?.dispose();m.dispose();}});}
   scene=new THREE.Scene();world=createMap(scene,seedValue);seed=world.seed;colliders=world.colliders;
   player=new Player(world.spawn);supplies=new Supplies(scene,world.supplies);enemies=new Enemies(scene,colliders,audio);waves=new Waves(seed);
   peer=new THREE.Group();const material=new THREE.MeshStandardMaterial({color:'#7d9676'});const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,3,6),material);body.position.y=1;peer.add(body);const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),material);head.position.y=1.75;peer.add(head);peer.visible=false;scene.add(peer);peerPose=null;

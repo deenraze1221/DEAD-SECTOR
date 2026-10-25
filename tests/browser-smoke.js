@@ -27,7 +27,7 @@ import assert from 'node:assert/strict';
     await page.waitForFunction(()=>document.pointerLockElement?.id==='scene');
     await waitForState(state => state.running);
     const initial=await snapshot();
-    await page.keyboard.down('KeyW');await page.waitForTimeout(450);await page.keyboard.up('KeyW');
+    await page.keyboard.down('KeyW');await waitForState(state => state.position.z < initial.position.z - .8);await page.keyboard.up('KeyW');
     const walked=await snapshot();assert.ok(walked.position.z<initial.position.z-.5);
     await page.keyboard.press('Space');
     await waitForState(state => state.position.y > 0);

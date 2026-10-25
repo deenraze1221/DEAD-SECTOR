@@ -1,9 +1,14 @@
 import * as T from 'three';
 import {createNavigation} from './navigation.js';
 import {ENEMY_TYPES} from './waves.js';
-export function obstacleDistance(origin,direction,colliders,max=100){const ray=new T.Ray(origin,direction),point=new T.Vector3();let nearest=max;for(const b of colliders){const box=new T.Box3(new T.Vector3(b.minX,b.minY,b.minZ),new T.Vector3(b.maxX,b.maxY,b.maxZ));if(ray.intersectBox(box,point))nearest=Math.min(nearest,point.distanceTo(origin));}return nearest;}
+const collisionBoxes=new WeakMap();
+export function obstacleDistance(origin,direction,colliders,max=100){
+ let cached=collisionBoxes.get(colliders);if(!cached||cached.count!==colliders.length){cached={count:colliders.length,boxes:colliders.map(b=>new T.Box3(new T.Vector3(b.minX,b.minY,b.minZ),new T.Vector3(b.maxX,b.maxY,b.maxZ)))};collisionBoxes.set(colliders,cached);}
+ const ray=new T.Ray(origin,direction),point=new T.Vector3(),ex=origin.x+direction.x*max,ey=origin.y+direction.y*max,ez=origin.z+direction.z*max,minX=Math.min(origin.x,ex),maxX=Math.max(origin.x,ex),minY=Math.min(origin.y,ey),maxY=Math.max(origin.y,ey),minZ=Math.min(origin.z,ez),maxZ=Math.max(origin.z,ez);let nearest=max;
+ for(const b of cached.boxes){if(b.max.x<minX||b.min.x>maxX||b.max.y<minY||b.min.y>maxY||b.max.z<minZ||b.min.z>maxZ)continue;if(ray.intersectBox(b,point))nearest=Math.min(nearest,point.distanceTo(origin));}return nearest;
+}
 export class Enemies{
- constructor(scene,colliders,audio,spawns=[]){this.scene=scene;this.colliders=colliders;this.audio=audio;this.items=[];this.projectiles=[];this.nextId=0;this.nav=createNavigation(colliders);this.fatNav=createNavigation(colliders,1.2);this.geometry=new Map();this.materials={flesh:new T.MeshStandardMaterial({color:'#8f7060',roughness:1,flatShading:true}),uniform:new T.MeshStandardMaterial({color:'#454f36',roughness:1}),wound:new T.MeshStandardMaterial({color:'#773d37',roughness:1}),bone:new T.MeshStandardMaterial({color:'#b5b49b'}),iris:new T.MeshBasicMaterial({color:'#cb9d35'}),black:new T.MeshBasicMaterial({color:'#17201c'}),bullet:new T.MeshBasicMaterial({color:'#ee9360'})};for(const [x,z]of spawns)this.spawn('zombie',x,z);}
+ constructor(scene,colliders,audio,spawns=[]){this.scene=scene;this.colliders=colliders;this.audio=audio;this.items=[];this.projectiles=[];this.nextId=0;this.nav=createNavigation(colliders);this.fatNav=createNavigation(colliders,1.2,6);this.airNav=createNavigation(colliders,.8,2,3.5);this.geometry=new Map();this.materials={flesh:new T.MeshStandardMaterial({color:'#8f7060',roughness:1,flatShading:true}),uniform:new T.MeshStandardMaterial({color:'#454f36',roughness:1}),wound:new T.MeshStandardMaterial({color:'#773d37',roughness:1}),bone:new T.MeshStandardMaterial({color:'#b5b49b'}),iris:new T.MeshBasicMaterial({color:'#cb9d35'}),black:new T.MeshBasicMaterial({color:'#17201c'}),bullet:new T.MeshBasicMaterial({color:'#ee9360'})};for(const [x,z]of spawns)this.spawn('zombie',x,z);}
  mesh(parent,kind,size,material,x,y,z){const key=kind+size.join(',');if(!this.geometry.has(key))this.geometry.set(key,kind==='box'?new T.BoxGeometry(...size):kind==='sphere'?new T.IcosahedronGeometry(...size):kind==='capsule'?new T.CapsuleGeometry(...size):new T.ConeGeometry(...size));const m=new T.Mesh(this.geometry.get(key),this.materials[material]);m.position.set(x,y,z);parent.add(m);return m;}
  spawn(type,x,z,id=this.nextId++){const stats=ENEMY_TYPES[type],rig=new T.Group(),limbs=[];rig.position.set(x,type==='eye'?4.5:0,z);rig.name='mutant-'+type;this.scene.add(rig);
  if(type==='eye'){this.mesh(rig,'sphere',[.8,1],'wound',0,0,0);this.mesh(rig,'sphere',[.55,1],'bone',0,0,.48);this.mesh(rig,'sphere',[.32,1],'iris',0,0,.88);this.mesh(rig,'sphere',[.15,1],'black',0,0,1.1);for(let n=0;n<6;n++){const a=n*Math.PI/3;this.mesh(rig,'cone',[.1,.45,5],'flesh',Math.cos(a)*.64,Math.sin(a)*.64,-.2);}}
@@ -22,7 +27,7 @@ export class Enemies{
  if(melee&&e.attack<=0){const origin=p.clone().add(new T.Vector3(0,Math.min(1.5,e.height*.7),0)),dir=new T.Vector3(goal.x,goal.y+1,goal.z).sub(origin),length=dir.length();if(obstacleDistance(origin,dir.normalize(),this.colliders,length)>=length-.05){target.hurt(e.damage);e.attack=e.type==='runner'?.65:.85;}}
  if(e.type==='eye'&&distance<40&&e.attack<=0){const origin=p.clone(),direction=new T.Vector3(goal.x,goal.y+1,goal.z).sub(origin),len=direction.length();if(obstacleDistance(origin,direction.normalize(),this.colliders,len)>=len-.1){const mesh=this.mesh(this.scene,'sphere',[.2,0],'bullet',p.x,p.y,p.z);this.projectiles.push({mesh,velocity:direction.multiplyScalar(10),life:6});e.attack=2.2;}}
  if(!melee&&(e.type!=='eye'||distance>16)){
-  if(e.repath<=0){e.path=(e.type==='brute'?this.fatNav:this.nav).path(p,goal);e.repath=.6;}
+  if(e.repath<=0){e.path=(e.type==='brute'?this.fatNav:e.type==='eye'?this.airNav:this.nav).path(p,goal);e.repath=.6;}
   const point=e.path[0];if(point){const dx=point.x-p.x,dz=point.z-p.z,len=Math.hypot(dx,dz),step=Math.min(len,e.speed*dt);if(len>.001){p.x+=dx/len*step;p.z+=dz/len*step;}if(len<.15)e.path.shift();}
  }
  e.limbs.forEach((limb,i)=>limb.rotation.x=Math.sin(e.phase+(i%2)*Math.PI)*.45+(i%2?-.45:0));
