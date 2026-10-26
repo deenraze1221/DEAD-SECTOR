@@ -1,4 +1,11 @@
 const entries={
+'ПОДКЛЮЧЕНИЕ':'CONNECTION',
+'ИНТЕРНЕТ · RENDER / WSS':'INTERNET · RENDER / WSS',
+'ЛОКАЛЬНАЯ СЕТЬ · LAN':'LOCAL NETWORK · LAN',
+'Введите адрес сервера':'Enter a server address',
+'Нужен адрес WS или WSS':'Enter a WS or WSS address',
+'Для локальной сети откройте игру по HTTP с компьютера хоста':'For LAN, open the game over HTTP from the host computer',
+
 'СМЕНА ОРУЖИЯ…':'SWITCHING…',
 
 'Доступно после завершения волны':'Available after completing wave',
@@ -118,5 +125,5 @@ let language='en';try{if(localStorage.getItem('dead-sector:language')==='ru')lan
 const reverse=Object.fromEntries(Object.entries(entries).map(([ru,en])=>[en,ru]));
 export function t(text){const original=reverse[text]||text;return language==='ru'?original:entries[original]||original;}
 export function remaining(count){return language==='ru'?`ЗАЧИСТИТЕ СЕКТОР · ОСТАЛОСЬ ${count}`:`CLEAR THE SECTOR · ${count} REMAINING`;}
-function translate(){document.documentElement.lang=language;document.title=language==='en'?'DEAD SECTOR — Sector clearance':'DEAD SECTOR — Зачистка сектора';const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(walker.nextNode()){const n=walker.currentNode;if(['SCRIPT','STYLE','OPTION'].includes(n.parentElement?.tagName))continue;const original=n.textContent.trim();const next=t(original);if(next!==original)n.textContent=n.textContent.replace(original,next);}for(const option of document.querySelectorAll('#graphics-quality option, #metrics-mode option'))option.textContent=t(option.textContent);document.getElementById('scene').setAttribute('aria-label',language==='en'?'3D combat sector':'Трёхмерный боевой сектор');}
+function translate(){document.documentElement.lang=language;document.title=language==='en'?'DEAD SECTOR — Sector clearance':'DEAD SECTOR — Зачистка сектора';const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(walker.nextNode()){const n=walker.currentNode;if(['SCRIPT','STYLE','OPTION'].includes(n.parentElement?.tagName))continue;const original=n.textContent.trim();const next=t(original);if(next!==original)n.textContent=n.textContent.replace(original,next);}for(const option of document.querySelectorAll('#graphics-quality option, #metrics-mode option, #connection-mode option'))option.textContent=t(option.textContent);document.getElementById('scene').setAttribute('aria-label',language==='en'?'3D combat sector':'Трёхмерный боевой сектор');}
 translate();const select=document.getElementById('language');select.value=language;select.addEventListener('change',()=>{language=select.value;try{localStorage.setItem('dead-sector:language',language);}catch{}translate();window.dispatchEvent(new Event('game-language-change'));});

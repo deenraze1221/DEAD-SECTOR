@@ -1,3 +1,4 @@
+import {connectionSettings} from './connection-settings.js';
 import {PoisonEffect} from './poison.js';
 import {blackoutDistrict} from './power-grid.js';
 import * as THREE from 'three';
@@ -292,9 +293,9 @@ function receiveNetwork(m){
 }
 $('join-toggle').addEventListener('click',()=>{$('settings').hidden=true;$('network-panel').hidden=!$('network-panel').hidden;});
 $('join-room').addEventListener('click',()=>{const code=$('room-code').value.trim();if(!/^\d{8}$/.test(code)){$('network-status').textContent=t('Введите 8 цифр');return;}connectRoom('join',code);});
-function connectRoom(mode,code){const url=$('server-url').value.trim();if(!url){const text=t('Укажите адрес общего сервера в настройках. Одиночная игра доступна без сервера.');$('network-status').textContent=text;$('lobby-status').textContent=text;return;}session.connect(url,mode,seed,code);}
+function connectRoom(mode,code){try{session.connect(getServerAddress(),mode,seed,code);}catch(error){$('network-status').textContent=error.message;$('lobby-status').textContent=error.message;}}
 $('resume-room').addEventListener('click',()=>session.resumeSaved());
-$('server-url').value=['localhost','127.0.0.1','[::1]'].includes(location.hostname)?'':location.protocol==='https:'?`wss://${location.host}`:location.protocol==='http:'?`ws://${location.hostname}:3000`:'';
+const getServerAddress=connectionSettings(t);
 window.addEventListener('game-language-change',()=>{setRunning(false);$('message').textContent=t($('message').textContent);});
 
 function openShop(){shopOpen=true;pause();shop.message('');shop.show(account);}
