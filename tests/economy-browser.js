@@ -1,3 +1,4 @@
+import {launchLobby} from './lobby-helpers.js';
 import {chromium} from 'playwright';import assert from 'node:assert/strict';import {mkdir} from 'node:fs/promises';
 import {createGameServer} from '../server/index.js';import {SHOP_ITEMS,totalAmmo,STORE} from '../economy.js';
 const game=createGameServer();await new Promise(r=>game.server.listen(0,'127.0.0.1',r));
@@ -9,9 +10,9 @@ try{
  const read=()=>p.evaluate(()=>readGame());
  async function wait(predicate,description,timeout=45000){const end=Date.now()+timeout;while(Date.now()<end){const s=await read();if(predicate(s))return s;await p.waitForTimeout(50);}throw Error(description+': '+JSON.stringify(await read())+' errors '+JSON.stringify(errors));}
  let s=await read();assert.equal(s.weapon,'Pistol');assert.equal(s.money,0);assert.equal(s.totalAmmo,92);assert.deepEqual(s.supplies,[]);
- await p.locator('#online').click();await p.locator('#server-url').fill('ws://127.0.0.1:'+game.server.address().port);await p.locator('#host-room').click();s=await wait(s=>s.networkActive,'room');const room=game.rooms.get(s.room);
+ await p.locator('#settings-button').click();await p.locator('#server-url').fill('ws://127.0.0.1:'+game.server.address().port);await p.locator('#start').click();await p.locator('#host-room').click();s=await wait(s=>s.networkActive,'room');const room=game.rooms.get(s.room);
  const pushAccount=()=>{room.host.account.revision++;room.host.socket.send(JSON.stringify({type:'economy',account:room.host.account}));};
- await p.locator('#start').click();await wait(s=>s.running,'play');
+ await launchLobby(p);await wait(s=>s.running,'play');
  room.cash.set('cash-ui',{id:'cash-ui',x:STORE.spawn.x,z:STORE.spawn.z,value:30,taken:false});room.host.socket.send(JSON.stringify({type:'loot-state',cash:[...room.cash.values()]}));await wait(s=>s.drops.length===1,'cash appears');
  await wait(s=>s.money===30,'cash pickup');assert.equal(room.cash.get('cash-ui').taken,true);
  // Isolated room fixture funds purchases; no debug grant exists in the game client.

@@ -15,6 +15,7 @@ export class Player {
     this.velocityY = 0; this.grounded = true; this.distance = 0;this.stamina=5;this.exhausted=false;this.sprinting=false;
   }
   look(dx, dy, sensitivity) {
+    if(!Number.isFinite(dx)||!Number.isFinite(dy)||!Number.isFinite(sensitivity))return;
     this.yaw -= dx * 0.002 * sensitivity;
     this.pitch = Math.max(-Math.PI / 2 + 0.02, Math.min(Math.PI / 2 - 0.02, this.pitch - dy * 0.002 * sensitivity));
   }

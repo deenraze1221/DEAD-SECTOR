@@ -1,10 +1,10 @@
 # DEAD SECTOR
 
-Browser wave-survival FPS with seeded 200 × 200 m towns, English/Russian UI and private two-player rooms. All environment models are original procedural geometry. Weapon models come from the user's updated `gunsv2.fbx`, with the original pistol retained.
+Browser wave-survival FPS with seeded 200 × 200 m towns, English/Russian UI and private four-player lobbies. All environment models are original procedural geometry. Weapon models come from the user's updated `gunsv2.fbx`, with the original pistol retained.
 
 ## Play
 
-Download ZIP, extract it and open `index.html`. Single player needs no installation, server or Internet connection. A new run generates a town and starts beside SECTOR MART with 100 HP, $0, a pistol, 8 loaded rounds and 84 spare rounds. Starter ammunition makes the first cash earnings possible; there are no free ammunition or medkit boxes in the world.
+Download ZIP, extract it and open `index.html`. Play first opens a four-slot lobby (one occupied, three empty). The lobby Play button starts a five-second countdown. Offline solo play uses the same lobby and does not need a server. Single player needs no installation, server or Internet connection. A new run generates a town and starts beside SECTOR MART with 100 HP, $0, a pistol, 8 loaded rounds and 84 spare rounds. Starter ammunition makes the first cash earnings possible; there are no free ammunition or medkit boxes in the world.
 
 WASD move; mouse look; Shift sprint; Space jump; LMB fire; R reload; E open the terminal or revive a nearby partner. **1 selects the primary weapon; 2 selects the pistol.** There are only these two weapon slots. Buying a different primary replaces the previous primary, returns its remaining magazine rounds to the universal reserve and equips the new empty gun. The pistol, its magazine and its condition remain. Reload the new weapon with R. H uses a small medkit; J uses a large medkit. Esc pauses single player. Resuming preserves the run; Restart starts over.
 
@@ -60,7 +60,7 @@ World pixel rendering remains mandatory at 540 pixels vertically. There is no ve
 
 Ordinary zombies have five procedural outfits. Jointed shoulders/elbows/hips/knees/ankles drive opposite strides, planted stance feet and attack motions. Brute arms stay outside the belly. Death immediately hides the model and emits red particles from one bounded pool. There are no falling corpses. Death/outfit/animation state replicates without replaying particles on duplicate packets.
 
-The first wave spawns 30 enemies gradually over 120 seconds from four corner hives. Each later wave adds five. After spawning finishes, **every enemy must die before the 30-second break starts**. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Projectiles are blocked by cover and damage only on body contact. The perimeter is a concrete wall 5.8 m high.
+The first wave spawns 15 enemies gradually over 120 seconds from four corner hives. Each later wave adds five. After spawning finishes, **every enemy must die before the 30-second break starts**. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Projectiles are blocked by cover and damage only on body contact. The perimeter is a concrete wall 5.8 m high.
 
 ## Network play
 
@@ -72,11 +72,13 @@ npm run build
 npm run server
 ```
 
-The server serves the built client and WebSocket rooms on port 3000. Host: Open to network → reachable server URL → Create room. Friend: same URL and six-character code → Join. Both press Play. A room code does not expose a local server to the Internet; public play requires a deployed server and HTTPS/WSS where applicable. No public server is automatically published.
+The main menu has Play, Join by code and Settings. Play opens your local four-slot lobby. Open to network inside that lobby creates a real server room and displays an eight-digit numeric invitation code with a copy button. Friends use Join by code in their main menu; they must connect to the same server. The host presses Play to start a synchronized five-second countdown. Guests can press Ready in the lobby to prepare mouse capture; a browser that has released capture may require Resume when the match begins. Disconnecting during the countdown cancels it and returns the remaining players to the lobby.
 
-The host simulates enemies, shooting and waves. The room server tracks cash availability, individual wallets, owned slots, medkits and market transactions. It checks pickup/terminal range and rejects duplicate cash collection or invalid purchases. Transaction revisions prevent delayed combat snapshots from undoing purchases/repairs. As in the existing private-room design, clients are trusted for combat movement/ammunition; this is not an anti-cheat service.
+The default endpoint is the current site's WSS/WS service (or localhost:3000 for an offline file). A different shared endpoint can be set in Settings → Server. Codes identify lobbies on that server; they do not publish a machine to the Internet. No public server is automatically deployed. The existing 60-second in-world preparation starts after the five-second lobby countdown.
 
-At zero HP, a partner within 2.5 m presses E to restore 50 HP. Both downed ends the run. Menu/shop use does not stop an active network world. Unexpected disconnect reserves the seat, account and world snapshot for 120 seconds; Reconnect can restore the same room after reload. Explicit host Disconnect closes it. Rooms are held in memory and disappear on server restart. Public Internet gameplay requires separate deployment; local two-client and real-socket checks cover the provided implementation.
+The host simulates enemies, shooting and waves for up to four people. Each client sees up to three peers, enemies target any living player, damage is addressed to its recipient, and E revives a nearby downed teammate. The room server tracks cash availability, individual wallets, owned slots, medkits and market transactions. It checks pickup/terminal range and rejects duplicate cash collection or invalid purchases. Transaction revisions prevent delayed combat snapshots from undoing purchases/repairs. As in the existing private-room design, clients are trusted for combat movement/ammunition; this is not an anti-cheat service.
+
+At zero HP, a partner within 2.5 m presses E to restore 50 HP. The run ends when every connected player is downed. Menu/shop use does not stop an active network world. Unexpected disconnect reserves the seat, account and world snapshot for 120 seconds; Reconnect can restore the same room after reload. Explicit host Disconnect closes it. Rooms are held in memory and disappear on server restart. Public Internet gameplay requires separate deployment; local four-client and real-socket checks cover the provided implementation.
 
 For Docker, first run `npm ci && npm run build`, then `docker build -t dead-sector .` and `docker run --rm -p 3000:3000 dead-sector`. The image runs as an unprivileged user; a public HTTPS site needs a TLS proxy with WebSocket upgrades.
 
@@ -96,7 +98,7 @@ CHROMIUM_PATH=/usr/bin/chromium npm run test:combat:browser
 CHROMIUM_PATH=/usr/bin/chromium npm run test:city:browser
 ```
 
-Browser checks need a running dev server. Override BASE_URL, CHROMIUM_PATH, ARTIFACT_DIR (screenshots), and WS_URL (external server for network/revive scenarios) as needed. `test:economy:browser` starts an isolated local room server and funds its test account server-side to verify purchases; the playable client has no money-grant debug API. `test:weapons:browser` aliases that market/equipment scenario. `test:network:browser` and `test:revive:browser` use a running room server. Tests cover exact stats, slots, wear/breakage, cash, caps, medkits, repairs, stamina, transactions/reconnect, wave completion, collision routes and model bounds. Software headless rendering is not a measurement of desktop GPU FPS.
+Browser checks need a running dev server. Override BASE_URL, CHROMIUM_PATH, ARTIFACT_DIR (screenshots), and WS_URL (external server for network/revive scenarios) as needed. `test:economy:browser` starts an isolated local room server and funds its test account server-side to verify purchases; the playable client has no money-grant debug API. `test:weapons:browser` aliases that market/equipment scenario. `test:network:browser` creates its own isolated server and verifies four browser clients; `test:revive:browser` uses a running room server. Tests cover exact stats, slots, wear/breakage, cash, caps, medkits, repairs, stamina, transactions/reconnect, wave completion, collision routes and model bounds. Software headless rendering is not a measurement of desktop GPU FPS.
 
 `npm run build` writes self-contained `index.html` and `dist/index.html`, including models and styles. Source edits require rebuilding. The committed root file supports double-click offline play.
 
@@ -128,3 +130,12 @@ A fresh match has a60-second preparation countdown with no enemy spawns or event
 Enemy progression: waves1–5 contain only zombies/runners (weights55:20 normalized over available types). Waves6–10 add eyes (55:20:20 normalized). Wave11 onward enables all four types at55/20/20/5. The separate Warden mini-boss appears every fifth wave starting at wave5; it is not a brute and does not unlock the regular brute early. Fifth-wave completion rewards remain $500 even before bosses unlock. Purchased medkits immediately heal an injured player; full-health purchases go into reserve for H/J.
 
 The fifth enemy family is the armored Warden: distinct mask, shoulder armor and horns, slimmer body and separate navigation clearance. Regular brute unlock remains wave11.
+
+
+Latest visual/control changes: the first assault contains15 enemies, then20,25 and +5 thereafter. A10m lattice landmark rises above the grocery roof with four SECTOR MART signs and a beacon. The terminal has a proper display, keypad, payment slot, trim and stereo beeps attenuated to silence at8m. The soundtrack now has four original calm and four original tense procedural compositions with different tempo, harmony, melody and timbre, rotating by wave while preserving the2.5s mood crossfade. Pointer-lock re-entry resets buffered input; non-finite/warp deltas are discarded and bounded smoothed input prevents sudden180° spikes. A top compass shows heading, azimuth ticks, localized N/E/S/W, and distance markers for the shop and up to three teammates. Targets behind the field of view are pinned to an edge.
+
+
+Per-wave weather uses independent seeded rolls: overcast55%, rain20%, storm15%, clear10%. Fog is rolled separately: light60%, medium30%, heavy10%, and can overlay any weather. Rain is masked under building roofs; storms add brief lightning and delayed thunder. The four-wave day/night cycle is day for waves1–2 and night for3–4, repeating; each wave advances six in-game hours. Clock starts at06:00, freezes during preparation/clearance waits/intermissions and does not rewind during breaks. Weather, fog and day phase derive from the shared seed/wave and match across a lobby.
+
+
+Settings now use Audio/Controls/Graphics tabs. Audio sliders persist master, music and weather volume independently, including mute at0. Weather has looping rain/wind beds, delayed storm thunder and fades between conditions; weapon/terminal sounds remain under master. Controls contains sensitivity and the key map. Low/Medium/High graphics adjust shadows, lamp lighting and rain density; required540p pixel rendering is unchanged. Graphics settings are reapplied when a new city or network room rebuilds the scene.

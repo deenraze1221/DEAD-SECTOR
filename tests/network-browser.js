@@ -1,29 +1,19 @@
-import {chromium} from 'playwright';
-import assert from 'node:assert/strict';
-const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,headless:true,args:['--no-sandbox','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
+import {chromium} from 'playwright';import assert from 'node:assert/strict';import {createGameServer} from '../server/index.js';import {mkdir} from 'node:fs/promises';
+const game=createGameServer();await new Promise(r=>game.server.listen(0,'127.0.0.1',r));const browser=await chromium.launch({executablePath:process.env.CHROMIUM_PATH||undefined,headless:true,args:['--disable-dev-shm-usage','--no-sandbox','--enable-unsafe-swiftshader','--use-gl=angle','--use-angle=swiftshader']});
 try{
- const errors=[],context=await browser.newContext({viewport:{width:1000,height:700}}),host=await context.newPage(),guest=await context.newPage();
- const read=p=>p.evaluate(()=>readGame());
- async function waitFor(p,predicate,description,timeout=20000){
-  const deadline=Date.now()+timeout;
-  while(Date.now()<deadline){const state=await read(p);if(predicate(state))return state;await p.waitForTimeout(100);}
-  assert.fail(description+': '+JSON.stringify(await read(p))+' errors: '+JSON.stringify(errors));
+ const pages=[],errors=[];let code;
+ for(let i=0;i<4;i++){
+  const p=await browser.newPage({viewport:{width:640,height:480}});p.on('pageerror',e=>errors.push(e.stack));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
+  await p.goto(process.env.BASE_URL||'http://127.0.0.1:5173/app.html',{waitUntil:'domcontentloaded',timeout:120000});await p.waitForFunction(()=>!document.getElementById('start').disabled,{},{timeout:90000});await p.evaluate(async()=>window.readGame=(await import('/game.js')).getSnapshot);
+  await p.locator('#settings-button').click();await p.locator('[data-setting-tab=graphics]').click();await p.locator('#graphics-quality').selectOption('low');await p.locator('#server-url').fill('ws://127.0.0.1:'+game.server.address().port);
+  if(i===0){await p.locator('#start').click();assert.equal(await p.locator('#lobby-slots article').count(),4);assert.equal(await p.locator('#lobby-slots .occupied').count(),1);await p.locator('#host-room').click();}
+  else{await p.locator('#join-toggle').click();await p.locator('#room-code').fill(code);await p.locator('#join-room').click();}
+  await p.waitForFunction(()=>readGame().networkActive&&readGame().lobbyOpen,{},{timeout:60000}).catch(async e=>{console.log('connection diagnostics',i,errors,'rooms',game.rooms.size,'url',await p.locator('#server-url').inputValue(),'status',await p.locator('#lobby-status').textContent());throw e;});
+  if(!i){code=await p.locator('#invite-code').inputValue();assert.match(code,/^\d{8}$/);}pages.push(p);console.log('Connected client',i+1);
  }
- for(const p of [host,guest]){
-  p.on('pageerror',e=>errors.push(e.stack));p.on('console',m=>{if(m.type()==='error')errors.push(m.text());});
-  await p.goto(process.env.BASE_URL||'http://127.0.0.1:5173/app.html');await p.waitForFunction(()=>!document.getElementById('start').disabled);
-  await p.evaluate(async()=>window.readGame=(await import('/game.js')).getSnapshot);
-  await p.locator('#online').click();await p.locator('#server-url').fill(process.env.WS_URL||'ws://127.0.0.1:3000');
- }
- await host.locator('#host-room').click();const room=await waitFor(host,s=>s.networkActive&&s.room,'host room creation');
- await guest.locator('#room-code').fill(room.room);await guest.locator('#join-room').click();
- const joined=await waitFor(guest,s=>s.networkActive&&s.room===room.room,'guest join');assert.equal(joined.seed,room.seed);
- await host.bringToFront();await host.locator('#start').click();await waitFor(host,s=>s.started&&s.running,'host pointer lock');
- await guest.bringToFront();await guest.locator('#start').click();await waitFor(guest,s=>s.started&&s.running,'guest pointer lock');
- const replicated=await waitFor(guest,s=>s.wave.warmup&&s.wave.time>1,'replicated preparation clock',90000);
- const authoritative=await read(host);assert.equal(authoritative.remaining,0);assert.equal(replicated.remaining,0);assert.equal(authoritative.peerVisible,true);assert.equal(replicated.peerVisible,true);
- assert.equal(authoritative.wave.number,replicated.wave.number);assert.ok(Math.abs(authoritative.wave.time-replicated.wave.time)<1);
- await guest.keyboard.press('Escape');await host.bringToFront();if(!(await host.locator('#network-panel').isVisible()))await host.locator('#online').click();
- await host.locator('#close-room').click();await waitFor(guest,s=>!s.networkActive,'explicit disconnect');assert.deepEqual(errors,[]);
- console.log('PASS two-browser city, synchronized preparation clock, visible partners and disconnect', {hostTime:authoritative.wave.time,guestTime:replicated.wave.time});
-}finally{await browser.close();}
+ const host=pages[0];await host.bringToFront();await host.waitForFunction(()=>readGame().members.filter(m=>m.connected).length===4);assert.equal(await host.locator('#lobby-slots .occupied').count(),4);
+ if(process.env.ARTIFACT_DIR){await mkdir(process.env.ARTIFACT_DIR,{recursive:true});await host.screenshot({path:process.env.ARTIFACT_DIR+'/four-player-lobby.png'});}
+ const before=Date.now();await host.locator('#lobby-play').click();for(const p of pages)await p.waitForFunction(()=>readGame().matchReady,{},{timeout:30000});assert.ok(Date.now()-before>=4900);
+ const first=await host.evaluate(()=>readGame());for(const p of pages){await p.bringToFront();await p.waitForFunction(()=>readGame().peerCount===3,{},{timeout:90000});const s=await p.evaluate(()=>readGame());assert.equal(s.started,true);assert.equal(s.wave.warmup,true);assert.equal(s.room,code);assert.equal(s.seed,first.seed);assert.deepEqual(s.weather,first.weather);assert.equal(await p.locator('#lobby').isVisible(),false);await p.waitForFunction(()=>document.querySelectorAll('#compass .player-marker').length===3,{},{timeout:30000});assert.equal(await p.locator('#compass .shop-marker').count(),1);console.log('Verified client',pages.indexOf(p)+1);}
+ assert.deepEqual(errors,[]);console.log('PASS four browser clients, eight-digit invitation, five-second launch, shared city/weather and three compass peers');
+}finally{await browser.close();for(const r of game.rooms.values())for(const role of ['host','guest','guest2','guest3'])r[role]?.socket?.terminate();await new Promise(r=>game.wss.close(r));await new Promise(r=>game.server.close(r));}

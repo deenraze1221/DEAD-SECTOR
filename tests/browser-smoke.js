@@ -1,3 +1,4 @@
+import {launchLobby} from './lobby-helpers.js';
 import { chromium } from 'playwright';
 import assert from 'node:assert/strict';
 (async () => {
@@ -20,10 +21,10 @@ import assert from 'node:assert/strict';
       assert.fail('Game did not reach the expected state');
     }
     await page.locator('#settings-button').click();
-    await page.locator('#sensitivity').fill('1.4');
+    await page.locator('#volume-master').fill('0.6');await page.locator('#volume-music').fill('0.25');await page.locator('#volume-weather').fill('0.4');await page.locator('[data-setting-tab=graphics]').click();await page.locator('#graphics-quality').selectOption('low');await page.locator('[data-setting-tab=controls]').click();await page.locator('#sensitivity').fill('1.4');
     await page.reload();
-    assert.equal(await page.locator('#sensitivity').inputValue(),'1.4');
-    await page.locator('#start').click();
+    assert.equal(await page.locator('#sensitivity').inputValue(),'1.4');assert.equal(await page.locator('#volume-master').inputValue(),'0.6');assert.equal(await page.locator('#volume-music').inputValue(),'0.25');assert.equal(await page.locator('#volume-weather').inputValue(),'0.4');assert.equal(await page.locator('#graphics-quality').inputValue(),'low');
+    await page.locator('#start').click();await launchLobby(page);
     await page.waitForFunction(()=>document.pointerLockElement?.id==='scene');
     await waitForState(state => state.running);
     const initial=await snapshot();
@@ -32,20 +33,20 @@ import assert from 'node:assert/strict';
     await page.keyboard.press('Space');
     await waitForState(state => state.position.y > 0);
     await waitForState(state => state.grounded);
-    await page.mouse.move(800,400);await page.waitForTimeout(100);
+    await page.mouse.move(800,400,{steps:20});await waitForState(state=>state.yaw!==0);
     assert.notEqual((await snapshot()).yaw,0);
     await page.keyboard.down('KeyW');await page.keyboard.press('Escape');await page.waitForTimeout(100);
     await waitForState(state => !state.running);
     const paused=await snapshot();await page.waitForTimeout(350);
     assert.deepEqual((await snapshot()).position,paused.position);
     await page.keyboard.up('KeyW');
-    await page.locator('#start').click();await page.waitForTimeout(200);
+    await page.locator('#start').click();await launchLobby(page);await page.waitForTimeout(200);
     await waitForState(state => state.running);
     const resume=await snapshot();await page.waitForTimeout(200);
     assert.deepEqual((await snapshot()).position,resume.position);
 
     await page.keyboard.press('Escape');await page.waitForTimeout(100);
-    await page.locator('#restart').click();await waitForState(state => state.running);
+    await page.locator('#restart').click();await launchLobby(page);await waitForState(state => state.running);
     assert.deepEqual((await snapshot()).position,{x:10.35,y:0,z:17.1});
     await page.keyboard.press('Escape');await page.waitForTimeout(100);
     await page.setViewportSize({width:800,height:600});

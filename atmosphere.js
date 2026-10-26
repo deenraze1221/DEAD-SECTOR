@@ -11,5 +11,5 @@ export function createAtmosphere(scene,layout){
  for(const [mat,records]of batches){const mesh=new T.InstancedMesh(box,mats[mat],records.length);records.forEach((matrix,i)=>mesh.setMatrixAt(i,matrix));mesh.name='weathering/'+mat;scene.add(mesh);}
  const warm=new T.PointLight('#ffd48c',16,16,2);warm.position.set(layout.shop.terminal.x+1,2.6,layout.shop.terminal.z+1);scene.add(warm);
  const lamps=[];for(const p of layout.props.filter(p=>p.type==='lamp').filter((_,i)=>i%12===0)){const l=new T.PointLight('#8daac8',5,11,2);l.position.set(p.x,4.7,p.z);scene.add(l);lamps.push(l);}
- return {update(time,powered){lamps.forEach((l,i)=>l.intensity=powered?8:5*(i===0&&Math.sin(time*9)*Math.sin(time*2)>.72?.15:1));warm.intensity=powered?23:16;}};
+ return {update(time,powered,quality='medium'){lamps.forEach((l,i)=>{l.visible=quality!=='low'&&(quality!=='medium'||i%2===0);l.intensity=quality==='low'||quality==='medium'&&i%2?0:powered?8:5*(i===0&&Math.sin(time*9)*Math.sin(time*2)>.72?.15:1);});warm.intensity=powered?23:16;}};
 }

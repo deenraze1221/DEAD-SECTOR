@@ -7,6 +7,7 @@ export function createCity(scene,layout){
  if(name==='paint'||name==='glass'){m.polygonOffset=true;m.polygonOffsetFactor=-2;m.polygonOffsetUnits=-2;}
  materials[name]=m;}
  for(const type of new Set(layout.buildings.map(b=>b.type))){const canvas=document.createElement('canvas');canvas.width=256;canvas.height=48;const ctx=canvas.getContext('2d');ctx.fillStyle='#ded9ba';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 28px monospace';ctx.fillText(type==='grocery'?'SECTOR MART':type.toUpperCase(),128,25,242);const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;texture.magFilter=T.NearestFilter;materials['label-'+type]=new T.MeshBasicMaterial({map:texture,alphaTest:.4,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});}
+ const screen=document.createElement('canvas');screen.width=256;screen.height=160;const sc=screen.getContext('2d');sc.fillStyle='#0a1d17';sc.fillRect(0,0,256,160);sc.fillStyle='#c7e1a0';sc.font='bold 24px monospace';sc.fillText('SECTOR MART',12,32);sc.font='15px monospace';sc.fillText('> WEAPONS',12,70);sc.fillText('> SUPPLIES',12,98);sc.fillStyle='#6eae91';sc.fillRect(12,119,232,2);sc.fillText('ACCESS TERMINAL',12,145);const sm=new T.CanvasTexture(screen);sm.colorSpace=T.SRGBColorSpace;sm.magFilter=T.NearestFilter;materials['terminal-screen']=new T.MeshBasicMaterial({map:sm,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
  const anchor=new T.Matrix4(),local=new T.Matrix4(),q=new T.Quaternion(),scale=new T.Vector3(),position=new T.Vector3();let model=null;const actualBounds=new Map();for(const geo of Object.values(geometries))geo.computeBoundingBox();
  function part(shape,mat,x,y,z,w,h,d,rx=0,ry=0,rz=0,tint=0){const batchKey=shape+'/'+mat;if(!batches.has(batchKey))batches.set(batchKey,[]);q.setFromEuler(new T.Euler(rx,ry,rz));local.compose(position.set(x,y,z),q,scale.set(w,h,d));const matrix=anchor.clone().multiply(local);batches.get(batchKey).push({matrix,tint:model?.variant??0});if(model?.id!==undefined){const key=String(model.id);if(!actualBounds.has(key))actualBounds.set(key,new T.Box3());actualBounds.get(key).union(geometries[shape].boundingBox.clone().applyMatrix4(matrix));}}
  const box=(mat,w,h,d,x,y,z,rx=0,ry=0,rz=0)=>part('box',mat,x,y,z,w,h,d,rx,ry,rz);
@@ -15,7 +16,7 @@ export function createCity(scene,layout){
  function legs(w,d,height=.7,mat='steel'){for(const x of [-w/2+.07,w/2-.07])for(const z of [-d/2+.07,d/2-.07])box(mat,.07,height,.07,x,height/2,z);}
  function furnishing(f){begin(f);const {w,h,d,type,variant:v}=f;
   if(type==='terminal'){
-   box('steel',w*.85,.25,d,0,.125,0);box('dark',w*.65,1.25,d*.7,0,.875,-.04);box('steel',w,.7,.22,0,1.85,-.02);box('glass',w-.12,.51,.025,0,1.88,.103);box('light',w-.27,.04,.012,0,2,.122);for(let n=0;n<3;n++)box('leaf',w-.27,.065,.012,0,1.83-n*.10,.122);box('dark',w*.6,.045,.35,0,1.48,.10);
+   box('steel',w,.12,d,0,.06,0);box('dark',.56,1.20,.46,0,.72,-.04);box('steel',.62,.07,.50,0,1.35,-.01);box('steel',w,.72,.22,0,1.84,-.02);box('dark',w-.07,.62,.025,0,1.84,.102);part('plane','terminal-screen',0,1.86,.119,.75,.47,1);for(const x of [-.43,.43])box('light',.018,.55,.015,x,1.85,.108);box('dark',.58,.04,.29,0,1.45,.16);for(let n=0;n<6;n++)box('steel',.058,.012,.04,-.20+n*.08,1.478,.18);box('steel',.34,.20,.035,0,1.03,.205);box('dark',.23,.025,.012,0,1.05,.229);box('light',.05,.025,.012,.12,.99,.23);
   }else if(type==='groceryShelf'||type==='displayRack'){
    for(const x of [-w/2+.035,w/2-.035])box('steel',.07,h,.08,x,h/2,0);
    for(let level=0;level<4;level++){const y=.12+level*(h-.25)/4;box('steel',w,.06,d,0,y,0);for(let n=0;n<5;n++)box((n+v+level)%3===0?'rust':(n+v)%2?'white':'leaf',w*.13,.18,d*.65,-w*.36+n*w*.18,y+.12,0);}
@@ -77,6 +78,12 @@ export function createCity(scene,layout){
   }
   if(b.type==='grocery'){box('leaf',w*.88,.72,.12,0,3.9,d/2+.13);part('plane','label-grocery',0,3.9,d/2+.198,w*.80,.52,1);for(const side of [-1,1]){box('glass',(w-door)/2-.3,1.7,.06,side*(door/2+(w-door)/4),1.65,d/2+.06);box('steel',.06,1.8,.08,side*(w/2-.2),1.65,d/2+.08);}box('light',door-.2,.04,.18,0,2.88,d/2-.1);}
   if(b.type==='cinema'){box('rust',w*.9,.8,1.2,0,3.9,d/2+.6);part('plane','label-cinema',0,3.95,d/2+1.207,w*.7,.5,1);for(let n=0;n<10;n++)box('light',.06,.06,.02,-w*.4+n*w*.8/9,3.59,d/2+1.218);}
+  if(b.type==='grocery'){
+   const base=h+.16;box('steel',2.5,.14,2.5,0,base+.07,0);
+   for(const x of [-1,1])for(const z of [-1,1])box('steel',.12,9.65,.12,x,base+4.925,z);
+   for(let level=0;level<4;level++){const y=base+1.3+level*2.35;for(const side of [-1,1]){box('steel',.07,Math.hypot(2,2.2),.07,0,y,side,0,0,Math.atan2(2,2.2));box('steel',.07,Math.hypot(2,2.2),.07,side,y,0,Math.atan2(2,2.2));}}
+   box('steel',2.4,.15,2.4,0,base+9.8,0);for(const side of [-1,1]){box('leaf',2.3,.9,.07,0,base+8.4,side*1.10);part('plane','label-grocery',0,base+8.4,side*1.14,2.15,.7,1,0,side<0?Math.PI:0);box('leaf',.07,.9,2.3,side*1.10,base+8.4,0);part('plane','label-grocery',side*1.14,base+8.4,0,2.15,.7,1,0,side*Math.PI/2);}box('light',.28,.12,.28,0,base+9.935,0);
+  }
   if(b.type==='firestation'){box('rust',w,.40,.07,0,3.6,d/2+.05);for(const side of [-1,1])box('white',.36,2.8,.06,side*(door/2+.3),1.4,d/2+.07);}
   if(b.type==='tower'){for(const side of [-1,1])box('dark',.18,h,.12,side*(w/2-.5),h/2,d/2+.08);box('steel',1,.3,1,0,h+.31,0);}
  }

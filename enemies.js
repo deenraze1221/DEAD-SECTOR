@@ -33,7 +33,7 @@ export class Enemies{
  get alive(){return this.items.reduce((n,e)=>n+(e.hp>0),0);}
  reset(){this.blood.clear();for(const e of this.items){e.hp=e.maxHp;e.stagger=0;e.corpse=0;e.dead=false;e.motion=0;e.attackTime=0;e.rig.visible=true;e.rig.rotation.set(0,0,0);poseMutant(e);}}
  step(dt,player,hurt,other=null,hurtOther=()=>{}){
- const living=[{p:player,hurt},...(other?[{p:other,hurt:hurtOther}]:[])].filter(v=>v.p.hp!==0);
+ const living=[{p:player,hurt},...(Array.isArray(other)?other:other?[{p:other,hurt:hurtOther}]:[])].filter(v=>v.p.hp!==0);
  for(const e of this.items){if(e.hp<=0){this.die(e);e.corpse+=dt;continue;}e.attack-=dt;e.repath-=dt;e.stagger=Math.max(0,e.stagger-dt);e.sound-=dt;e.attackTime=Math.max(0,e.attackTime-dt);e.reaction=Math.max(0,e.reaction-dt);if(!living.length)continue;
  const p=e.rig.position,target=living.reduce((a,b)=>Math.hypot(a.p.position.x-p.x,a.p.position.z-p.z)<Math.hypot(b.p.position.x-p.x,b.p.position.z-p.z)?a:b),goal=target.p.position,distance=Math.hypot(goal.x-p.x,goal.z-p.z);
  if(e.sound<=0){if(distance<25)this.audio.play(e.type==='eye'?'eye':e.type==='brute'?'brutegrowl':e.type==='runner'?'snarl':'growl',1-distance/28);e.sound=3+e.id%3;}const beforeX=p.x,beforeZ=p.z,yaw=Math.atan2(goal.x-p.x,goal.z-p.z),turn=Math.atan2(Math.sin(yaw-e.rig.rotation.y),Math.cos(yaw-e.rig.rotation.y));e.rig.rotation.y+=T.MathUtils.clamp(turn,-dt*3,dt*3);

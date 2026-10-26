@@ -10,7 +10,7 @@ export class Waves {
  constructor(seed=1){this.seed=seed>>>0;this.number=1;this.time=0;this.spawned=0;this.rest=false;this.clearing=false;this.warmup=true;}
  random(){this.seed=(1664525*this.seed+1013904223)>>>0;return this.seed/4294967296;}
  get variant(){return this.number%5===0?'boss':this.number%3===0?'rush':this.number%3===2?'siege':'standard';}
- get total(){return 30+(this.number-1)*5;}
+ get total(){return 15+(this.number-1)*5;}
  step(dt,spawn,getAlive=()=>0){
   let remaining=dt;
   while(remaining>1e-9){

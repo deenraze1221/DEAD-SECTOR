@@ -1,4 +1,45 @@
 const entries={
+"ЗВУК":"AUDIO",
+"УПРАВЛЕНИЕ":"CONTROLS",
+"ГРАФИКА":"GRAPHICS",
+"Общая громкость":"Master volume",
+"Громкость музыки":"Music volume",
+"Громкость погоды":"Weather volume",
+"Качество графики":"Graphics quality",
+"Низкая":"Low",
+"Средняя":"Medium",
+"Высокая":"High",
+"Бег / Прыжок":"Sprint / Jump",
+"Огонь / Перезарядка":"Fire / Reload",
+"Основное / Пистолет":"Primary / Pistol",
+"Терминал / Помощь":"Terminal / Revive",
+"Малая / Большая аптечка":"Small / Large medkit",
+
+'День':'Day','Ночь':'Night',
+'Пасмурно':'Overcast','Дождь':'Rain','Гроза':'Storm','Ясно':'Clear','Слабый туман':'Light fog','Средний туман':'Medium fog','Сильный туман':'Heavy fog',
+'ВОЙТИ В МАТЧ':'ENTER MATCH',
+'С':'N','В':'E','Ю':'S','З':'W','МАГАЗИН':'MART',
+"ВОЙТИ ПО КОДУ":"JOIN BY CODE",
+"КОД ЛОББИ":"LOBBY CODE",
+"ВОЙТИ":"JOIN",
+"ЛОББИ · DEAD SECTOR":"LOBBY · DEAD SECTOR",
+"ДО 4 ИГРОКОВ":"UP TO 4 PLAYERS",
+"НАЗАД":"BACK",
+"КОД ПРИГЛАШЕНИЯ":"INVITE CODE",
+"КОПИРОВАТЬ":"COPY",
+"ИГРОК":"PLAYER",
+"ВЫ":"YOU",
+"ХОЗЯИН":"HOST",
+"ГОТОВ":"READY",
+"В ЛОББИ":"IN LOBBY",
+"ПЕРЕПОДКЛЮЧЕНИЕ":"RECONNECTING",
+"ПРИГЛАСИТЕ ДРУГА":"INVITE A FRIEND",
+"СТАРТ ЧЕРЕЗ":"STARTING IN",
+"ИГРАТЬ":"PLAY",
+"Введите 8 цифр":"Enter 8 digits",
+"СЕРВЕР":"SERVER",
+"ПЕРЕПОДКЛЮЧИТЬСЯ":"RECONNECT",
+
 'При ранении лечит сразу; при полном HP — в запас (H/J)':'Heals immediately if injured; stored at full HP (H/J)',
 '60 секунд подготовки · Уничтожь всех · 30 секунд перерыва.':'60-second preparation · Clear all enemies · 30-second break',
 'ПОДГОТОВКА':'PREPARATION',
@@ -56,5 +97,5 @@ let language='en';try{if(localStorage.getItem('dead-sector:language')==='ru')lan
 const reverse=Object.fromEntries(Object.entries(entries).map(([ru,en])=>[en,ru]));
 export function t(text){const original=reverse[text]||text;return language==='ru'?original:entries[original]||original;}
 export function remaining(count){return language==='ru'?`ЗАЧИСТИТЕ СЕКТОР · ОСТАЛОСЬ ${count}`:`CLEAR THE SECTOR · ${count} REMAINING`;}
-function translate(){document.documentElement.lang=language;document.title=language==='en'?'DEAD SECTOR — Sector clearance':'DEAD SECTOR — Зачистка сектора';const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(walker.nextNode()){const n=walker.currentNode;if(['SCRIPT','STYLE','OPTION'].includes(n.parentElement?.tagName))continue;const original=n.textContent.trim();const next=t(original);if(next!==original)n.textContent=n.textContent.replace(original,next);}document.getElementById('scene').setAttribute('aria-label',language==='en'?'3D combat sector':'Трёхмерный боевой сектор');}
+function translate(){document.documentElement.lang=language;document.title=language==='en'?'DEAD SECTOR — Sector clearance':'DEAD SECTOR — Зачистка сектора';const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);while(walker.nextNode()){const n=walker.currentNode;if(['SCRIPT','STYLE','OPTION'].includes(n.parentElement?.tagName))continue;const original=n.textContent.trim();const next=t(original);if(next!==original)n.textContent=n.textContent.replace(original,next);}for(const option of document.querySelectorAll('#graphics-quality option'))option.textContent=t(option.textContent);document.getElementById('scene').setAttribute('aria-label',language==='en'?'3D combat sector':'Трёхмерный боевой сектор');}
 translate();const select=document.getElementById('language');select.value=language;select.addEventListener('change',()=>{language=select.value;try{localStorage.setItem('dead-sector:language',language);}catch{}translate();window.dispatchEvent(new Event('game-language-change'));});
