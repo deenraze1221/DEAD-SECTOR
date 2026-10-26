@@ -30,7 +30,7 @@ for(const d of m.operations?.drops||[])if(d.status==='opened'&&/^airdrop-\d+$/.t
 if(m.wave?.rest&&Number.isInteger(m.wave.number)){for(const role of ROLES)if(r[role])r[role].account.completedWave=Math.max(r[role].account.completedWave||0,m.wave.number);reward('wave-'+m.wave.number,m.wave.number%5===0?500:75+m.wave.number*25);}
 broadcast(r,m,'host');}
 else if(r&&m.type==='shot'&&s.role!=='host'&&r[s.role].pose?.hp>0&&Array.isArray(m.direction)&&m.direction.length===3&&m.direction.every(Number.isFinite)){const damage=WEAPON_BY_ID[m.weapon]?.damage,p=r[s.role].pose;if(damage)send(r.host.socket,{type:'shot',origin:[p.x,p.y+1.65,p.z],direction:m.direction,damage});}
-else if(r&&m.type==='damage'&&s.role==='host'&&ROLES.slice(1).includes(m.target))send(r[m.target]?.socket,{type:'damage',amount:[15,25,30,40,55].includes(m.amount)?m.amount:25});
+else if(r&&m.type==='damage'&&s.role==='host'&&ROLES.slice(1).includes(m.target))send(r[m.target]?.socket,{type:'damage',amount:[10,15,25,30,40,55].includes(m.amount)?m.amount:25,poison:m.amount===10&&m.poison===true,hitId:typeof m.hitId==='string'?m.hitId.slice(0,80):undefined});
 else if(r&&m.type==='end'&&s.role==='host'){r.result=m.result;broadcast(r,m,'host');}
 else if(r&&m.type==='event-interact'&&s.role!=='host'&&r[s.role].pose?.hp>0)send(r.host.socket,{type:'event-interact',position:{x:r[s.role].pose.x,y:r[s.role].pose.y,z:r[s.role].pose.z}});
 else if(r&&m.type==='pickup'){

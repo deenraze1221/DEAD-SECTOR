@@ -12,7 +12,7 @@ Sprinting lasts five seconds from full stamina. Stamina recovers in five seconds
 
 ## Money, shop and condition
 
-A dead enemy leaves a cash bundle on the ground. Walking within 0.85 m collects it automatically with a cash sound. Rewards derive from maximum HP, clamped to $15–100: runner 125 HP → $15; zombie 250 HP → $30; eye 300 HP → $40; brute 600 HP → $100. Cash remains until collected, and a bundle can be collected once. In co-op, one collection removes the bundle for everyone and credits its full value to every room account, including reconnecting players.
+A dead enemy leaves a cash bundle on the ground. Walking within 0.85 m collects it automatically with a cash sound. Rewards derive from maximum HP, clamped to $15–100: runner 125 HP → $15; zombie 250 HP → $30; eye 200 HP → $20; brute 800 HP → $100. Cash remains until collected, and a bundle can be collected once. In co-op, one collection removes the bundle for everyone and credits its full value to every room account, including reconnecting players.
 
 SECTOR MART is a unique grocery building in the central quarter. Its large terminal opens within 2.1 m. The shop contains ten prop families: stocked shelves, produce stand, refrigerated case, freezer, checkout with cash register, shopping cart, basket stand, display rack, stock boxes and the terminal. Entrances and the route to the terminal have physical player-clearance checks.
 
@@ -55,10 +55,10 @@ World pixel rendering remains mandatory at 540 pixels vertically. There is no ve
 | --- | --- | --- | --- | --- |
 | Zombie | 250 | 2.42 m/s | 25 | 55% |
 | Runner | 125 | 3.78 m/s | 15 | 20% |
-| Flying flesh eye | 300 | 2.3 m/s | projectile 30 | 20% |
-| Brute | 600 | 1.1 m/s | 40 | 5% |
+| Flying flesh eye | 200 | 2.3 m/s | projectile 30 | 20% |
+| Brute | 800 | 1.1 m/s | 40 | 5% |
 
-Ordinary zombies have five procedural outfits. Jointed shoulders/elbows/hips/knees/ankles drive opposite strides, planted stance feet and attack motions. Brute arms stay outside the belly. Death immediately hides the model and emits red particles from one bounded pool. There are no falling corpses. Death/outfit/animation state replicates without replaying particles on duplicate packets.
+Ordinary zombies have nine procedural outfits. Jointed shoulders/elbows/hips/knees/ankles drive opposite strides, planted stance feet and attack motions. Brute arms stay outside the belly. Death immediately hides the model and emits red particles from one bounded pool; Vomiters emit harmless green spores instead. There are no falling corpses. Death/outfit/animation state replicates without replaying particles on duplicate packets.
 
 The first wave spawns 15 enemies gradually over 120 seconds from four corner hives. Each later wave adds five. After spawning finishes, **every enemy must die before the 30-second break starts**. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Projectiles are blocked by cover and damage only on body contact. The perimeter is a concrete wall 5.8 m high.
 
@@ -108,7 +108,7 @@ The town now uses a cool overcast evening palette and lighter-distance fog, warm
 
 Each gun has its own recoil parameters and reload motion profile, with animated action/bolt, spent cases and support-hand operation. The original FBX guns remain single meshes: these are procedural first-person mechanisms rather than imported skeletal animations. Hits emit small red particles and cause a body recoil. Wounded enemies limp and slow to 80% speed below 35% health. Normal/runner melee has a short preparation; brutes wind up for 0.6 s and can miss if the player moves away or takes cover. Flying eyes swell before firing. Brute steps have a separate low-frequency sound.
 
-Wave 1 remains standard. Waves congruent to 2 modulo 3 concentrate on one hive; waves congruent to 0 modulo 3 favor runners (at least70%, depending on unlocked types); every fifth wave overrides these modes and finishes with one mini-boss. It has 1,800 HP, 55 melee damage, speed 1.3 m/s and a separate armored Warden body, 2.2 m height and 0.7 m navigation radius, plus visible red chest marks and a HUD health counter. It must die before the normal clear-and-break transition.
+Wave 1 remains standard. Waves congruent to 2 modulo 3 concentrate on one hive; waves congruent to 0 modulo 3 favor runners (at least70%, depending on unlocked types); every fifth wave overrides these modes and finishes with one mini-boss. It has 1,800 HP, 55 melee damage, speed 1.3 m/s and a separate armored Warden body, 6.6 m height and 2.1 m navigation radius, plus visible red chest marks and a HUD health counter. It must die before the normal clear-and-break transition.
 
 Missions use a single seeded roll after20 seconds of assault. Waves1–2 never produce missions; wave3 onward has a15% chance. The successful roll selects one package, terminal-zone, generator or growth objective, paying300–600 dollars to each player. All four mission types share one lifecycle and persist until completed. A carried active mission prevents a second mission from replacing it. Pickup is E, terminal radius is6m with30 seconds of continuous occupation, and beeps repeat every5 seconds. The server awards each shared completion once. Generator interaction stabilizes street lights; the growth must be shot with cover respected.
 
@@ -123,9 +123,9 @@ Shop update: two tabs separate weapons from gear (ammo, medkits and repair). Wea
 A fresh match has a60-second preparation countdown with no enemy spawns or events. The first assault begins after that countdown; enemies then emerge gradually on its normal120-second schedule. Subsequent intermissions last30 seconds after every enemy is dead. Each assault starts with a five-second on-screen notification and an original synthesized horn. Original procedural ambient music has calm and tense stems: preparation/intermission uses calm chords, active assault/clearing uses the tense stem. Changes crossfade over2.5 seconds; paused single player fades music out. Browser audio starts after the player's Play gesture. No external songs or audio downloads are used.
 
 
-Enemy progression: waves1–5 contain only zombies/runners (weights55:20 normalized over available types). Waves6–10 add eyes (55:20:20 normalized). Wave11 onward enables all four types at55/20/20/5. The separate Warden mini-boss appears every fifth wave starting at wave5; it is not a brute and does not unlock the regular brute early. Fifth-wave completion rewards remain $500 even before bosses unlock. Purchased medkits immediately heal an injured player; full-health purchases go into reserve for H/J.
+Enemy progression: waves1–5 contain only zombies/runners (weights55:20 normalized over available types). Waves6–20 add eyes (55:20:20 normalized) and allow Vomiters under the per-wave10% cap. Wave21 onward enables regular brutes as well, with base weights55/20/20/5. The separate Warden mini-boss appears every fifth wave starting at wave5; it is not a brute and does not unlock the regular brute early. Fifth-wave completion rewards remain $500 even before bosses unlock. Purchased medkits immediately heal an injured player; full-health purchases go into reserve for H/J.
 
-The fifth enemy family is the armored Warden: distinct mask, shoulder armor and horns, slimmer body and separate navigation clearance. Regular brute unlock remains wave11.
+The fifth enemy family is the armored Warden: distinct mask, shoulder armor and horns, slimmer body and separate navigation clearance. Regular brute unlock is wave21.
 
 
 Latest visual/control changes: the first assault contains15 enemies, then20,25 and +5 thereafter. A10m lattice landmark rises above the grocery roof with four SECTOR MART signs and a beacon. The terminal has a proper display, keypad, payment slot, trim and stereo beeps attenuated to silence at8m. The soundtrack now has five original calm and five original tense procedural compositions with different tempo, harmony, melody and timbre, rotating by wave while preserving the2.5s mood crossfade. Pointer-lock re-entry resets buffered input; non-finite/warp deltas are discarded and bounded direct input prevents sudden180° spikes. A top compass shows heading, azimuth ticks, localized N/E/S/W, and distance markers for the shop and up to three teammates. Targets behind the field of view are pinned to an edge.
@@ -204,3 +204,9 @@ Mouse look now requests unadjusted relative input where supported, falls back to
 First-person body update: the local view keeps a narrowed leg rig (72% width/depth) with torso, vest, backpack and upper gear hidden. Walk/run steps advance from actual physics travel, with separate stride lengths, planted-foot IK, smooth stop/start and a jump tuck. The local view no longer estimates speed from network-packet timing. Remote soldier proportions and rig remain unchanged.
 
 Local body now includes a compact pelvis, belt and lower abdomen joined to straight-legged, hip-driven steps; the upper vest stays hidden to preserve downward visibility. Refrigerated display back panels are inset within their frame and box tape uses separate raised strips, removing the reported coplanar surfaces. A linear HDR target now combines world and viewmodel before one post pass (gentle bloom, restrained sharpening/color grading, vignette and grain), retaining built-in pixelization. Surface normals gain subtle micro relief. Heavy fog density is doubled to0.058; other fog tiers are unchanged.
+
+## Vomiter enemy
+
+Eye health is200HP; brutes have800HP and unlock on wave21. Vomiters unlock on wave6 with300HP,1.25× standard scale and2.057m/s speed (15% below the standard2.42). They prepare a visible1.5s vomit attack only within5m and with a clear firing line, then launch a green liquid projectile at5m/s with a maximum1s flight. Reload is3–4s after release. Walls stop the projectile. Impact deals10HP and starts five1s poison ticks of5HP each; repeat hits refresh rather than stack poison. Typed hits/projectiles and enemy preparation replicate to guests.
+
+A seeded10% replacement roll is capped at floor(wave total×0.10) Vomiters per wave; zero are possible. The per-wave count survives snapshots and resets between waves. Their death emits harmless green spores for2.5s and a wet sound instead of red gore. Health below25HP displays a persistent red edge vignette during play; poison has a separate countdown.

@@ -44,8 +44,8 @@ export function attackPose(e){const smooth=x=>{x=T.MathUtils.clamp(x,0,1);return
 // Separate shoulders, elbows, hips, knees and ankles; all measurements are local metres.
 export function createMutantVisuals(owner,type,skinIndex){
  const root=new T.Group();root.name='anatomy';const limbs=[],legs=[],arms=[];
- const boss=type==='boss',brute=type==='brute',runner=type==='runner',skin=(boss?BOSS_SKINS:ZOMBIE_SKINS)[skinIndex];
- const palette={skin:boss?skin.skin:brute?'#938270':runner?'#a0967c':skin.skin,cloth:boss?skin.clothes:brute?'#625445':runner?'#4b5750':skin.clothes,pants:brute?'#4b4236':skin.pants,accent:skin.accent,boot:'#292d29',wound:'#823c40',bone:'#bfb497',eye:'#e4c46b',black:'#252a23'};
+ const boss=type==='boss',brute=type==='brute',vomiter=type==='vomiter',runner=type==='runner',skin=(boss?BOSS_SKINS:ZOMBIE_SKINS)[skinIndex];
+ const palette={skin:vomiter?'#718d43':boss?skin.skin:brute?'#938270':runner?'#a0967c':skin.skin,cloth:vomiter?'#596337':boss?skin.clothes:brute?'#625445':runner?'#4b5750':skin.clothes,pants:brute?'#4b4236':skin.pants,accent:vomiter?'#b6c66a':skin.accent,boot:'#292d29',wound:'#823c40',bone:'#bfb497',eye:'#e4c46b',black:'#252a23'};
  const materials=Object.fromEntries(Object.entries(palette).map(([key,color])=>[key,owner.material(color,key==='eye')]));
  function part(parent,name,kind,size,material,x,y,z){const p=owner.mesh(parent,kind,size,materials[material],x,y,z);p.name=name;p.castShadow=true;return p;}
  if(type==='eye'){
@@ -71,6 +71,7 @@ export function createMutantVisuals(owner,type,skinIndex){
   for(const side of [-1,1])upper('pocket','box',[.095,.105,.035],'accent',side*.12,1.37,.24);
   upper('chest-wound','sphere',[.06,1],'wound',-.13,1.19,.235).scale.set(1,1.45,.38);
  }
+ if(vomiter){upper('vomiter-belly','sphere',[.32,2],'skin',0,1.10,.13).scale.set(1,1.08,1);for(let n=0;n<9;n++){const x=Math.sin(n*2.4)*.25,y=1.00+n*.055;upper('green-blister','sphere',[.035+(n%3)*.01,1],'accent',x,y,.42-Math.abs(x)*.25);}for(const side of [-1,1])for(let n=0;n<3;n++){upper('fungal-stem','cylinder',[.015,.02,.12,6],'bone',side*(.18+n*.035),1.5+n*.04,-.12);upper('fungal-cap','sphere',[.055,1],'accent',side*(.18+n*.035),1.57+n*.04,-.12).scale.y=.4;}}
  upper('neck','capsule',[.085,.10,3,7],'skin',0,1.57,0);
  const head=new T.Group();head.name='head';head.position.set(0,1.72-.96,.025);torso.add(head);
  part(head,'skull','sphere',[.215,2],'skin',0,0,0).scale.set(.92,1.08,.91);
@@ -93,7 +94,7 @@ export function createMutantVisuals(owner,type,skinIndex){
   upper('warden-armor','box',[.46,.36,.10],'black',0,1.29,.25);for(const side of [-1,1]){upper('warden-shoulder','box',[.22,.15,.27],'bone',side*.31,1.47,0);part(head,'warden-horn','cone',[.055,.22,5],'bone',side*.14,.19,-.02).rotation.z=side*-.35;}part(head,'warden-mask','box',[.29,.10,.06],'black',0,-.06,.195);part(head,'warden-eye-band','box',[.25,.028,.018],'wound',0,.048,.208);}
  for(let n=0;n<3;n++)upper('rib-scar','box',[.08,.018,.018],'wound',-.10,1.11+n*.045,.26);
  part(head,'temple-wound','sphere',[.05,1],'wound',.148,.105,.085).scale.set(.5,1,.55);
- if(!brute&&!runner&&!boss){
+ if(!brute&&!runner&&!boss&&!vomiter){
   if(skin.id==='firefighter'){part(head,'fire-helmet','sphere',[.24,2],'accent',0,.16,0).scale.set(1,.45,1.15);part(head,'helmet-brim','box',[.49,.025,.46],'black',0,.13,.015);for(const y of [1.05,1.37])upper('reflective-band','box',[.44,.04,.03],'accent',0,y,.25);}
   else if(skin.id==='police'){upper('police-armor','box',[.42,.37,.09],'black',0,1.29,.24);upper('badge','box',[.055,.08,.02],'accent',-.11,1.4,.30);part(head,'police-cap','sphere',[.23,1],'cloth',0,.16,0).scale.set(1,.3,1);part(head,'police-visor','box',[.32,.025,.17],'black',0,.14,.15);}
   else if(skin.id==='mechanic'){for(const side of [-1,1])upper('overall-strap','box',[.06,.34,.035],'accent',side*.13,1.37,.25);upper('overall-bib','box',[.28,.24,.045],'cloth',0,1.24,.27);part(head,'goggle-band','box',[.34,.055,.04],'black',0,.16,.14);}
@@ -118,7 +119,7 @@ export function createMutantVisuals(owner,type,skinIndex){
   }else upper('jacket-collar','box',[.32,.065,.15],'accent',0,1.48,.11);
  }
  for(const side of [-1,1]){
-  const shoulderMass=upper('shoulder-joint','capsule',[brute?.13:.09,brute?.24:.06,3,7],'cloth',side*(brute?.40:.275),1.43,0);shoulderMass.rotation.z=Math.PI/2;
+  const shoulderMass=upper('shoulder-joint','capsule',[brute?.13:.09,brute?.24:.06,3,7],'cloth',side*(brute?.40:vomiter?.32:.275),1.43,0);shoulderMass.rotation.z=Math.PI/2;
   const hip=new T.Group();hip.name=side<0?'left-hip':'right-hip';hip.position.set(side*(brute?.25:.145),.85,0);root.add(hip);
   part(hip,'thigh','capsule',[brute?.13:.10,.19,3,7],'pants',0,-.195,0);
   const knee=new T.Group();knee.name='knee';knee.position.y=-.39;hip.add(knee);
@@ -129,7 +130,7 @@ export function createMutantVisuals(owner,type,skinIndex){
   legs.push({hip,knee,ankle,side});limbs.push(hip,knee,ankle);
   const shoulder=new T.Group();shoulder.name=side<0?'left-shoulder':'right-shoulder';
   // Wide shoulders keep both arms outside the bloated torso at every gait phase.
-  shoulder.position.set(side*(brute?.53:.34),1.43-.96,0);torso.add(shoulder);
+  shoulder.position.set(side*(brute?.53:vomiter?.42:.34),1.43-.96,0);torso.add(shoulder);
   shoulder.rotation.z=side*(brute?.09:.10);
   part(shoulder,'upper-arm','capsule',[brute?.105:.075,.19,3,7],'cloth',0,-.17,0);
   const elbow=new T.Group();elbow.name='elbow';elbow.position.y=-.34;shoulder.add(elbow);
@@ -146,7 +147,8 @@ export function poseMutant(enemy){
  if(v.eye){v.arms.forEach((a,i)=>a.pivot.rotation.z=Math.sin(phase+i)*.14);return;}
  v.torso.rotation.x=(v.runner?.15:.045)+Math.sin(phase*2)*.018*motion;
  v.torso.rotation.z=Math.sin(phase)*.018*motion;
- v.head.rotation.y=Math.sin(phase*.5)*.035+Math.sin(idle*.7+enemy.id)*.02;v.head.rotation.x=Math.sin(idle*1.2+enemy.id)*.015;v.torso.rotation.x+=Math.sin(idle*1.5+enemy.id)*.008;
+ if(enemy.type==='vomiter'&&enemy.pendingAttack){v.torso.rotation.x+=.22;v.head.rotation.x=.15;}
+ v.head.rotation.y=Math.sin(phase*.5)*.035+Math.sin(idle*.7+enemy.id)*.02;v.head.rotation.x=Math.sin(idle*1.2+enemy.id)*.015;v.torso.rotation.x+=Math.sin(idle*1.5+enemy.id)*.008;if(enemy.type==='vomiter'&&enemy.pendingAttack)v.head.rotation.x=.18;
  for(const leg of v.legs){
   const p=phase+(leg.side<0?0:Math.PI),z=Math.cos(p)*.18*motion*(enemy.hp<enemy.maxHp*.35&&leg.side<0?.6:1),lift=Math.max(0,Math.sin(p))*.12*motion*(enemy.hp<enemy.maxHp*.35&&leg.side<0?.55:1);
   const down=.75-lift,distance=Math.min(.779,Math.hypot(down,z));
