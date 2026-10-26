@@ -26,7 +26,7 @@ try{
   const before=(await read()).money;await p.locator(`[data-shop-action=buy][data-item=${item.id}]`).click();s=await wait(s=>s.weapon===item.id,'buy '+item.id);
   assert.equal(s.money,before-item.price);assert.deepEqual(Object.keys(s.inventory.weapons).sort(),['Pistol',item.id].sort());console.log('PASS buy/equip and replace primary',item.id);
  }
- await p.locator('[data-shop-tab=gear]').click();
+ await p.locator('[data-shop-tab=gear]').click();assert.equal(await p.locator('.supply-silhouette svg').count(),4);
  for(const id of ['smallMedkit','largeMedkit']){await p.locator(`[data-shop-action=buy][data-item=${id}]`).click();await wait(s=>s.inventory[id]===1,'buy '+id);}
  room.host.account.health=10;room.host.pose.hp=10;room.host.account.weapons.G36.durability=30;room.host.account.reserve=492;pushAccount();await wait(s=>s.hp===10&&s.durability===30&&s.totalAmmo===500,'condition and ammo fixture');
  await p.locator('[data-shop-action=buy][data-item=smallMedkit]').click();await wait(s=>s.hp===35,'purchase immediately heals');await p.locator('[data-shop-action=buy][data-item=largeMedkit]').click();await wait(s=>s.hp===100,'large purchase heals to cap');room.host.account.health=10;room.host.pose.hp=10;pushAccount();await wait(s=>s.hp===10,'stored kit fixture');

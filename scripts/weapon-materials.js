@@ -30,15 +30,4 @@ export function paintWeapon(geometry,id,length){
  geometry.setAttribute('color',new T.BufferAttribute(colors,3));geometry.clearGroups();geometry.addGroup(0,geometry.index?.count??n,0);
  return [{name:'Mechanical palette',color:0xffffff,vertexColors:true}];
 }
-export const GRIPS={
- Pistol:{trigger:[.05,-.10,.09],support:[-.045,-.065,.015]},
- Helsing:{trigger:[.045,-.10,.18],support:[-.06,-.055,-.18]},
- Tikhar:{trigger:[.045,-.075,.28],support:[-.05,-.04,-.13]},
- Shambler:{trigger:[.045,-.09,.20],support:[-.06,-.065,-.19]},
- Shotgun:{trigger:[.05,-.07,.23],support:[-.06,-.065,-.21]},
- Kalash:{trigger:[.04,-.10,.12],support:[-.05,-.045,-.16]},
- VSV:{trigger:[.045,-.08,.22],support:[-.06,-.055,-.18]},
- Scorpion:{trigger:[.04,-.12,.07],support:[-.05,-.065,-.13]},
- Vector:{trigger:[.04,-.17,.10],support:[-.05,-.12,-.07]},
- G36:{trigger:[.04,-.15,.10],support:[-.05,-.07,-.15]},
-};
+export const GRIPS={"Pistol":{"trigger":[0.04,-0.055,0.13],"support":[-0.04,-0.075,0.07]},"Helsing":{"trigger":[0.04,-0.065,0.13],"support":[-0.045,-0.04,-0.16]},"Tikhar":{"trigger":[0.04,-0.052,0.225],"support":[-0.045,-0.026,-0.13]},"Shambler":{"trigger":[0.04,-0.059,0.147],"support":[-0.045,-0.065,-0.217]},"Shotgun":{"trigger":[0.04,-0.031,0.2],"support":[-0.045,-0.025,-0.2]},"Kalash":{"trigger":[0.04,-0.062,0.009],"support":[-0.045,-0.035,-0.165]},"VSV":{"trigger":[0.04,-0.052,0.144],"support":[-0.045,-0.018,-0.18]},"Scorpion":{"trigger":[0.04,-0.062,0.043],"support":[-0.04,-0.025,-0.15]},"Vector":{"trigger":[0.035,0.025,0.055],"support":[-0.04,0.055,-0.22]},"G36":{"trigger":[0.04,-0.078,0.107],"support":[-0.045,-0.02,-0.25]}};

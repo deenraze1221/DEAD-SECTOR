@@ -1,3 +1,5 @@
 import test from 'node:test';import assert from 'node:assert/strict';import {LookInput} from '../look-input.js';
 test('camera discards lock-transition warps and non-finite mouse input',()=>{const l=new LookInput();l.reset(100);l.add(300,100,120);l.add(10000,-10000,200);l.add(NaN,Infinity,200);assert.deepEqual(l.consume(.016),{x:0,y:0});l.add(15,-10,200);const v=l.consume(.016);assert.ok(v.x>0&&v.y<0);l.reset(250);assert.deepEqual(l.consume(.016),{x:0,y:0});});
 test('large batches remain bounded and ordinary movement settles without endless camera drift',()=>{const l=new LookInput();for(let i=0;i<100;i++)l.add(80,0,200);const first=l.consume(.1,2);assert.ok(first.x*.004<=.28);for(let i=0;i<120;i++)l.consume(1/60,2);assert.equal(l.x,0);});
+
+test('ordinary mouse movement applies once with no smoothing tail or frame-rate scaling',()=>{for(const dt of [1/30,1/60,1/144]){const l=new LookInput();l.add(25,-12,200);assert.deepEqual(l.consume(dt),{x:25,y:-12});assert.deepEqual(l.consume(dt),{x:0,y:0});}});

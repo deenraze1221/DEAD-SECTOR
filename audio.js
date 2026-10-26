@@ -26,6 +26,10 @@ export class GameAudio {
     const out=c.createGain();out.gain.value=.055*(1-d/8)**1.3;let dest=this.master||c.destination;if(c.createStereoPanner){const pan=c.createStereoPanner();pan.pan.value=Math.max(-1,Math.min(1,(dx*Math.cos(yaw)-dz*Math.sin(yaw))/Math.max(1,d)));pan.connect(dest);dest=pan;}out.connect(dest);
     for(let n=0;n<2;n++){const o=c.createOscillator(),g=c.createGain(),t=c.currentTime+n*.1;o.type='sine';o.frequency.value=n?1260:940;g.gain.setValueAtTime(.001,t);g.gain.linearRampToValueAtTime(1,t+.008);g.gain.exponentialRampToValueAtTime(.001,t+.075);o.connect(g);g.connect(out);o.start(t);o.stop(t+.08);}return true;
   }
+  ui(kind='click'){
+    if(kind==='hover'&&this.context?.state!=='running')return;this.unlock();const c=this.context;if(!c||c.state!=='running')return;const now=c.currentTime;if(kind==='hover'&&now-(this.lastHover??-1)<.07)return;if(kind==='hover')this.lastHover=now;
+    const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(kind==='hover'?620:880,now);o.frequency.exponentialRampToValueAtTime(kind==='hover'?780:480,now+.055);g.gain.setValueAtTime(kind==='hover'?.018:.04,now);g.gain.exponentialRampToValueAtTime(.001,now+.065);o.connect(g);g.connect(this.master);o.start(now);o.stop(now+.075);
+  }
   shot(id){
     const c=this.context;if(!c||c.state!=='running')return;
     const p={Pistol:[.12,1700,160,.12],Helsing:[.09,2100,180,.13],Tikhar:[.21,620,95,.17],Shambler:[.25,1100,70,.2],Shotgun:[.32,800,55,.23],Kalash:[.17,1550,110,.18],VSV:[.23,760,80,.2],Scorpion:[.075,3300,230,.12],Vector:[.08,2750,210,.13],G36:[.16,2050,125,.17]}[id];if(!p)return;

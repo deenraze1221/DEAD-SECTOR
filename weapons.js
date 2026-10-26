@@ -6,7 +6,7 @@ import {recordShot} from './economy.js';
 export {WEAPONS};
 export class Rifle {
   constructor(audio, random = Math.random) {
-    this.audio=audio;this.random=random;this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(65,1,.01,10);
+    this.audio=audio;this.random=random;this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(45,1,.01,10);
     this.scene.add(new THREE.HemisphereLight('#d5dfcb','#494739',3));
     const light=new THREE.DirectionalLight('#ece2c4',3);light.position.set(-2,3,2);this.scene.add(light);
     this.model=new THREE.Group();this.model.scale.setScalar(.8);this.scene.add(this.model);
@@ -65,7 +65,7 @@ export class Rifle {
   fire(){if(this.reloadTime||this.cooldown||this.durability<=0)return false;if(!this.ammo){this.cooldown=.25;this.audio.play('empty');return false;}if(this.inventory)recordShot(this.inventory);else{this.ammo--;this.wearShots++;if(this.wearShots>=100){this._durability=Math.max(0,this._durability-5);this.wearShots=0;}}this.cooldown=this.config.interval;this.recoil=MOTION[this.config.id].kick;const shell=new THREE.Mesh(this.casingGeometry,this.casingMaterial);shell.position.set(.27,-.17,-.39);this.scene.add(shell);this.casings.push({mesh:shell,life:.7,velocity:new THREE.Vector3(.5,.35,.12)});if(this.casings.length>24)this.scene.remove(this.casings.shift().mesh);this.flashTime=.045;this.audio.shot?.(this.config.id);return true;}
   pose(time,moving){
     const progress=this.reloadTime?1-this.reloadTime/this.config.reload:0,drop=this.reloadTime?Math.sin(progress*Math.PI):0;
-    this.model.position.set(.23,(-.22)-drop*.15,-.48+this.recoil);const motion=MOTION[this.config.id];this.model.rotation.set(this.recoil*motion.pitch*12,Math.sin(time*17)*this.recoil*motion.yaw*8,-drop*(motion.action==='drum'?.65:.25));
+    this.model.position.set(.16,(-.16)-drop*.15,-.48+this.recoil);const motion=MOTION[this.config.id];this.model.rotation.set(this.recoil*motion.pitch*12,Math.sin(time*17)*this.recoil*motion.yaw*8,-drop*(motion.action==='drum'?.65:.25));
     this.magazine.position.y=-drop*.22;this.magazine.rotation.x=drop*.2;
     const loading=this.reloadTime&&this.config.reloadStyle!=='magazine'?Math.sin(progress*Math.PI*6)*drop:0;
     if(this.reloadTime)this.model.rotation.x+=drop*(this.config.reloadStyle==='breech'?.4:.12);

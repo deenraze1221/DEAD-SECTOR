@@ -23,7 +23,7 @@
         <button id="settings-button" class="secondary" aria-expanded="false">НАСТРОЙКИ <span>+</span></button>
       </div>
       <section id="network-panel" class="settings" hidden><label for="room-code">КОД ЛОББИ</label><input id="room-code" inputmode="numeric" pattern="[0-9]{8}" maxlength="8" placeholder="00000000" /><button id="join-room">ВОЙТИ</button><p id="network-status" role="status"></p></section>
-      <section id="settings" class="settings" hidden>
+      <section id="settings" class="settings" aria-label="Settings" hidden><div class="settings-heading"><h2>НАСТРОЙКИ</h2><button id="close-settings" type="button" aria-label="Close settings">×</button></div>
         <div class="settings-tabs" role="tablist"><button type="button" data-setting-tab="audio" aria-selected="true">ЗВУК</button><button type="button" data-setting-tab="controls" aria-selected="false">УПРАВЛЕНИЕ</button><button type="button" data-setting-tab="graphics" aria-selected="false">ГРАФИКА</button></div>
         <div data-setting-panel="audio"><label for="volume-master">Общая громкость <output id="volume-master-value"></output></label><input id="volume-master" type="range" min="0" max="1" step=".01" /><label for="volume-music">Громкость музыки <output id="volume-music-value"></output></label><input id="volume-music" type="range" min="0" max="1" step=".01" /><label for="volume-weather">Громкость погоды <output id="volume-weather-value"></output></label><input id="volume-weather" type="range" min="0" max="1" step=".01" /></div>
         <div data-setting-panel="controls" hidden>        <label for="sensitivity">Чувствительность мыши <output id="sensitivity-value">1.0</output></label>

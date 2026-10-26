@@ -9,6 +9,7 @@ import { GameAudio } from './audio.js';
 import {settingsUI} from './settings.js';
 import {LookInput} from './look-input.js';
 import {updateCompass} from './compass.js';
+import {PeerAvatar} from './peer-avatar.js';
 import {LobbyUI} from './lobby-ui.js';
 import {Session} from './network.js';
 import {MoneyDrops} from './loot.js';
@@ -22,6 +23,7 @@ import {Waves} from './waves.js';
 const $ = id => document.getElementById(id);
 const keys = new Set();const lookInput=new LookInput();
 const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space']);
+let selfAvatar;
 let renderer, scene, camera, player,lastMenuFrame=-Infinity;
 let needsCapture=false,lobbyOpen=false,matchReady=false,lobbyPhase='lobby',countdownAt=0,members=[],localTimer;const peers=new Map();
 let weather,events,cashCooldown=0,lastAnnouncedWave=0,waveNoticeUntil=0;
@@ -30,6 +32,11 @@ let seed=crypto.getRandomValues(new Uint32Array(1))[0];
 const session=new Session(receiveNetwork,text=>{$('network-status').textContent=text;$('lobby-status').textContent=text;});
 const lobby=new LobbyUI({start:startLobby,open:()=>connectRoom('create'),leave:leaveLobby});
 const audio = new GameAudio();
+document.addEventListener('pointerdown',e=>{if(e.target.closest('button,input,select'))audio.unlock();});
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!b.disabled)audio.ui();});
+document.addEventListener('pointerover',e=>{const b=e.target.closest('button');if(b&&!b.disabled&&!b.contains(e.relatedTarget))audio.ui('hover');});
+document.addEventListener('change',e=>{if(e.target.matches('select,input[type=range]'))audio.ui();});
+$('close-settings').addEventListener('click',()=>{$('settings').hidden=true;$('settings-button').setAttribute('aria-expanded','false');});
 const preferences=settingsUI(applyPreferences);audio.setVolumes(preferences);
 const shop=new ShopUI(submitAction,closeShop);
 let hp=100, outcome='', shooting=false, triggerPressed=false, hitTime=0, hurtTime=0, elapsed=0;
@@ -65,7 +72,7 @@ function rebuild(seedValue){
   if(shopOpen){shopOpen=false;shop.hide();}
   if(scene){scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m){m.map?.dispose();m.dispose();}});}
   scene=new THREE.Scene();world=createMap(scene,seedValue);seed=world.seed;colliders=world.colliders;
-  player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);lastAnnouncedWave=0;waveNoticeUntil=0;events=new EncounterEvents(scene);weather=new WeatherEffects(scene,seed,world.buildings);
+  selfAvatar=new PeerAvatar();selfAvatar.head.visible=false;selfAvatar.upper.visible=false;selfAvatar.root.visible=false;scene.add(selfAvatar.root);player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);lastAnnouncedWave=0;waveNoticeUntil=0;events=new EncounterEvents(scene);weather=new WeatherEffects(scene,seed,world.buildings);
   peer=new THREE.Group();const material=new THREE.MeshStandardMaterial({color:'#7d9676'});const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,3,6),material);body.position.y=1;peer.add(body);const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),material);head.position.y=1.75;peer.add(head);peer.visible=false;scene.add(peer);peerPose=null;peers.clear();if(renderer)applyPreferences(preferences);
 }
 function resetCombat(){needsCapture=false;clearTimeout(localTimer);matchReady=false;lobbyOpen=false;$('lobby').hidden=true;session.close();rebuild(crypto.getRandomValues(new Uint32Array(1))[0]);account=createInventory();rifle.bindInventory(account);hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;footstep=0;downed=false;updateCamera();}
@@ -137,7 +144,7 @@ function resize() {
 
 // Read-only snapshot for reproducible browser checks, without allowing state mutation.
 export function getSnapshot() {
-  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded,fov:camera?.fov,weather:weather?.state,wave:waves?.snapshot(),event:events?.snapshot(), hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, seed,room:session.code,networkActive:session.active,peerVisible:[...peers.values()].some(p=>p.mesh.visible),peerCount:peers.size,lobbyOpen,lobbyPhase,matchReady,members,downed,shopOpen,inventory:account,money:account.money,totalAmmo:totalAmmo(account),durability:rifle?.durability,stamina:player?.stamina,terminal:world?.shop.terminal,streetDensity:world?.streetDensity,drops:loot?.snapshot(),supplies:[],remaining:enemies?.alive, enemies:enemies?.items.map(e=>({id:e.id,type:e.type,hp:e.hp,fast:e.type==='runner',x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z})) };
+  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded,fov:camera?.fov,weather:weather?.state,wave:waves?.snapshot(),event:events?.snapshot(), hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, seed,room:session.code,networkActive:session.active,peerVisible:[...peers.values()].some(p=>p.mesh.visible),peerCount:peers.size,bodyVisible:selfAvatar?.root.visible,peerWeapons:[...peers.values()].map(p=>p.avatar.id),lobbyOpen,lobbyPhase,matchReady,members,downed,shopOpen,inventory:account,money:account.money,totalAmmo:totalAmmo(account),durability:rifle?.durability,stamina:player?.stamina,terminal:world?.shop.terminal,streetDensity:world?.streetDensity,drops:loot?.snapshot(),supplies:[],remaining:enemies?.alive, enemies:enemies?.items.map(e=>({id:e.id,type:e.type,hp:e.hp,fast:e.type==='runner',x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z})) };
 }
 
 try {
@@ -190,7 +197,7 @@ try {
       camera.position.set(36, 28, 95); camera.lookAt(0, 2, 40);
     }
     if(started&&!waves.warmup&&!waves.rest&&lastAnnouncedWave!==waves.number){lastAnnouncedWave=waves.number;waveNoticeUntil=performance.now()+5000;audio.play('wave');}
-    $('wave-notice').hidden=!started||performance.now()>waveNoticeUntil;$('wave-notice').textContent=`${t('ВОЛНА')} ${waves.number} · ${t('НАЧИНАЕТСЯ')}`;audio.music(started&&!outcome&&(running||shopOpen||session.active)?(waves.warmup||waves.rest)?'calm':'tense':'paused',waves.number);
+    $('wave-notice').hidden=!started||performance.now()>waveNoticeUntil;$('wave-notice').textContent=`${t('ВОЛНА')} ${waves.number} · ${t('НАЧИНАЕТСЯ')}`;audio.music(started&&!outcome&&(running||shopOpen||session.active)?(waves.warmup||waves.rest)?'calm':'tense':'calm',waves.number);
     updateCompass($('compass'),player.position,player.yaw,[{...STORE,label:t('МАГАЗИН'),shop:true},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({...v.pose,label:`${t('ИГРОК')} ${['host','guest','guest2','guest3'].indexOf(id)+1}`}))],t);
     audio.terminalBeacon(player.position,STORE.terminal,player.yaw,started&&(running||shopOpen||session.active));
     $('health').textContent=hp;$('health-bar').style.width=`${hp}%`;
@@ -214,7 +221,9 @@ try {
     rifle.pose(elapsed,keys.size>0);
     account.health=hp;
     if(lobbyOpen&&countdownAt)$('lobby-countdown').textContent=`${t('СТАРТ ЧЕРЕЗ')} ${Math.max(0,Math.ceil((countdownAt-Date.now())/1000))}`;
-    if(session.active&&matchReady){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id,inventory:account});if(session.host)session.send({type:'state',wave:waves.snapshot(),event:events.snapshot(),cash:loot.snapshot(),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
+    if(session.active&&matchReady){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,pitch:player.pitch,hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id,inventory:account});if(session.host)session.send({type:'state',wave:waves.snapshot(),event:events.snapshot(),cash:loot.snapshot(),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
+    for(const p of peers.values())p.avatar.animate(delta);
+    selfAvatar.update({...player.position,yaw:player.yaw,pitch:0,hp,weapon:rifle.config.id});selfAvatar.animate(delta);selfAvatar.root.position.set(player.position.x,player.position.y,player.position.z);selfAvatar.root.rotation.y=player.yaw;selfAvatar.root.visible=started&&!outcome&&player.pitch<-.3;
     renderer.autoClear=true;renderer.render(scene, camera);
     if(started&&!outcome){renderer.autoClear=false;renderer.clearDepth();renderer.render(rifle.scene,rifle.camera);}
   }
@@ -242,7 +251,7 @@ function receiveNetwork(m){
  if(m.type==='countdown'){lobbyPhase='countdown';countdownAt=m.startAt;renderLobby();}
  if(m.type==='countdown-cancelled'){countdownAt=0;lobbyPhase='lobby';renderLobby();}
  if(m.type==='match-start')beginMatch();
- if(m.type==='pose'){let p=peers.get(m.id);if(!p){const mesh=peer.clone();mesh.visible=true;scene.add(mesh);p={mesh,pose:m};peers.set(m.id,p);}p.pose=m;p.mesh.visible=true;p.mesh.position.set(m.x,m.y,m.z);p.mesh.rotation.y=m.yaw;peerPose=m;}
+ if(m.type==='pose'){let p=peers.get(m.id);if(!p){const avatar=new PeerAvatar(),mesh=avatar.root;scene.add(mesh);p={avatar,mesh,pose:m};peers.set(m.id,p);}p.pose=m;p.mesh.visible=true;p.avatar.update(m,elapsed);peerPose=m;}
  if(m.type==='left'||(m.type==='away'&&m.role!=='host')){const p=peers.get(m.role);if(p)scene.remove(p.mesh);peers.delete(m.role);}
  if(m.type==='closed'){for(const p of peers.values())scene.remove(p.mesh);peers.clear();if(hp<=0)finish('dead');else{resetCombat();showLobby();}}
  if(m.type==='state'&&!session.host)applyState(m);
@@ -258,7 +267,7 @@ $('join-toggle').addEventListener('click',()=>{$('settings').hidden=true;$('netw
 $('join-room').addEventListener('click',()=>{const code=$('room-code').value.trim();if(!/^\d{8}$/.test(code)){$('network-status').textContent=t('Введите 8 цифр');return;}connectRoom('join',code);});
 function connectRoom(mode,code){const url=$('server-url').value.trim();if(!url){const text=t('Укажите адрес общего сервера в настройках. Одиночная игра доступна без сервера.');$('network-status').textContent=text;$('lobby-status').textContent=text;return;}session.connect(url,mode,seed,code);}
 $('resume-room').addEventListener('click',()=>session.resumeSaved());
-$('server-url').value=location.protocol==='https:'?`wss://${location.host}`:location.protocol==='http:'?`ws://${location.hostname}:3000`:'';
+$('server-url').value=['localhost','127.0.0.1','[::1]'].includes(location.hostname)?'':location.protocol==='https:'?`wss://${location.host}`:location.protocol==='http:'?`ws://${location.hostname}:3000`:'';
 window.addEventListener('game-language-change',()=>{setRunning(false);$('message').textContent=t($('message').textContent);});
 
 function openShop(){shopOpen=true;pause();shop.message('');shop.show(account);}
