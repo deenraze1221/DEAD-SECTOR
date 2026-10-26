@@ -1,7 +1,7 @@
 extends RefCounted
 # Three.js and Godot both use a right-handed Y-up world. Godot triangles are clockwise.
 var materials: Array = []
-var meshes: Array = []
+var mesh_cache: Dictionary = {}
 var data: Dictionary
 
 func matrix(values: Array) -> Transform3D:
@@ -37,6 +37,8 @@ func load_data() -> void:
   materials.append(material)
 
 func make_mesh(record: Dictionary) -> ArrayMesh:
+ var key=JSON.stringify([record.geometry,record.materials])
+ if mesh_cache.has(key): return mesh_cache[key]
  var raw: Dictionary=data.geometries[int(record.geometry)]
  var mesh=ArrayMesh.new()
  var vertices=PackedVector3Array()
@@ -63,6 +65,7 @@ func make_mesh(record: Dictionary) -> ArrayMesh:
   arrays[Mesh.ARRAY_INDEX]=indices
   mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
   mesh.surface_set_material(mesh.get_surface_count()-1,materials[int(record.materials[int(group.materialIndex)])])
+ mesh_cache[key]=mesh
  return mesh
 
 func build_world(parent: Node3D) -> void:
@@ -103,6 +106,7 @@ func build_weapon(parent: Node3D, id: String) -> void:
   var instance=MeshInstance3D.new()
   instance.mesh=make_mesh(part)
   if id=="Pistol":
+   instance.mesh=instance.mesh.duplicate()
    for surface in range(instance.mesh.get_surface_count()):
     var source: StandardMaterial3D=instance.mesh.surface_get_material(surface)
     var finish=source.duplicate()
@@ -160,3 +164,15 @@ func build_hands(parent: Node3D, grips: Dictionary) -> void:
    mesh.material_override=glove
    mesh.layers=2
    hand.add_child(mesh)
+
+func creature_node(record: Dictionary) -> Node3D:
+ var node: Node3D
+ if record.has("geometry"):
+  var mesh=MeshInstance3D.new()
+  mesh.mesh=make_mesh(record)
+  node=mesh
+ else: node=Node3D.new()
+ node.name=record.name if not record.name.is_empty() else "Joint"
+ node.transform=matrix(record.transform)
+ for child in record.children: node.add_child(creature_node(child))
+ return node

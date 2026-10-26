@@ -1,6 +1,6 @@
 ## Two versions: HTML and Godot
 
-The existing HTML game remains in the repository root. A separate **Godot 4.6 Standard** first-stage port is in [godot/](godot/README.md): import [godot/project.godot](godot/project.godot) and press F5. It includes the original city snapshot, native movement and all ten weapons in a test armory. Zombies, waves, shop/economy and multiplayer have not been ported yet. The HTML and Godot versions currently cannot share a multiplayer match.
+The existing HTML game remains in the repository root. A separate **Godot 4.6 Standard** single-player port is in [godot/](godot/README.md): import [godot/project.godot](godot/project.godot) and press F5. It includes the original city snapshot, native movement, ten weapons, six enemy types, waves and shop/economy. Multiplayer has not been ported yet. The HTML and Godot versions currently cannot share a multiplayer match.
 
 # DEAD SECTOR
 

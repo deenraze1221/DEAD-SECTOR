@@ -5,6 +5,10 @@ var weapon_viewport: SubViewport
 var mouse_guard=0.0
 var gun: Node3D
 var stamina=5.0
+var health=100
+var battle
+var switch_time=0.0
+var pending_weapon=""
 var ammo=8
 var reserve=84
 var reloading=0.0
@@ -21,6 +25,8 @@ var shot_sound: AudioStreamPlayer
 var flash: OmniLight3D
 
 func _ready() -> void:
+ collision_layer=8
+ collision_mask=1|4
  var collider=CollisionShape3D.new()
  var capsule=CapsuleShape3D.new()
  capsule.radius=.32
@@ -69,19 +75,32 @@ func _ready() -> void:
  add_child(shot_sound)
 
 func _unhandled_input(event: InputEvent) -> void:
- if not active: return
+ if not active or health<=0: return
  if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED and mouse_guard<=0:
   # Relative input is used exactly once, independent of frame rate.
   var motion=event.screen_relative
   if abs(motion.x)>600 or abs(motion.y)>600: return
   look(motion)
  if event.is_action_pressed("fire"): fire()
- if event.is_action_pressed("reload") and reloading<=0 and ammo<int(config.capacity) and reserve>0: reloading=float(config.reload)
- if event.is_action_pressed("flashlight"):
+ if event.is_action_pressed("reload") and switch_time<=0 and reloading<=0 and ammo<int(config.capacity) and reserve>0: reloading=float(config.reload)
+ if event.is_action_pressed("flashlight") and (battle==null or battle.flashlight and battle.battery>0):
   camera.get_node("Flashlight").visible=not camera.get_node("Flashlight").visible
+ if battle!=null:
+  if event.is_action_pressed("primary") and battle.primary!="": battle.switch_to(battle.primary)
+  if event.is_action_pressed("pistol"): battle.switch_to("Pistol")
+  if event.is_action_pressed("trap") and battle.traps>0: battle.trap_selected=true
+  if event.is_action_pressed("small_medkit"): battle.use_medkit(0)
+  if event.is_action_pressed("large_medkit"): battle.use_medkit(1)
+  if event.is_action_pressed("battery") and battle.batteries>0 and battle.flashlight and battle.battery<120:
+   battle.batteries-=1
+   battle.battery=120
 
 func _physics_process(delta: float) -> void:
- if not active: return
+ if not active or health<=0: return
+ if switch_time>0:
+  var before=switch_time
+  switch_time=maxf(0,switch_time-delta)
+  if before>.75 and switch_time<=.75 and battle!=null: battle.equip_owned(pending_weapon)
  mouse_guard=maxf(0,mouse_guard-delta)
  cooldown=maxf(0,cooldown-delta)
  if config.automatic and Input.is_action_pressed("fire"): fire()
@@ -113,10 +132,18 @@ func _physics_process(delta: float) -> void:
  distance_walked+=actual*delta
  var bob=sin(distance_walked*TAU/1.65)*minf(actual/4.5,1)*.006
  gun.position=base_gun+Vector3(0,bob-(sin((float(config.reload)-reloading)/float(config.reload)*PI)*.16 if reloading>0 else 0),recoil*.07)
+ gun.position.y-=sin((1.5-switch_time)/1.5*PI)*.35 if switch_time>0 else 0
  gun.rotation.x=recoil*.15
 
 func fire() -> void:
+ if not active or health<=0 or switch_time>0: return
+ if battle!=null and battle.trap_selected: battle.place_trap();return
  if cooldown>0 or reloading>0 or ammo<=0: return
+ if battle!=null:
+  var state=battle.inventory.get(config.id,{})
+  if state.get("durability",100)<=0: return
+  state.shots=state.get("shots",0)+1
+  if state.shots>=100: state.durability=maxf(0,state.durability-5);state.shots=0
  ammo-=1
  cooldown=float(config.interval)
  recoil=1
@@ -128,14 +155,16 @@ func fire() -> void:
  query.exclude=[get_rid()]
  var hit=get_world_3d().direct_space_state.intersect_ray(query)
  last_hit=not hit.is_empty()
- if last_hit and hit.collider.has_meta("target"):
+ if last_hit and hit.collider.has_method("take_damage"): hit.collider.take_damage(int(config.damage))
+ elif last_hit and hit.collider.has_meta("target"):
   var target=hit.collider
   target.set_meta("hp",target.get_meta("hp")-int(config.damage))
   if target.get_meta("hp")<=0: target.queue_free()
 
 func look(relative: Vector2) -> void:
- rotate_y(-relative.x*.002)
- camera.rotation.x=clamp(camera.rotation.x-relative.y*.002,-PI/3,PI/2-.02)
+ var sensitivity=get_parent().sensitivity
+ rotate_y(-relative.x*.002*sensitivity)
+ camera.rotation.x=clamp(camera.rotation.x-relative.y*.002*sensitivity,-PI/3,PI/2-.02)
 
 func setup_weapon_view() -> void:
  var layer=CanvasLayer.new()
@@ -178,3 +207,8 @@ func setup_weapon_view() -> void:
 func _process(_delta: float) -> void:
  if is_instance_valid(weapon_camera):
   weapon_camera.global_transform=camera.global_transform
+
+func hurt(amount: int) -> void:
+ if health<=0: return
+ health=maxi(0,health-amount)
+ if health==0: get_parent().show_death()

@@ -1,5 +1,6 @@
 // Reusable bridge: preserve the browser city's instancing and original weapon geometry.
 import {createServer} from 'vite';
+import {weaponSilhouette} from '../weapon-icons.js';
 import {chromium} from 'playwright';
 import {writeFile,mkdir} from 'node:fs/promises';
 const vite=await createServer({server:{host:'127.0.0.1',port:0}});await vite.listen();
@@ -14,7 +15,15 @@ const data=await page.evaluate(async()=>{
  const batches=[];scene.updateMatrixWorld(true);scene.traverse(o=>{if(!o.isMesh||(o.material?.transparent&&o.material?.depthWrite===false))return;const transforms=[];if(o.isInstancedMesh){const m=new T.Matrix4();for(let i=0;i<o.count;i++){o.getMatrixAt(i,m);transforms.push(o.matrixWorld.clone().multiply(m).elements);}}else transforms.push(o.matrixWorld.elements);batches.push({geometry:geometry(o.geometry),materials:(Array.isArray(o.material)?o.material:[o.material]).map(material),transforms,colors:o.instanceColor?Array.from(o.instanceColor.array):[]});});
  const {WEAPONS}=await import('/weapon-config.js');const avatar=new PeerAvatar(),weapons={};
  for(const config of WEAPONS){avatar.setWeapon(config.id);avatar.body.updateMatrixWorld(true);const parts=[];avatar.body.traverse(o=>{if(o.isMesh)parts.push({geometry:geometry(o.geometry),materials:(Array.isArray(o.material)?o.material:[o.material]).map(material),transform:o.matrix.elements});});weapons[config.id]={...config,parts,grips:{support:avatar.arms[0].hand.position.toArray(),trigger:avatar.arms[1].hand.position.toArray()}};}
- return {version:1,seed:42,spawn:layout.spawn,terminal:layout.shop.terminal,colliders:layout.colliders,batches,geometries,materials,textures,weapons};
+ const {Enemies}=await import('/enemies.js'),{ENEMY_TYPES}=await import('/waves.js'),{SHOP_ITEMS}=await import('/economy.js');
+ const factory=new Enemies(new T.Scene(),[],{play(){},creature(){}});
+ function node(o){o.updateMatrix();return {name:o.name,transform:o.matrix.elements,...(o.isMesh?{geometry:geometry(o.geometry),materials:(Array.isArray(o.material)?o.material:[o.material]).map(material)}:{}),children:o.children.filter(c=>c.visible).map(node)};}
+ const creatures={};
+ for(const type of Object.keys(ENEMY_TYPES)){creatures[type]=[];for(let skin=0;skin<(type==='zombie'?9:type==='boss'?5:1);skin++){const e=factory.spawn(type,0,0,skin,skin);creatures[type].push(node(e.visual.root));}}
+ return {creatures,enemy_types:ENEMY_TYPES,shop_items:SHOP_ITEMS,hives:layout.hives,version:1,seed:42,spawn:layout.spawn,terminal:layout.shop.terminal,colliders:layout.colliders,batches,geometries,materials,textures,weapons};
 });
-await mkdir('godot/assets',{recursive:true});for(let i=0;i<data.textures.length;i++)await writeFile(`godot/assets/label-${i}.png`,Buffer.from(data.textures[i].split(',')[1],'base64'));delete data.textures;await writeFile('godot/assets/city.json',JSON.stringify(data));console.log(`Godot bridge: ${data.batches.length} batches, ${data.colliders.length} colliders, all ten original weapons, seed ${data.seed}`);
+await mkdir('godot/assets',{recursive:true});
+await mkdir('godot/assets/icons',{recursive:true});
+for(const id of Object.keys(data.weapons))await writeFile('godot/assets/icons/'+id+'.svg',weaponSilhouette(id).replace('<svg ','<svg xmlns="http://www.w3.org/2000/svg" width="180" height="88" ').replaceAll('currentColor','#b2c19c'));
+for(let i=0;i<data.textures.length;i++)await writeFile(`godot/assets/label-${i}.png`,Buffer.from(data.textures[i].split(',')[1],'base64'));delete data.textures;await writeFile('godot/assets/city.json',JSON.stringify(data));console.log(`Godot bridge: ${data.batches.length} batches, ${data.colliders.length} colliders, all ten original weapons, seed ${data.seed}`);
 }finally{await browser.close();await vite.close();}
