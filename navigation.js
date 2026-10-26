@@ -11,7 +11,8 @@ export function createNavigation(colliders, radius=.4, height=1.8, baseY=0) {
   for(const b of obstacles){const minX=Math.max(-offset,Math.floor(b.minX-radius)+1),maxX=Math.min(offset,Math.ceil(b.maxX+radius)-1),minZ=Math.max(-offset,Math.floor(b.minZ-radius)+1),maxZ=Math.min(offset,Math.ceil(b.maxZ+radius)-1);if(minX>maxX)continue;for(let z=minZ;z<=maxZ;z++)blocked.fill(1,index(minX,z),index(maxX,z)+1);}
   function nearest(p) {
     const x = Math.max(-offset,Math.min(offset,Math.round(p.x))), z = Math.max(-offset,Math.min(offset,Math.round(p.z)));
-    for(let r=0;r<7;r++) for(let dz=-r;dz<=r;dz++) for(let dx=-r;dx<=r;dx++) if(free(x+dx,z+dz)) return [x+dx,z+dz];
+    for(let r=0;r<7;r++){let best=null,score=Infinity;for(let dz=-r;dz<=r;dz++)for(let dx=-r;dx<=r;dx++)if(free(x+dx,z+dz)){const distance=(x+dx-p.x)**2+(z+dz-p.z)**2;if(distance<score){best=[x+dx,z+dz];score=distance;}}if(best)return best;}
+
     return null;
   }
   const fields=new Map();

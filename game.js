@@ -1,3 +1,4 @@
+import {blackoutDistrict} from './power-grid.js';
 import * as THREE from 'three';
 import {t} from './i18n.js';
 import {PerformanceMetrics} from './metrics.js';
@@ -11,7 +12,7 @@ import { Rifle,WEAPONS } from './weapons.js';
 import { Enemies } from './enemies.js';
 import { GameAudio } from './audio.js';
 import {settingsUI} from './settings.js';
-import {LookInput} from './look-input.js';
+import {LookInput,requestLookLock} from './look-input.js';
 import {updateCompass} from './compass.js';
 import {Flashlight} from './flashlight.js';
 import {Operations,makeTrapModel,AIRDROP_INTERVAL} from './operations.js';
@@ -96,7 +97,7 @@ async function enter() {
   if(outcome)resetCombat();
   audio.unlock();
   try {
-    await $('scene').requestPointerLock();
+    await requestLookLock($('scene'));
   } catch {
     $('message').textContent = t('Браузер не разрешил захват мыши. Нажмите «Войти в сектор» ещё раз или откройте игру в отдельной вкладке.');
   }
@@ -140,7 +141,7 @@ document.addEventListener('keydown', event => {
   keys.add(event.code);
 });
 document.addEventListener('keyup', event => { keys.delete(event.code); });
-document.addEventListener('mousemove', event => { if (running&&document.pointerLockElement===$('scene'))lookInput.add(event.movementX,event.movementY,performance.now()); });
+document.addEventListener('mousemove', event => { if (running&&document.pointerLockElement===$('scene'))lookInput.add(event.movementX,event.movementY,event.timeStamp,performance.now()); });
 
 document.addEventListener('mousedown', event=>{if(!running)return;if(event.button===0){if(trapSelected){placeTrap();return;}shooting=true;triggerPressed=true;}});
 document.addEventListener('mouseup', event=>{if(event.button===0)shooting=false;});
@@ -215,7 +216,7 @@ try {
     if(started&&!waves.warmup&&!waves.rest&&lastAnnouncedWave!==waves.number){lastAnnouncedWave=waves.number;waveNoticeUntil=performance.now()+5000;waveNoticeMessage=`${t('ВОЛНА')} ${waves.number} · ${t('НАЧИНАЕТСЯ')}`;audio.play('wave');}
     if(started&&waves.rest&&lastCompletedWave!==waves.number){lastCompletedWave=waves.number;waveNoticeUntil=performance.now()+5000;waveNoticeMessage=`${t('ВОЛНА')} ${waves.number} · ${t('ЗАВЕРШЕНА')}`;audio.play('wave-clear');}
     $('wave-notice').hidden=!started||performance.now()>waveNoticeUntil;$('wave-notice').textContent=`${t('ВОЛНА')} ${waves.number} · ${t(waves.rest?'ЗАВЕРШЕНА':'НАЧИНАЕТСЯ')}`;audio.music(started&&!outcome&&(running||shopOpen||session.active)?(waves.warmup||waves.rest)?'calm':'tense':'calm',waves.number);
-    updateCompass($('compass'),player.position,player.yaw,[{...STORE,label:t('МАГАЗИН'),shop:true},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({...v.pose,label:`${t('ИГРОК')} ${['host','guest','guest2','guest3'].indexOf(id)+1}`})),...(activeMission()?[{...activeMission(),quest:true,label:t('MISSION')}]:[]),...operations.drops.filter(d=>d.status!=='opened').slice(0,1).map(d=>({...d,drop:true,label:t('SUPPLY')})),...enemies.items.filter(e=>e.hp>0&&Math.hypot(e.rig.position.x-player.position.x,e.rig.position.z-player.position.z)<=25).map(e=>({...e.rig.position,enemy:true,label:t('Enemy')}))],t);
+    updateCompass($('compass'),player.position,player.yaw,[{...STORE,label:t('МАГАЗИН'),shop:true},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({...v.pose,label:`${t('ИГРОК')} ${['host','guest','guest2','guest3'].indexOf(id)+1}`})),...(activeMission()?[{...activeMission(),quest:true,label:t('MISSION')}]:[]),...operations.drops.filter(d=>d.status!=='opened').slice(0,1).map(d=>({...d,drop:true,label:t('SUPPLY')})),...enemies.items.filter(e=>e.hp>0&&(waves.clearing||Math.hypot(e.rig.position.x-player.position.x,e.rig.position.z-player.position.z)<=25)).map(e=>({...e.rig.position,enemy:true,label:t('Enemy')}))],t);
     audio.terminalBeacon(player.position,STORE.terminal,player.yaw,started&&(running||shopOpen||session.active));
     $('health').textContent=hp;$('health-bar').style.width=`${hp}%`;
     $('stamina-bar').style.width=`${player.stamina/5*100}%`;$('stamina').textContent=`${Math.ceil(player.stamina/5*100)}%`;
@@ -227,11 +228,11 @@ try {
     if(!session.active&&waves.rest&&account.lastRewardWave!==waves.number){account.lastRewardWave=waves.number;account.completedWave=Math.max(account.completedWave||0,waves.number);account.money+=waves.number%5===0?500:75+waves.number*25;}
     $('objective').textContent=waves.warmup?`${t('ПОДГОТОВКА')} · ${Math.ceil(60-waves.time)}s`:`${t('ВОЛНА')} ${waves.number} · ${waves.clearing?t('ДОБЕЙТЕ ОСТАВШИХСЯ'):waves.rest?t('ПЕРЕРЫВ'):t('НАСТУПЛЕНИЕ')}${waves.clearing?'':` ${Math.ceil((waves.rest?30:120)-waves.time)}s`}`;
     const boss=enemies.items.find(e=>e.boss&&e.hp>0);
-    $('wave-details').textContent=`${t(waves.variant==='boss'?'МИНИ-БОСС':waves.variant==='rush'?'БЫСТРОЕ НАСТУПЛЕНИЕ':waves.variant==='siege'?'ОСАДА':'СТАНДАРТ')} · ${t('ЖИВЫХ')}: ${enemies.alive} · ${t('ВЫШЛО')}: ${waves.spawned}/${waves.total}${boss?` · BOSS ${boss.hp}/${boss.maxHp} HP · ${t('PHASE')} ${boss.bossPhase||1}`:''}`;
+    $('wave-details').textContent=`${t(waves.variant==='boss'?'МИНИ-БОСС':waves.variant==='rush'?'БЫСТРОЕ НАСТУПЛЕНИЕ':waves.variant==='siege'?'ОСАДА':waves.variant==='blackout'?'ОТКЛЮЧЕНИЕ СВЕТА':'СТАНДАРТ')} · ${t('ЖИВЫХ')}: ${enemies.alive} · ${t('ВЫШЛО')}: ${waves.spawned}/${waves.total}${boss?` · BOSS ${boss.hp}/${boss.maxHp} HP · ${t('PHASE')} ${boss.bossPhase||1}`:''}`;
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
     const event=events.state;$('event-objective').textContent=event?.status==='active'?`${t(event.label)} · $${event.reward} · ${Math.round(Math.hypot(player.position.x-event.x,player.position.z-event.z))}m${event.id==='defend'?` · ${Math.floor(event.progress)}/25s`:event.id==='growth'?` · ${event.hp} HP`:t(' · E рядом')}`:event?.status==='complete'&&event.wave===waves.number?t('Событие выполнено'):'';
     weather.maxDrops={low:160,medium:350,high:650}[preferences.quality];weather.step(delta,waves,player.position,audio,matchReady&&(running||session.active));$('weather-status').textContent=`${String(Math.floor(weather.cycle?.hour??6)).padStart(2,'0')}:${String(Math.floor(((weather.cycle?.hour??6)%1)*60)).padStart(2,'0')} · ${t(weather.cycle?.night?'Ночь':'День')} · ${t({overcast:'Пасмурно',rain:'Дождь',storm:'Гроза',clear:'Ясно'}[weather.state.weather])} · ${t({light:'Слабый туман',medium:'Средний туман',heavy:'Сильный туман'}[weather.state.fog])}`;
-    scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta,weather.state.weather,weather.cycle?.night);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
+    scene.userData.powerCut.value=blackoutDistrict(waves);scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta,weather.state.weather,weather.cycle?.night);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
     events.step(delta);flashlight.update(camera,account,preferences.quality);operations.visualStep(player.position,audio,running||(session.active&&started&&!outcome));updateSurvivalUI();updateMissionNotice();
     const near=loot.nearby(player.position);
     $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&nearDowned()?t('E · Поднять напарника'):near?`$${near.value} · ${t('Автоподбор')}`:nearTerminal(player.position)?t('E · Открыть магазин'):'';
@@ -313,7 +314,7 @@ function nearDowned(){return [...peers].map(([id,v])=>({...v.pose,id})).find(p=>
 function renderLobby(){lobby.root.hidden=!lobbyOpen;lobby.render(session.active?members.map(m=>({...m,self:m.id===session.role})):[{id:'host',slot:0,connected:true,self:true}],!session.active||session.host,session.code,lobbyPhase);setRunning(false);}
 function showLobby(){lobbyOpen=true;lobbyPhase='lobby';countdownAt=0;renderLobby();}
 function leaveLobby(){clearTimeout(localTimer);countdownAt=0;session.close();lobbyOpen=false;matchReady=false;started=false;lobby.root.hidden=true;if(document.pointerLockElement)document.exitPointerLock();setRunning(false);}
-function startLobby(){audio.unlock();$('scene').requestPointerLock().catch(()=>{});if(session.active){if(session.host)session.send({type:'start'});else session.send({type:'ready',ready:true});}else{lobbyPhase='countdown';countdownAt=Date.now()+5000;renderLobby();localTimer=setTimeout(beginMatch,5000);}}
+function startLobby(){audio.unlock();requestLookLock($('scene')).catch(()=>{});if(session.active){if(session.host)session.send({type:'start'});else session.send({type:'ready',ready:true});}else{lobbyPhase='countdown';countdownAt=Date.now()+5000;renderLobby();localTimer=setTimeout(beginMatch,5000);}}
 function beginMatch(){needsCapture=document.pointerLockElement!==$('scene');matchReady=true;started=true;lobbyOpen=false;countdownAt=0;lobbyPhase='playing';lobby.root.hidden=true;setRunning(document.pointerLockElement===$('scene'));updateCamera();}
 
 function applyPreferences(v){audio.setVolumes(v);if(!renderer||!scene)return;renderer.shadowMap.enabled=v.quality!=='low';const sun=scene.userData.sun||scene.children.find(o=>o.isDirectionalLight&&o.castShadow);if(sun){sun.castShadow=v.quality!=='low';const size=v.quality==='high'?2048:1024;if(sun.shadow.mapSize.x!==size){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(size,size);}sun.shadow.needsUpdate=true;}if(scene.userData.appliedQuality!==v.quality){scene.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:[o.material])if(m)m.needsUpdate=true;});scene.userData.appliedQuality=v.quality;}}

@@ -169,7 +169,7 @@ City expansion adds residential highrise24m, corporate tower32m, hospital tower2
 
 ## Movement, crowds and presentation
 
-Acceleration and braking take15% longer; jump apex is50% lower (launch speed divided by sqrt2). Ground enemies default to the player spawn beside the market as their base destination. Visible players within25m trigger pursuit; a short sight memory and the existing gunshot investigation remain. Smoothed grid routes, distributed flanking positions and three-pass local crowd separation prevent shared-cell queues. Terrain collisions constrain separation. Ground zombies use ballistic jumps and floor/ceiling checks to reach players on vehicles up to2.8m above them. Authoritative enemy positions, including height, replicate to guests.
+Acceleration and braking take15% longer; jump apex is50% lower (launch speed divided by sqrt2). Ground enemies default to the player spawn beside the market as their base destination. Players within180m trigger pursuit even behind walls; a short sight memory and the existing gunshot investigation remain. Smoothed grid routes, distributed flanking positions and three-pass local crowd separation prevent shared-cell queues. Terrain collisions constrain separation. Ground zombies use ballistic jumps and floor/ceiling checks to reach players on vehicles up to2.8m above them. Authoritative enemy positions, including height, replicate to guests.
 
 A seeded decorative belt extends100m behind each perimeter wall, including corner districts, with varied rooflines, facade windows and roof equipment. It has no gameplay colliders or interiors. A moving cloud sky, night moon/halo and world-space surface weathering preserve the dark pixel aesthetic without vertex distortion.
 
@@ -188,3 +188,15 @@ Materials use metre-scaled world coordinates: staggered brick courses, pavement 
 The playable square is250×250m (62,500m²), with100 city blocks,298 furnished ground-floor rooms and106 evenly spaced street lamps. New architecture: courthouse,38m Art Deco tower, freight depot and observatory with a rooftop dome. New props: recycling station, parcel locker, bus sign, road block, cable reel, utility cabinet, flower box, street kiosk, delivery trolley and solar bollard. All are original procedural models and participate in placement bounds/collisions. Select facade windows emit a restrained warm glow at night without adding point lights.
 
 World dimensions are shared by generator, server pose bounds, navigation, flying-enemy positioning, mission placement and the100m background belt. Navigation rasterizes collider footprints directly to accommodate the larger city without a collider scan for every grid cell.
+
+## Districts and creature presentation
+
+Four districts now constrain building selection and vary facade materials, details, trees and service props: Ironworks, Old Residences, Civic Quarter and Market Row. The original five zombie outfits gain firefighter, police, mechanic and exposed-infection costumes (nine total). The Warden retains its original outfit and gains plague, iron, charred and reclaimer variants (five total), selected per boss encounter and replicated by skin index. Face details, clothing equipment, idle breathing and continuous anticipation/strike/recovery improve the rigs while retaining planted feet and brute arm clearance.
+
+Every fourth assault cuts power to one rotating district; boss assaults take priority. Lamps, facade windows, signs and light halos/pools go dark until intermission. Store terminal and its emergency light remain usable. The event is derived from wave state on every client.
+
+Enemy awareness is180m, independent of line of sight; melee and projectile damage still require unobstructed paths. Added ticket machine, drinking fountain, vent stack, fire-hose cabinet and folding barricade. Tripods now connect three grounded feet to a raised hub instead of an inverted point. City construction removes exact duplicate primitives and reports same-transform overlaps between different non-decal materials for review.
+
+Enemy traversal now validates smoothed segments against actual expanded terrain colliders, picks the nearest free navigation cell by distance, replans after blocked movement or a3s no-progress window, and attempts headroom-checked hops over low prop obstacles. Missing grid paths fall back to collision-constrained pursuit so recovery still runs. Every surviving enemy is marked on the compass during clearing. Regression scenarios cover cars, connected fences, narrow gaps and all hive routes on two furnished seeds.
+
+Mouse look now requests unadjusted relative input where supported, falls back to standard pointer lock, rejects stale queued events and isolated cursor warps, and removes the old16-degree-per-frame truncation that made fast movements depend on FPS. Ordinary deltas apply once with no smoothing tail. Five additional street models and grounded tripod feet are included in the rendered-bounds audit.

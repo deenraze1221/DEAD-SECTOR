@@ -26,13 +26,26 @@ export const ZOMBIE_SKINS = Object.freeze([
  {id:'medic',skin:'#a8a493',clothes:'#c0bba2',pants:'#596c60',accent:'#8e292c'},
  {id:'soldier',skin:'#818e70',clothes:'#4a5840',pants:'#3d4634',accent:'#7c7954'},
  {id:'hoodie',skin:'#9a817b',clothes:'#703c46',pants:'#38373b',accent:'#99908a'},
+ {id:'firefighter',skin:'#a18a77',clothes:'#74603c',pants:'#493f31',accent:'#d5bc58'},
+ {id:'police',skin:'#929b88',clothes:'#273c54',pants:'#29303d',accent:'#a8adb3'},
+ {id:'mechanic',skin:'#9d8a73',clothes:'#3f7779',pants:'#344c50',accent:'#b1b5a2'},
+ {id:'infected',skin:'#9b9d79',clothes:'#726d5f',pants:'#45453d',accent:'#8d3c40'},
 ]);
+
+export const BOSS_SKINS=Object.freeze([
+ {id:'warden',skin:'#6e8386',clothes:'#293849',pants:'#303a43',accent:'#bd9c71'},
+ {id:'plague',skin:'#8e9970',clothes:'#536343',pants:'#353e2e',accent:'#d2c487'},
+ {id:'iron',skin:'#a08b7b',clothes:'#6b4541',pants:'#403434',accent:'#9caba9'},
+ {id:'charred',skin:'#5d605b',clothes:'#292a2e',pants:'#303031',accent:'#cb794c'},
+ {id:'reclaimer',skin:'#959b9c',clothes:'#a39d83',pants:'#434a49',accent:'#485e6b'},
+]);
+export function attackPose(e){const smooth=x=>{x=T.MathUtils.clamp(x,0,1);return x*x*(3-2*x);};if(e.pendingAttack){const duration=e.windupDuration||(e.attackKind==='slam'?1.2:e.boss?.9:e.type==='brute'?.6:.18),p=1-(e.windup||0)/duration,draw=e.boss&&e.attackKind==='slam'?-1.6:.35;return p<.7?draw*smooth(p/.7):draw+(-.95-draw)*smooth((p-.7)/.3);}return -.95*smooth((e.attackTime||0)/.21);}
 
 // Separate shoulders, elbows, hips, knees and ankles; all measurements are local metres.
 export function createMutantVisuals(owner,type,skinIndex){
  const root=new T.Group();root.name='anatomy';const limbs=[],legs=[],arms=[];
- const boss=type==='boss',brute=type==='brute',runner=type==='runner',skin=ZOMBIE_SKINS[skinIndex];
- const palette={skin:boss?'#6e8386':brute?'#938270':runner?'#a0967c':skin.skin,cloth:boss?'#293849':brute?'#625445':runner?'#4b5750':skin.clothes,pants:brute?'#4b4236':skin.pants,accent:skin.accent,boot:'#292d29',wound:'#823c40',bone:'#bfb497',eye:'#e4c46b',black:'#252a23'};
+ const boss=type==='boss',brute=type==='brute',runner=type==='runner',skin=(boss?BOSS_SKINS:ZOMBIE_SKINS)[skinIndex];
+ const palette={skin:boss?skin.skin:brute?'#938270':runner?'#a0967c':skin.skin,cloth:boss?skin.clothes:brute?'#625445':runner?'#4b5750':skin.clothes,pants:brute?'#4b4236':skin.pants,accent:skin.accent,boot:'#292d29',wound:'#823c40',bone:'#bfb497',eye:'#e4c46b',black:'#252a23'};
  const materials=Object.fromEntries(Object.entries(palette).map(([key,color])=>[key,owner.material(color,key==='eye')]));
  function part(parent,name,kind,size,material,x,y,z){const p=owner.mesh(parent,kind,size,materials[material],x,y,z);p.name=name;p.castShadow=true;return p;}
  if(type==='eye'){
@@ -66,15 +79,26 @@ export function createMutantVisuals(owner,type,skinIndex){
  for(let n=0;n<5;n++)part(head,'tooth','box',[.023,.027,.015],'bone',(n-2)*.033,-.106,.185);
  part(head,'nose','cone',[.046,.11,5],'skin',0,-.018,.20).rotation.x=-Math.PI/2;
  for(const side of [-1,1]){
+  part(head,'cheekbone','sphere',[.065,1],'skin',side*.13,-.03,.13).scale.set(1,.8,.65);
   part(head,'eye-socket','sphere',[.058,1],'black',side*.085,.047,.165).scale.set(1,.7,.55);
   part(head,'eye','sphere',[.027,1],'eye',side*.085,.049,.19);
   part(head,'brow','box',[.10,.027,.04],'skin',side*.083,.09,.166).rotation.z=side*-.17;
   part(head,'ear','sphere',[.045,1],'skin',side*.207,-.008,0).scale.set(.55,1,.7);
  }
- if(boss){upper('warden-armor','box',[.46,.36,.10],'black',0,1.29,.25);for(const side of [-1,1]){upper('warden-shoulder','box',[.22,.15,.27],'bone',side*.31,1.47,0);part(head,'warden-horn','cone',[.055,.22,5],'bone',side*.14,.19,-.02).rotation.z=side*-.35;}part(head,'warden-mask','box',[.29,.10,.06],'black',0,-.06,.195);part(head,'warden-eye-band','box',[.25,.028,.018],'wound',0,.048,.208);}
+ if(boss){
+  if(skin.id==='plague'){for(const side of [-1,1]){part(head,'plague-filter','cylinder',[.065,.065,.10,8],'accent',side*.12,-.09,.23).rotation.x=Math.PI/2;upper('canister','cylinder',[.09,.09,.36,8],'accent',side*.16,1.22,-.24);}}
+  if(skin.id==='iron'){for(const side of [-1,1]){upper('iron-pauldron','box',[.18,.20,.32],'accent',side*.30,1.47,0);for(let n=0;n<3;n++)upper('iron-rivet','sphere',[.025,1],'bone',side*.30,1.40+n*.06,.17);}part(head,'iron-faceplate','box',[.26,.20,.04],'accent',0,-.04,.22);}
+  if(skin.id==='charred')for(let n=0;n<6;n++){upper('charred-fissure','box',[.025,.12,.025],'accent',Math.sin(n*2.4)*.17,1.06+n*.065,.31);}
+  if(skin.id==='reclaimer'){part(head,'reclaimer-cowl','sphere',[.25,1],'cloth',0,.05,-.08).scale.set(1,1.1,.7);for(const side of [-1,1])upper('reclaimer-straps','box',[.065,.44,.04],'accent',side*.15,1.26,.32);}
+  upper('warden-armor','box',[.46,.36,.10],'black',0,1.29,.25);for(const side of [-1,1]){upper('warden-shoulder','box',[.22,.15,.27],'bone',side*.31,1.47,0);part(head,'warden-horn','cone',[.055,.22,5],'bone',side*.14,.19,-.02).rotation.z=side*-.35;}part(head,'warden-mask','box',[.29,.10,.06],'black',0,-.06,.195);part(head,'warden-eye-band','box',[.25,.028,.018],'wound',0,.048,.208);}
+ for(let n=0;n<3;n++)upper('rib-scar','box',[.08,.018,.018],'wound',-.10,1.11+n*.045,.26);
  part(head,'temple-wound','sphere',[.05,1],'wound',.148,.105,.085).scale.set(.5,1,.55);
  if(!brute&&!runner&&!boss){
-  if(skin.id==='worker'){
+  if(skin.id==='firefighter'){part(head,'fire-helmet','sphere',[.24,2],'accent',0,.16,0).scale.set(1,.45,1.15);part(head,'helmet-brim','box',[.49,.025,.46],'black',0,.13,.015);for(const y of [1.05,1.37])upper('reflective-band','box',[.44,.04,.03],'accent',0,y,.25);}
+  else if(skin.id==='police'){upper('police-armor','box',[.42,.37,.09],'black',0,1.29,.24);upper('badge','box',[.055,.08,.02],'accent',-.11,1.4,.30);part(head,'police-cap','sphere',[.23,1],'cloth',0,.16,0).scale.set(1,.3,1);part(head,'police-visor','box',[.32,.025,.17],'black',0,.14,.15);}
+  else if(skin.id==='mechanic'){for(const side of [-1,1])upper('overall-strap','box',[.06,.34,.035],'accent',side*.13,1.37,.25);upper('overall-bib','box',[.28,.24,.045],'cloth',0,1.24,.27);part(head,'goggle-band','box',[.34,.055,.04],'black',0,.16,.14);}
+  else if(skin.id==='infected'){for(const side of [-1,1])upper('exposed-ribs','box',[.15,.24,.04],'wound',side*.11,1.2,.25);for(let n=0;n<4;n++)upper('bone-ribs','capsule',[.018,.15,2,5],'bone',-.1,1.12+n*.05,.28).rotation.z=Math.PI/2;part(head,'jaw-lesion','sphere',[.065,1],'wound',.12,-.16,.12);}
+  else if(skin.id==='worker'){
    part(head,'hardhat','sphere',[.234,1],'accent',0,.148,-.01).scale.set(1,.43,1);
    part(head,'hardhat-brim','box',[.49,.025,.39],'accent',0,.128,.015);
    for(const side of [-1,1])upper('reflector','box',[.045,.31,.03],'bone',side*.18,1.25,.25);
@@ -118,11 +142,11 @@ export function createMutantVisuals(owner,type,skinIndex){
 }
 
 export function poseMutant(enemy){
- const v=enemy.visual,phase=enemy.phase,motion=enemy.motion||0,attack=Math.sin(Math.min(1,(enemy.attackTime||0)/.42)*Math.PI);
+ const v=enemy.visual,phase=enemy.phase,motion=enemy.motion||0,attack=attackPose(enemy),idle=enemy.idleTime||0;
  if(v.eye){v.arms.forEach((a,i)=>a.pivot.rotation.z=Math.sin(phase+i)*.14);return;}
  v.torso.rotation.x=(v.runner?.15:.045)+Math.sin(phase*2)*.018*motion;
  v.torso.rotation.z=Math.sin(phase)*.018*motion;
- v.head.rotation.y=Math.sin(phase*.5)*.035;
+ v.head.rotation.y=Math.sin(phase*.5)*.035+Math.sin(idle*.7+enemy.id)*.02;v.head.rotation.x=Math.sin(idle*1.2+enemy.id)*.015;v.torso.rotation.x+=Math.sin(idle*1.5+enemy.id)*.008;
  for(const leg of v.legs){
   const p=phase+(leg.side<0?0:Math.PI),z=Math.cos(p)*.18*motion*(enemy.hp<enemy.maxHp*.35&&leg.side<0?.6:1),lift=Math.max(0,Math.sin(p))*.12*motion*(enemy.hp<enemy.maxHp*.35&&leg.side<0?.55:1);
   const down=.75-lift,distance=Math.min(.779,Math.hypot(down,z));
@@ -132,8 +156,8 @@ export function poseMutant(enemy){
  }
  for(const arm of v.arms){
   const stride=Math.cos(phase+(arm.side<0?0:Math.PI));
-  arm.pivot.rotation.x=(enemy.boss&&enemy.pendingAttack&&enemy.attackKind==='slam'?-1.6:-.12)+stride*.22*motion-attack*.85;
+  arm.pivot.rotation.x=-.12+stride*.22*motion+attack;
   arm.pivot.rotation.z=arm.side*(v.brute?.09:.10);
-  arm.elbow.rotation.x=-.16-attack*.32-Math.max(0,-stride)*.10*motion;
+  arm.elbow.rotation.x=-.16+attack*.25-Math.max(0,-stride)*.10*motion;
  }
 }

@@ -2,15 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import * as T from 'three';
 import {Enemies} from '../enemies.js';
-import {poseMutant,ZOMBIE_SKINS} from '../mutant-visuals.js';
+import {poseMutant,ZOMBIE_SKINS,BOSS_SKINS,attackPose} from '../mutant-visuals.js';
 import {generateTown} from '../town.js';
 const audio={play(){}};
 
-test('five deterministic zombie outfits survive network replication',()=>{
+test('nine deterministic zombie outfits survive network replication',()=>{
  const host=new Enemies(new T.Scene(),[],audio),guest=new Enemies(new T.Scene(),[],audio);
- for(let i=0;i<5;i++)host.spawn('zombie',i*3,0);
- assert.equal(ZOMBIE_SKINS.length,5);assert.equal(new Set(host.items.map(e=>e.skin)).size,5);
- assert.equal(new Set(host.items.map(e=>e.rig.getObjectByName('chest').material.color.getHex())).size,5);
+ for(let i=0;i<9;i++)host.spawn('zombie',i*3,0);
+ assert.equal(ZOMBIE_SKINS.length,9);assert.equal(new Set(host.items.map(e=>e.skin)).size,9);
+ assert.equal(new Set(host.items.map(e=>e.rig.getObjectByName('chest').material.color.getHex())).size,9);
  guest.apply(host.snapshot());assert.deepEqual(guest.items.map(e=>e.skin),host.items.map(e=>e.skin));
  for(const name of ['hardhat','medical-patch','vest','hood'])assert.ok(host.items.some(e=>e.rig.getObjectByName(name)),name);
 });
@@ -45,3 +45,6 @@ test('all four hive exits admit the enlarged brute on generated city navigation'
   for(const h of town.hives){const from={x:h.x-Math.sign(h.x)*1.5,z:h.z-Math.sign(h.z)*1.5};assert.ok(enemies.fatNav.path(from,town.spawn).length>0,`seed ${seed}, hive ${h.x}/${h.z}`);}
  }
 });
+
+test('five distinct boss costumes replicate and every encounter rotates its outfit',()=>{const a=new Enemies(new T.Scene(),[],audio),b=new Enemies(new T.Scene(),[],audio);for(let wave=5;wave<=25;wave+=5)a.spawn('boss',wave,0,undefined,undefined,{wave});assert.equal(BOSS_SKINS.length,5);assert.equal(new Set(a.items.map(e=>e.skin)).size,5);assert.equal(new Set(a.items.map(e=>e.rig.getObjectByName('chest').material.color.getHex())).size,5);b.apply(a.snapshot());assert.deepEqual(b.items.map(e=>e.skin),a.items.map(e=>e.skin));for(const name of ['plague-filter','iron-pauldron','charred-fissure','reclaimer-cowl'])assert.ok(a.items.some(e=>e.rig.getObjectByName(name)));});
+test('attack preparation and recovery connect continuously at impact',()=>{const e={type:'zombie',pendingAttack:true,windupDuration:.18,windup:.18};assert.ok(Math.abs(attackPose(e))<1e-9);let last=0;for(let i=1;i<=120;i++){e.windup=.18*(1-i/120);const next=attackPose(e);assert.ok(Math.abs(next-last)<.1);last=next;}e.pendingAttack=false;e.attackTime=.21;assert.ok(Math.abs(attackPose(e)-last)<1e-8);e.attackTime=0;assert.ok(Math.abs(attackPose(e))<1e-9);});

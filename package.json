@@ -20,6 +20,7 @@
     "test:economy:browser": "node tests/economy-browser.js",
     "test:music:browser": "node tests/music-browser.js",
     "report:economy": "node scripts/economy-report.js",
+    "test:creatures:browser": "node tests/creatures-districts-browser.js",
     "test:graphics:browser": "node tests/graphics-browser.js",
     "test:presentation:browser": "node tests/presentation-browser.js",
     "test:survival:browser": "node tests/survival-ui-browser.js"

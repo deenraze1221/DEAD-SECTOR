@@ -65,7 +65,7 @@ const entries={
 'ПОДГОТОВКА':'PREPARATION',
 'НАЧИНАЕТСЯ':'INCOMING','120 секунд спавна · Уничтожь всех · 30 секунд перерыва.':'120 seconds of spawns · Kill all enemies · 30-second break',
 'Автоподбор':'Auto pickup','ОРУЖИЕ':'WEAPONS','СНАРЯЖЕНИЕ':'GEAR','выстр/мин':'rounds/min','Деньги подобраны':'Cash collected',
-'Запустить генератор':'Start the generator','Удержать перекрёсток':'Hold the crossroads','Уничтожить нарост':'Destroy the growth','Событие выполнено':'Event complete',' · E рядом':' · E nearby','Награда получена':'Reward received','МИНИ-БОСС':'MINI-BOSS','БЫСТРОЕ НАСТУПЛЕНИЕ':'RUNNER RUSH','ОСАДА':'SIEGE','СТАНДАРТ':'STANDARD',
+'Запустить генератор':'Start the generator','Удержать перекрёсток':'Hold the crossroads','Уничтожить нарост':'Destroy the growth','Событие выполнено':'Event complete',' · E рядом':' · E nearby','Награда получена':'Reward received','МИНИ-БОСС':'MINI-BOSS','БЫСТРОЕ НАСТУПЛЕНИЕ':'RUNNER RUSH','ОТКЛЮЧЕНИЕ СВЕТА':'DISTRICT BLACKOUT','ОСАДА':'SIEGE','СТАНДАРТ':'STANDARD',
 
 "ПУСТО":"EMPTY",
 "Состояние обновлено":"State updated",
