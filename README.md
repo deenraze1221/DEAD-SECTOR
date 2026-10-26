@@ -212,3 +212,5 @@ Eye health is200HP; brutes have800HP and unlock on wave21. Vomiters unlock on wa
 A seeded10% replacement roll is capped at floor(wave total×0.10) Vomiters per wave; zero are possible. The per-wave count survives snapshots and resets between waves. Their death emits harmless green spores for2.5s and a wet sound instead of red gore. Health below25HP displays a persistent red edge vignette during play; poison has a separate countdown.
 
 Player look-down is capped at60degrees below the horizon; the upward limit remains unchanged. The limit applies to accumulated mouse input at every sensitivity.
+
+UI refresh: neutral field-terminal panels, consistent button/focus states, compact store cards and revised menu/settings/lobby/HUD styling. The store header and tabs stay fixed while cards scroll without a visible scrollbar; wheel, touch and keyboard scrolling remain available. The world camera FOV is73degrees (was78); weapon viewmodel zoom is unchanged.

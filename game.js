@@ -170,7 +170,7 @@ try {
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .85;
-  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(78, 1, .1, 500);
+  scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(73, 1, .1, 500);
   rebuild(seed);rifle=new Rifle(audio);rifle.bindInventory(account);
   trapPreview=makeTrapModel();trapPreview.position.set(.06,-.20,-.62);trapPreview.rotation.x=.7;trapPreview.scale.setScalar(.55);trapPreview.visible=false;for(const [i,hand]of rifle.hands.entries()){const h=hand.clone();h.position.set(i? .35:-.35,.02,0);h.scale.setScalar(1.5);trapPreview.add(h);const arm=rifle.forearms[i].clone(),start=h.position.clone().add(new THREE.Vector3(0,0,.10)),end=new THREE.Vector3(i?.65:-.65,-.5,.9),v=end.clone().sub(start);arm.position.copy(start).add(end).multiplyScalar(.5);arm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.clone().normalize());arm.scale.set(1.5,v.length(),1.5);trapPreview.add(arm);}rifle.scene.add(trapPreview);rifle.utilityModel=trapPreview;
   psx = createPSX(scene, renderer);applyPreferences(preferences);
