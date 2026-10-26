@@ -14,9 +14,9 @@ const wall = { minX: -10, maxX: 10, minY: 0, maxY: 4, minZ: -2, maxZ: -1 };
 test('cardinal and diagonal walk cover the same distance; sprint is faster', () => {
   const a = new Player({ x: 0, y: 0, z: 0 }), b = new Player(a.spawn), c = new Player(a.spawn);
   advance(a, 1, { forward: true }); advance(b, 1, { forward: true, right: true }); advance(c, 1, { forward: true, sprint: true });
-  near(Math.hypot(a.position.x, a.position.z), PLAYER.walk);
-  near(Math.hypot(b.position.x, b.position.z), PLAYER.walk);
-  near(-c.position.z, PLAYER.run);
+  assert.ok(Math.hypot(a.position.x,a.position.z)>4.1&&Math.hypot(a.position.x,a.position.z)<PLAYER.walk);
+  near(Math.hypot(b.position.x,b.position.z),Math.hypot(a.position.x,a.position.z));
+  assert.ok(-c.position.z>6.5&&-c.position.z<PLAYER.run);
 });
 test('walls block walking and running; diagonal movement slides along a wall', () => {
   const a = new Player({ x: 0, y: 0, z: 0 });
@@ -46,7 +46,7 @@ test('low ceilings stop upward movement', () => {
 });
 test('yaw rotates forward motion and pitch is clamped', () => {
   const a = new Player({ x: 0, y: 0, z: 0 }); a.yaw = Math.PI / 2;
-  advance(a, 1, { forward: true }); near(a.position.x, -PLAYER.walk); near(a.position.z, 0);
+  advance(a, 1, { forward: true }); assert.ok(a.position.x < -4.1); near(a.position.z, 0);
   a.look(0, 1e6, 1); assert.ok(a.pitch > -Math.PI / 2);
   a.look(0, -1e6, 1); assert.ok(a.pitch < Math.PI / 2);
 });
@@ -73,9 +73,11 @@ test('fixed step produces the same movement at 30, 60 and 144 rendered frames/se
     }
     return a.position.z;
   });
-  for (const z of positions) near(z, SPAWN.z - PLAYER.walk * 2);
+  for (const z of positions) near(z, positions[0]);assert.ok(positions[0]>SPAWN.z-PLAYER.walk*2);
 });
 test('reset restores position, orientation and vertical motion', () => {
   const a = new Player(SPAWN); advance(a, .1, { jump: true, forward: true }); a.look(100, 50, 1); a.reset();
   assert.deepEqual(a.position, SPAWN); assert.equal(a.yaw, 0); assert.equal(a.pitch, 0); assert.equal(a.velocityY, 0); assert.equal(a.grounded, true);
 });
+
+test('movement accelerates and brakes briefly; stationary shift does not sprint or drain stamina',()=>{const p=new Player({x:0,y:0,z:0});advance(p,.5,{sprint:true});assert.equal(p.speed,0);assert.equal(p.sprinting,false);near(p.stamina,5);p.step(FIXED_STEP,{...emptyInput,forward:true},[]);assert.ok(p.speed>0&&p.speed<PLAYER.walk);advance(p,.5,{forward:true});const before=p.position.z;advance(p,.05);assert.ok(p.position.z<before);advance(p,.2);near(p.speed,0);});

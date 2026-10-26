@@ -132,7 +132,7 @@ export function poseMutant(enemy){
  }
  for(const arm of v.arms){
   const stride=Math.cos(phase+(arm.side<0?0:Math.PI));
-  arm.pivot.rotation.x=-.12+stride*.22*motion-attack*.85;
+  arm.pivot.rotation.x=(enemy.boss&&enemy.pendingAttack&&enemy.attackKind==='slam'?-1.6:-.12)+stride*.22*motion-attack*.85;
   arm.pivot.rotation.z=arm.side*(v.brute?.09:.10);
   arm.elbow.rotation.x=-.16-attack*.32-Math.max(0,-stride)*.10*motion;
  }

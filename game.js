@@ -9,11 +9,13 @@ import { GameAudio } from './audio.js';
 import {settingsUI} from './settings.js';
 import {LookInput} from './look-input.js';
 import {updateCompass} from './compass.js';
+import {Flashlight} from './flashlight.js';
+import {Operations,makeTrapModel} from './operations.js';
 import {PeerAvatar} from './peer-avatar.js';
 import {LobbyUI} from './lobby-ui.js';
 import {Session} from './network.js';
 import {MoneyDrops} from './loot.js';
-import {createInventory,totalAmmo,buy,equipWeapon,useMedkit,nearTerminal,STORE} from './economy.js';
+import {createInventory,totalAmmo,buy,equipWeapon,useMedkit,useSupply,consumeTrap,nearTerminal,STORE} from './economy.js';
 import {ShopUI} from './shop-ui.js';
 import {EncounterEvents} from './encounter-events.js';
 import {obstacleDistance} from './enemies.js';
@@ -21,9 +23,12 @@ import {WeatherEffects} from './weather.js';
 import {Waves} from './waves.js';
 
 const $ = id => document.getElementById(id);
+for(const id of ['settings','network-panel'])document.body.append($(id));
 const keys = new Set();const lookInput=new LookInput();
 const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'ShiftRight', 'Space']);
-let selfAvatar;
+const announcedMissionCompletions=new Set();
+let lastMissionKey='',lastMissionCompleteKey='',missionNoticeUntil=0,missionNoticeRecord=null;
+let selfAvatar,flashlight,operations,trapSelected=false,trapPreview;let lastCompletedWave=0,waveNoticeMessage='';
 let renderer, scene, camera, player,lastMenuFrame=-Infinity;
 let needsCapture=false,lobbyOpen=false,matchReady=false,lobbyPhase='lobby',countdownAt=0,members=[],localTimer;const peers=new Map();
 let weather,events,cashCooldown=0,lastAnnouncedWave=0,waveNoticeUntil=0;
@@ -36,6 +41,7 @@ document.addEventListener('pointerdown',e=>{if(e.target.closest('button,input,se
 document.addEventListener('click',e=>{const b=e.target.closest('button');if(b&&!b.disabled)audio.ui();});
 document.addEventListener('pointerover',e=>{const b=e.target.closest('button');if(b&&!b.disabled&&!b.contains(e.relatedTarget))audio.ui('hover');});
 document.addEventListener('change',e=>{if(e.target.matches('select,input[type=range]'))audio.ui();});
+$('close-network').addEventListener('click',()=>{$('network-panel').hidden=true;});
 $('close-settings').addEventListener('click',()=>{$('settings').hidden=true;$('settings-button').setAttribute('aria-expanded','false');});
 const preferences=settingsUI(applyPreferences);audio.setVolumes(preferences);
 const shop=new ShopUI(submitAction,closeShop);
@@ -58,7 +64,7 @@ $('settings-button').addEventListener('click', () => {
   $('settings-button').setAttribute('aria-expanded', String(!$('settings').hidden));
 });
 
-function clearInput() { lookInput.reset(performance.now());keys.clear(); shooting=false; triggerPressed=false; jumpQueued = false; accumulator = 0; }
+function clearInput() {if(player){player.velocityX=0;player.velocityZ=0;player.speed=0;} lookInput.reset(performance.now());keys.clear(); shooting=false; triggerPressed=false; jumpQueued = false; accumulator = 0; }
 function setRunning(value) {
   value=!!value&&matchReady;if(value)needsCapture=false;$('capture-mouse').hidden=!needsCapture;running = value; clearInput();
   document.body.classList.toggle('playing', value||shopOpen||needsCapture);
@@ -72,7 +78,7 @@ function rebuild(seedValue){
   if(shopOpen){shopOpen=false;shop.hide();}
   if(scene){scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m){m.map?.dispose();m.dispose();}});}
   scene=new THREE.Scene();world=createMap(scene,seedValue);seed=world.seed;colliders=world.colliders;
-  selfAvatar=new PeerAvatar();selfAvatar.head.visible=false;selfAvatar.upper.visible=false;selfAvatar.root.visible=false;scene.add(selfAvatar.root);player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);lastAnnouncedWave=0;waveNoticeUntil=0;events=new EncounterEvents(scene);weather=new WeatherEffects(scene,seed,world.buildings);
+  selfAvatar=new PeerAvatar();selfAvatar.head.visible=false;selfAvatar.upper.visible=false;selfAvatar.root.visible=false;scene.add(selfAvatar.root);flashlight=new Flashlight(scene);operations=new Operations(scene,world,seed);trapSelected=false;lastMissionKey='';lastMissionCompleteKey='';announcedMissionCompletions.clear();missionNoticeUntil=0;missionNoticeRecord=null;player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);lastAnnouncedWave=0;lastCompletedWave=0;waveNoticeMessage='';waveNoticeUntil=0;events=new EncounterEvents(scene,seed);weather=new WeatherEffects(scene,seed,world.buildings);
   peer=new THREE.Group();const material=new THREE.MeshStandardMaterial({color:'#7d9676'});const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,3,6),material);body.position.y=1;peer.add(body);const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),material);head.position.y=1.75;peer.add(head);peer.visible=false;scene.add(peer);peerPose=null;peers.clear();if(renderer)applyPreferences(preferences);
 }
 function resetCombat(){needsCapture=false;clearTimeout(localTimer);matchReady=false;lobbyOpen=false;$('lobby').hidden=true;session.close();rebuild(crypto.getRandomValues(new Uint32Array(1))[0]);account=createInventory();rifle.bindInventory(account);hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;footstep=0;downed=false;updateCamera();}
@@ -109,17 +115,20 @@ document.addEventListener('visibilitychange', () => { if (document.hidden) pause
 document.addEventListener('keydown', event => {
   if(lobbyOpen){if(event.code==='Escape'&&session.active&&!session.host)session.send({type:'ready',ready:false});return;}
   if(shopOpen){if(event.code==='Escape'||event.code==='KeyE'){event.preventDefault();closeShop();}return;}
-  if(running&&(event.code==='Digit1'||event.code==='Digit2')){const id=event.code==='Digit2'?'Pistol':Object.keys(account.weapons).find(id=>id!=='Pistol');if(id)submitAction('equip',id);event.preventDefault();return;}
+  if(running&&event.code==='Digit3'){trapSelected=true;shooting=false;return;}
+  if(running&&event.code==='KeyF'&&!event.repeat){flashlight.toggle(account);audio.ui();return;}
+  if(running&&event.code==='KeyB'&&!event.repeat){submitAction('use','battery');return;}
+  if(running&&(event.code==='Digit1'||event.code==='Digit2')){trapSelected=false;const id=event.code==='Digit2'?'Pistol':Object.keys(account.weapons).find(id=>id!=='Pistol');if(id)submitAction('equip',id);event.preventDefault();return;}
   if(running&&(event.code==='KeyH'||event.code==='KeyJ')){submitAction('use',event.code==='KeyH'?'smallMedkit':'largeMedkit');return;}
   if (event.code === 'Escape' && running) { pause(); return; }
-  if(running && event.code==='KeyE'){
+  if(running && event.code==='KeyE'){keys.add('KeyE');if(operations.nearby(player.position))return;
     const down=nearDowned();if(session.active&&down){session.send({type:'revive',target:down.id});return;}
     const event=events.state;if(session.active&&!session.host&&event?.id==='generator'&&event.status==='active'&&Math.hypot(player.position.x-event.x,player.position.z-event.z)<2.4){session.send({type:'event-interact'});return;}
     if(events.interact(player.position)){rewardEvent();return;}
     if(nearTerminal(player.position)){openShop();return;}
 
   }
-  if(running && event.code==='KeyR'){rifle.reload();event.preventDefault();return;}
+  if(running && event.code==='KeyR'&&!trapSelected){rifle.reload();event.preventDefault();return;}
   if (!running || !movementKeys.has(event.code)) return;
   event.preventDefault();
   if (event.code === 'Space' && !keys.has('Space') && !event.repeat) jumpQueued = true;
@@ -128,7 +137,7 @@ document.addEventListener('keydown', event => {
 document.addEventListener('keyup', event => { keys.delete(event.code); });
 document.addEventListener('mousemove', event => { if (running&&document.pointerLockElement===$('scene'))lookInput.add(event.movementX,event.movementY,performance.now()); });
 
-document.addEventListener('mousedown', event=>{if(!running)return;if(event.button===0){shooting=true;triggerPressed=true;}});
+document.addEventListener('mousedown', event=>{if(!running)return;if(event.button===0){if(trapSelected){placeTrap();return;}shooting=true;triggerPressed=true;}});
 document.addEventListener('mouseup', event=>{if(event.button===0)shooting=false;});
 $('scene').addEventListener('contextmenu',event=>event.preventDefault());
 
@@ -144,7 +153,7 @@ function resize() {
 
 // Read-only snapshot for reproducible browser checks, without allowing state mutation.
 export function getSnapshot() {
-  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded,fov:camera?.fov,weather:weather?.state,wave:waves?.snapshot(),event:events?.snapshot(), hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, seed,room:session.code,networkActive:session.active,peerVisible:[...peers.values()].some(p=>p.mesh.visible),peerCount:peers.size,bodyVisible:selfAvatar?.root.visible,peerWeapons:[...peers.values()].map(p=>p.avatar.id),lobbyOpen,lobbyPhase,matchReady,members,downed,shopOpen,inventory:account,money:account.money,totalAmmo:totalAmmo(account),durability:rifle?.durability,stamina:player?.stamina,terminal:world?.shop.terminal,streetDensity:world?.streetDensity,drops:loot?.snapshot(),supplies:[],remaining:enemies?.alive, enemies:enemies?.items.map(e=>({id:e.id,type:e.type,hp:e.hp,fast:e.type==='runner',x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z})) };
+  return { running, started, position: player ? { ...player.position } : null, yaw: player?.yaw, pitch: player?.pitch, grounded: player?.grounded,fov:camera?.fov,weather:weather?.state,wave:waves?.snapshot(),event:events?.snapshot(), hp, outcome, ammo:rifle?.ammo, reserve:rifle?.reserve, reloading:rifle?.reloadTime>0, weapon:rifle?.config.id, capacity:rifle?.config.capacity, seed,room:session.code,networkActive:session.active,peerVisible:[...peers.values()].some(p=>p.mesh.visible),peerCount:peers.size,bodyVisible:selfAvatar?.root.visible,peerWeapons:[...peers.values()].map(p=>p.avatar.id),lobbyOpen,lobbyPhase,matchReady,members,downed,shopOpen,inventory:account,operations:operations?.snapshot(),flashlightOn:flashlight?.on,trapSelected,money:account.money,totalAmmo:totalAmmo(account),durability:rifle?.durability,stamina:player?.stamina,terminal:world?.shop.terminal,streetDensity:world?.streetDensity,drops:loot?.snapshot(),supplies:[],remaining:enemies?.alive, enemies:enemies?.items.map(e=>({id:e.id,type:e.type,hp:e.hp,fast:e.type==='runner',x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z})) };
 }
 
 try {
@@ -154,6 +163,7 @@ try {
   renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .85;
   scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(78, 1, .1, 260);
   rebuild(seed);rifle=new Rifle(audio);rifle.bindInventory(account);
+  trapPreview=makeTrapModel();trapPreview.position.set(.06,-.20,-.62);trapPreview.rotation.x=.7;trapPreview.scale.setScalar(.55);trapPreview.visible=false;for(const [i,hand]of rifle.hands.entries()){const h=hand.clone();h.position.set(i? .35:-.35,.02,0);h.scale.setScalar(1.5);trapPreview.add(h);const arm=rifle.forearms[i].clone(),start=h.position.clone().add(new THREE.Vector3(0,0,.10)),end=new THREE.Vector3(i?.65:-.65,-.5,.9),v=end.clone().sub(start);arm.position.copy(start).add(end).multiplyScalar(.5);arm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.clone().normalize());arm.scale.set(1.5,v.length(),1.5);trapPreview.add(arm);}rifle.scene.add(trapPreview);
   psx = createPSX(scene, renderer);applyPreferences(preferences);
   updateCamera(); resize(); window.addEventListener('resize', resize);
   $('scene').addEventListener('webglcontextlost', event => {
@@ -174,17 +184,18 @@ try {
         }, colliders);
         jumpQueued = false; accumulator -= FIXED_STEP;
         cashCooldown=Math.max(0,cashCooldown-FIXED_STEP);const cash=loot.nearby(player.position);if(hp>0&&cash&&Math.hypot(cash.x-player.position.x,cash.z-player.position.z)<.85&&cashCooldown<=0){cashCooldown=.3;if(session.active)session.send({type:'pickup',id:cash.id,health:hp,inventory:account});else if(loot.collect(cash.id,account))audio.play('cash');}
-        elapsed+=FIXED_STEP;rifle.step(FIXED_STEP);
+        elapsed+=FIXED_STEP;rifle.step(FIXED_STEP);flashlight.drain(FIXED_STEP,account);
         updateCamera();camera.updateMatrixWorld();
-        if(hp>0&&((shooting && rifle.config.automatic)||triggerPressed) && rifle.fire()){
-          const direction=camera.getWorldDirection(new THREE.Vector3());
+        if(hp>0&&!trapSelected&&((shooting && rifle.config.automatic)||triggerPressed) && rifle.fire()){
+          const direction=camera.getWorldDirection(new THREE.Vector3());enemies.hear(camera.position,90);
           if(session.active&&!session.host)session.send({type:'shot',direction:direction.toArray(),weapon:rifle.config.id,inventory:account});else if(combatShot(camera.position,direction,rifle.config.damage))hitTime=.15;
           player.pitch=Math.min(Math.PI/2-.02,player.pitch+.008);
         }
         triggerPressed=false;
         if(!session.active||session.host){
           waves.step(FIXED_STEP,(type,index,options)=>{const h=world.hives[index];enemies.spawn(type,h.x-Math.sign(h.x)*1.5,h.z-Math.sign(h.z)*1.5,undefined,undefined,options);},()=>enemies.alive);
-          if(events.step(FIXED_STEP,waves,[{hp,position:player.position},...[...peers.values()].filter(v=>v.pose).map(v=>({hp:v.pose.hp,position:v.pose}))],enemies.items))rewardEvent();
+          events.suppressSpawn=operations.mission?.status==='active';if(events.step(FIXED_STEP,waves,[{hp,position:player.position},...[...peers.values()].filter(v=>v.pose).map(v=>({hp:v.pose.hp,position:v.pose}))],enemies.items))rewardEvent();
+          operations.step(FIXED_STEP,{...waves,questBusy:events.state?.status==='active'},[{id:session.active?session.role:'solo',hp,position:player.position,interacting:running&&keys.has('KeyE')},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({id,hp:v.pose.hp,position:v.pose,interacting:!!v.pose.interacting}))],enemies);rewardOperations();
           player.hp=hp;const targets=[...peers].filter(([,v])=>v.pose?.hp>0).map(([id,v])=>({p:{hp:v.pose.hp,position:v.pose},hurt:amount=>session.send({type:'damage',target:id,amount})}));if(hp>0||targets.length)enemies.step(FIXED_STEP,player,receiveDamage,targets);else if(session.active)finish('dead');
         }
         hitTime=Math.max(0,hitTime-FIXED_STEP);hurtTime=Math.max(0,hurtTime-FIXED_STEP);
@@ -196,9 +207,10 @@ try {
     } else if (!started) {
       camera.position.set(36, 28, 95); camera.lookAt(0, 2, 40);
     }
-    if(started&&!waves.warmup&&!waves.rest&&lastAnnouncedWave!==waves.number){lastAnnouncedWave=waves.number;waveNoticeUntil=performance.now()+5000;audio.play('wave');}
-    $('wave-notice').hidden=!started||performance.now()>waveNoticeUntil;$('wave-notice').textContent=`${t('ВОЛНА')} ${waves.number} · ${t('НАЧИНАЕТСЯ')}`;audio.music(started&&!outcome&&(running||shopOpen||session.active)?(waves.warmup||waves.rest)?'calm':'tense':'calm',waves.number);
-    updateCompass($('compass'),player.position,player.yaw,[{...STORE,label:t('МАГАЗИН'),shop:true},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({...v.pose,label:`${t('ИГРОК')} ${['host','guest','guest2','guest3'].indexOf(id)+1}`}))],t);
+    if(started&&!waves.warmup&&!waves.rest&&lastAnnouncedWave!==waves.number){lastAnnouncedWave=waves.number;waveNoticeUntil=performance.now()+5000;waveNoticeMessage=`${t('ВОЛНА')} ${waves.number} · ${t('НАЧИНАЕТСЯ')}`;audio.play('wave');}
+    if(started&&waves.rest&&lastCompletedWave!==waves.number){lastCompletedWave=waves.number;waveNoticeUntil=performance.now()+5000;waveNoticeMessage=`${t('ВОЛНА')} ${waves.number} · ${t('ЗАВЕРШЕНА')}`;audio.play('wave-clear');}
+    $('wave-notice').hidden=!started||performance.now()>waveNoticeUntil;$('wave-notice').textContent=`${t('ВОЛНА')} ${waves.number} · ${t(waves.rest?'ЗАВЕРШЕНА':'НАЧИНАЕТСЯ')}`;audio.music(started&&!outcome&&(running||shopOpen||session.active)?(waves.warmup||waves.rest)?'calm':'tense':'calm',waves.number);
+    updateCompass($('compass'),player.position,player.yaw,[{...STORE,label:t('МАГАЗИН'),shop:true},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({...v.pose,label:`${t('ИГРОК')} ${['host','guest','guest2','guest3'].indexOf(id)+1}`})),...(activeMission()?[{...activeMission(),quest:true,label:t('MISSION')}]:[]),...operations.drops.filter(d=>d.status!=='opened').slice(0,1).map(d=>({...d,drop:true,label:t('SUPPLY')}))],t);
     audio.terminalBeacon(player.position,STORE.terminal,player.yaw,started&&(running||shopOpen||session.active));
     $('health').textContent=hp;$('health-bar').style.width=`${hp}%`;
     $('stamina-bar').style.width=`${player.stamina/5*100}%`;$('stamina').textContent=`${Math.ceil(player.stamina/5*100)}%`;
@@ -210,20 +222,22 @@ try {
     if(!session.active&&waves.rest&&account.lastRewardWave!==waves.number){account.lastRewardWave=waves.number;account.money+=waves.number%5===0?500:75+waves.number*25;}
     $('objective').textContent=waves.warmup?`${t('ПОДГОТОВКА')} · ${Math.ceil(60-waves.time)}s`:`${t('ВОЛНА')} ${waves.number} · ${waves.clearing?t('ДОБЕЙТЕ ОСТАВШИХСЯ'):waves.rest?t('ПЕРЕРЫВ'):t('НАСТУПЛЕНИЕ')}${waves.clearing?'':` ${Math.ceil((waves.rest?30:120)-waves.time)}s`}`;
     const boss=enemies.items.find(e=>e.boss&&e.hp>0);
-    $('wave-details').textContent=`${t(waves.variant==='boss'?'МИНИ-БОСС':waves.variant==='rush'?'БЫСТРОЕ НАСТУПЛЕНИЕ':waves.variant==='siege'?'ОСАДА':'СТАНДАРТ')} · ${t('ЖИВЫХ')}: ${enemies.alive} · ${t('ВЫШЛО')}: ${waves.spawned}/${waves.total}${boss?` · BOSS ${boss.hp}/${boss.maxHp} HP`:''}`;
+    $('wave-details').textContent=`${t(waves.variant==='boss'?'МИНИ-БОСС':waves.variant==='rush'?'БЫСТРОЕ НАСТУПЛЕНИЕ':waves.variant==='siege'?'ОСАДА':'СТАНДАРТ')} · ${t('ЖИВЫХ')}: ${enemies.alive} · ${t('ВЫШЛО')}: ${waves.spawned}/${waves.total}${boss?` · BOSS ${boss.hp}/${boss.maxHp} HP · ${t('PHASE')} ${boss.bossPhase||1}`:''}`;
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
-    const event=events.state;$('event-objective').textContent=event?.status==='active'?`${t(event.label)} · $${event.reward} · ${Math.round(Math.hypot(player.position.x-event.x,player.position.z-event.z))}m${event.id==='defend'?` · ${Math.floor(event.progress)}/25s`:event.id==='growth'?` · ${event.hp} HP`:t(' · E рядом')}`:event?.status==='complete'?t('Событие выполнено'):'';
+    const event=events.state;$('event-objective').textContent=event?.status==='active'?`${t(event.label)} · $${event.reward} · ${Math.round(Math.hypot(player.position.x-event.x,player.position.z-event.z))}m${event.id==='defend'?` · ${Math.floor(event.progress)}/25s`:event.id==='growth'?` · ${event.hp} HP`:t(' · E рядом')}`:event?.status==='complete'&&event.wave===waves.number?t('Событие выполнено'):'';
     weather.maxDrops={low:160,medium:350,high:650}[preferences.quality];weather.step(delta,waves,player.position,audio,matchReady&&(running||session.active));$('weather-status').textContent=`${String(Math.floor(weather.cycle?.hour??6)).padStart(2,'0')}:${String(Math.floor(((weather.cycle?.hour??6)%1)*60)).padStart(2,'0')} · ${t(weather.cycle?.night?'Ночь':'День')} · ${t({overcast:'Пасмурно',rain:'Дождь',storm:'Гроза',clear:'Ясно'}[weather.state.weather])} · ${t({light:'Слабый туман',medium:'Средний туман',heavy:'Сильный туман'}[weather.state.fog])}`;
-    scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
+    scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta,weather.state.weather);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
+    flashlight.update(camera,account,preferences.quality);operations.visualStep(player.position,audio);updateSurvivalUI();updateMissionNotice();
     const near=loot.nearby(player.position);const living=enemies.items.filter(e=>e.hp>0);const nearest=living.sort((a,b)=>a.rig.position.distanceTo(camera.position)-b.rig.position.distanceTo(camera.position))[0];
-    $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&nearDowned()?t('E · Поднять напарника'):near?`$${near.value} · ${t('Автоподбор')}`:nearTerminal(player.position)?t('E · Открыть магазин'):nearest?`${t('Ближайший враг')} · ${Math.round(Math.hypot(nearest.rig.position.x-player.position.x,nearest.rig.position.z-player.position.z))} m · ${Math.atan2(nearest.rig.position.x-player.position.x,player.position.z-nearest.rig.position.z)*180/Math.PI|0}° N`:t('Выживайте. Ульи находятся в четырёх углах города.');
+    $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&nearDowned()?t('E · Поднять напарника'):near?`$${near.value} · ${t('Автоподбор')}`:nearTerminal(player.position)?t('E · Открыть магазин'):nearest&&nearest.rig.position.distanceTo(camera.position)<25?`${t('Ближайший враг')} · ${Math.round(Math.hypot(nearest.rig.position.x-player.position.x,nearest.rig.position.z-player.position.z))}m`:'';
     enemies.updateEffects((running||(session.active&&started&&!outcome))?delta:0,session.active&&!session.host);
-    rifle.pose(elapsed,keys.size>0);
+    rifle.pose(elapsed,player.grounded&&player.speed>.1);rifle.model.visible=!trapSelected;trapPreview.visible=trapSelected;if(trapSelected){$('weapon-state').textContent=t('Bear trap');$('ammo').textContent=account.traps||0;$('reserve').textContent='—';}
+    const nearbyOperation=operations.nearby(player.position);if(nearbyOperation)$('interaction').textContent=nearbyOperation.type==='drop'?`${t('Hold E · Open supply crate')} · ${nearbyOperation.record.progress.toFixed(1)}/10s`:t('E · Collect mission package');
     account.health=hp;
     if(lobbyOpen&&countdownAt)$('lobby-countdown').textContent=`${t('СТАРТ ЧЕРЕЗ')} ${Math.max(0,Math.ceil((countdownAt-Date.now())/1000))}`;
-    if(session.active&&matchReady){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,pitch:player.pitch,hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id,inventory:account});if(session.host)session.send({type:'state',wave:waves.snapshot(),event:events.snapshot(),cash:loot.snapshot(),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
+    if(session.active&&matchReady){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,pitch:player.pitch,flashlightOn:flashlight.on,interacting:running&&keys.has('KeyE'),hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id,inventory:account});if(session.host)session.send({type:'state',wave:waves.snapshot(),event:events.snapshot(),operations:operations.snapshot(),cash:loot.snapshot(),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
     for(const p of peers.values())p.avatar.animate(delta);
-    selfAvatar.update({...player.position,yaw:player.yaw,pitch:0,hp,weapon:rifle.config.id});selfAvatar.animate(delta);selfAvatar.root.position.set(player.position.x,player.position.y,player.position.z);selfAvatar.root.rotation.y=player.yaw;selfAvatar.root.visible=started&&!outcome&&player.pitch<-.3;
+    selfAvatar.update({...player.position,yaw:player.yaw,pitch:0,hp,weapon:rifle.config.id});selfAvatar.animate(delta);selfAvatar.root.position.set(player.position.x+Math.sin(player.yaw)*.12,player.position.y,player.position.z+Math.cos(player.yaw)*.12);selfAvatar.root.rotation.y=player.yaw;selfAvatar.root.visible=started&&!outcome&&player.pitch<-.95;
     renderer.autoClear=true;renderer.render(scene, camera);
     if(started&&!outcome){renderer.autoClear=false;renderer.clearDepth();renderer.render(rifle.scene,rifle.camera);}
   }
@@ -234,7 +248,7 @@ try {
   $('message').textContent = t('Не удалось запустить 3D-сцену. Нужен браузер с WebGL 2 и включённым аппаратным ускорением.');
 }
 
-function applyState(m){events.restore(m.event);if(m.wave)waves.restore(m.wave);loot.apply(m.cash||[]);enemies.apply(m.enemies);
+function applyState(m){events.restore(m.event);operations.restore(m.operations);if(m.wave)waves.restore(m.wave);loot.apply(m.cash||[]);enemies.apply(m.enemies);
  if(!session.host){for(const p of enemies.projectiles)scene.remove(p.mesh);enemies.projectiles=(m.projectiles||[]).map(pos=>({mesh:enemies.mesh(scene,'sphere',[.2,0],'bullet',...pos),life:6,velocity:new THREE.Vector3()}));}}
 function receiveNetwork(m){
  if(m.type==='transport-lost'||(m.type==='away'&&m.role==='host')){pause();$('message').textContent=t('Переподключение. Дождитесь хозяина комнаты.');}
@@ -251,11 +265,12 @@ function receiveNetwork(m){
  if(m.type==='countdown'){lobbyPhase='countdown';countdownAt=m.startAt;renderLobby();}
  if(m.type==='countdown-cancelled'){countdownAt=0;lobbyPhase='lobby';renderLobby();}
  if(m.type==='match-start')beginMatch();
+ if(m.type==='trap-placed')operations.addTrap(m.trap);
  if(m.type==='pose'){let p=peers.get(m.id);if(!p){const avatar=new PeerAvatar(),mesh=avatar.root;scene.add(mesh);p={avatar,mesh,pose:m};peers.set(m.id,p);}p.pose=m;p.mesh.visible=true;p.avatar.update(m,elapsed);peerPose=m;}
  if(m.type==='left'||(m.type==='away'&&m.role!=='host')){const p=peers.get(m.role);if(p)scene.remove(p.mesh);peers.delete(m.role);}
  if(m.type==='closed'){for(const p of peers.values())scene.remove(p.mesh);peers.clear();if(hp<=0)finish('dead');else{resetCombat();showLobby();}}
  if(m.type==='state'&&!session.host)applyState(m);
- if(m.type==='shot'&&session.host){const direction=new THREE.Vector3(...m.direction);if(direction.lengthSq()>.1){const origin=new THREE.Vector3(...m.origin);direction.normalize();combatShot(origin,direction,m.damage);}}
+ if(m.type==='shot'&&session.host){const direction=new THREE.Vector3(...m.direction);if(direction.lengthSq()>.1){const origin=new THREE.Vector3(...m.origin);enemies.hear(origin,90);direction.normalize();combatShot(origin,direction,m.damage);}}
  if(m.type==='damage')receiveDamage(m.amount);
  if(m.type==='revived'){hp=m.hp;account.health=hp;downed=false;outcome='';$('message').textContent=t('Напарник помог. Продолжайте игру.');}
  if(m.type==='event-interact'&&session.host&&events.interact(m.position))rewardEvent();
@@ -277,7 +292,7 @@ function submitAction(action,id){
  let result;
  if(action==='buy'){if(!nearTerminal(player.position))return;account.health=hp;result=buy(account,id);hp=account.health;}
  else if(action==='equip')result={ok:equipWeapon(account,id),reason:''};
- else{account.health=hp;result={ok:useMedkit(account,id),reason:''};hp=account.health;}
+ else{account.health=hp;result={ok:useSupply(account,id),reason:''};hp=account.health;}
  if(result.ok){rifle.bindInventory(account);audio.play('reload');}
  shop.message(result.reason);if(shopOpen)shop.render(account);
 }
@@ -296,3 +311,10 @@ function beginMatch(){needsCapture=document.pointerLockElement!==$('scene');matc
 function applyPreferences(v){audio.setVolumes(v);if(!renderer||!scene)return;renderer.shadowMap.enabled=v.quality!=='low';const sun=scene.userData.sun||scene.children.find(o=>o.isDirectionalLight&&o.castShadow);if(sun){sun.castShadow=v.quality!=='low';const size=v.quality==='high'?2048:1024;if(sun.shadow.mapSize.x!==size){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(size,size);}sun.shadow.needsUpdate=true;}if(scene.userData.appliedQuality!==v.quality){scene.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:[o.material])if(m)m.needsUpdate=true;});scene.userData.appliedQuality=v.quality;}}
 
 try{$('resume-room').hidden=!sessionStorage.getItem('dead-sector:room');}catch{$('resume-room').hidden=true;}
+
+function placeTrap(){if(hp<=0||!account.traps)return;if(session.active){submitAction('trap','trap');return;}const id='solo-trap-'+Math.floor(elapsed*1000);if(operations.placeTrap(player.position,id)){consumeTrap(account);audio.ui();}}
+function rewardOperations(){if(session.active)return;const m=operations.mission;if(m?.status==='complete'&&!m.paid){m.paid=true;account.money+=m.reward;audio.play('cash');}for(const d of operations.drops)if(d.status==='opened'&&!d.paid){d.paid=true;account.money+=d.reward;}}
+function updateSurvivalUI(){const m=operations.mission;$('survival-objective').textContent=m&&(m.status==='active'||operations.time-(m.completedAt||0)<8)?`${t(m.id==='package'?'Collect building package':'Hold terminal zone')} · $${m.reward} · ${m.status==='complete'?t('Событие выполнено'):`${Math.round(Math.hypot(m.x-player.position.x,m.z-player.position.z))}m${m.id==='zone'?` · ${Math.floor(m.progress)}/30s`:''}`}`:'';const drop=operations.drops.find(d=>d.status!=='opened');$('airdrop-status').textContent=drop?`${t('Supply crate')} · ${Math.round(Math.hypot(drop.x-player.position.x,drop.z-player.position.z))}m · ${t(drop.status==='falling'?'Descending':'Hold E for 10 seconds')}`:`${t('Next airdrop')} · ${Math.ceil(360-operations.time%360)}s`;$('gear-status').textContent=`F · ${t('Flashlight')} ${account.flashlight?Math.ceil(account.flashlightCharge)+'s':'—'} · B ×${account.batteries||0} · 3 ${t('Traps')} ×${account.traps||0}${trapSelected?' · '+t('LMB · Place underfoot'):''}`;}
+
+function activeMission(){const m=operations?.mission;if(m?.status==='active')return {...m,label:t(m.id==='package'?'Collect building package':'Hold terminal zone')};const e=events?.state;if(e?.status==='active')return {...e,key:'event-'+e.wave,label:t(e.label)};return null;}
+function updateMissionNotice(){if(!started){$('mission-notice').hidden=true;return;}const m=activeMission();if(m&&m.key!==lastMissionKey){lastMissionKey=m.key;missionNoticeRecord={...m,complete:false};missionNoticeUntil=performance.now()+6000;audio.play('mission');}const completed=[operations.mission,events.state?{...events.state,key:'event-'+events.state.wave}:null].find(e=>e?.status==='complete'&&!announcedMissionCompletions.has(e.key));if(completed){announcedMissionCompletions.add(completed.key);lastMissionCompleteKey=completed.key;missionNoticeRecord={...completed,complete:true};missionNoticeUntil=performance.now()+5000;audio.play('wave-clear');}const r=missionNoticeRecord;$('mission-notice').hidden=!r||performance.now()>missionNoticeUntil;if(r)$('mission-notice').textContent=r.complete?`${t('MISSION COMPLETE')} · +$${r.reward}`:`${t('NEW SHARED MISSION')} · ${t(r.id==='package'?'Collect building package':r.id==='zone'?'Hold terminal zone':r.label)} · $${r.reward}`;}

@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {CityWeatherDetails} from './city-weather.js';
 import {AtmosphereParticles} from './atmosphere-particles.js';
 // Decorative details never obstruct the tested player routes. Shared geometry/materials.
 export function createAtmosphere(scene,layout){
@@ -9,9 +10,11 @@ export function createAtmosphere(scene,layout){
   for(let n=0;n<3;n++){const x=b.x-b.w*.46+n*.14;put('black',x,.4+n*.27,front+.004,.012,.36,.008,.05);}
  }
  for(const p of layout.props){if(p.type==='dumpster'){for(let n=0;n<4;n++){const dx=.65+(n%2)*.22,dz=(Math.floor(n/2)-.5)*.35;put(n%2?'paper':'black',p.x+dx,.025,p.z+dz,.14,.035,.11,n);}}if(['car','van','hatchback'].includes(p.type)&&p.variant%4===0){put('rust',p.x,.925,p.z+.8,.55,.018,.45);}}
+ const scarShape=new T.Shape();scarShape.moveTo(-.32,-.5);scarShape.lineTo(.22,-.42);scarShape.lineTo(.4,-.14);scarShape.lineTo(.18,.12);scarShape.lineTo(.3,.44);scarShape.lineTo(-.16,.5);scarShape.lineTo(-.38,.15);scarShape.closePath();const scarGeometry=new T.ShapeGeometry(scarShape),scarMaterial=new T.MeshStandardMaterial({color:'#4d4c40',roughness:1,polygonOffset:true,polygonOffsetFactor:-3});for(const b of layout.buildings){if(b.type==='grocery')continue;for(const side of [-1,1]){const scar=new T.Mesh(scarGeometry,scarMaterial);scar.position.set(b.x+side*b.w*.40,1.2+(b.id%3)*.3,b.z+b.d/2+.012);scar.scale.setScalar(.65+(b.id%4)*.1);scene.add(scar);}for(let n=0;n<3;n++){const x=b.x-b.w*.43+n*.19,z=b.z+b.d/2+.38;if(!layout.colliders.some(c=>c.minY<.3&&c.maxY>0&&x>c.minX-.1&&x<c.maxX+.1&&z>c.minZ-.1&&z<c.maxZ+.1))put('rubble',x,.06,z,.12,.12,.15,n*.7);}}
  for(const [mat,records]of batches){const mesh=new T.InstancedMesh(box,mats[mat],records.length);records.forEach((matrix,i)=>mesh.setMatrixAt(i,matrix));mesh.name='weathering/'+mat;scene.add(mesh);}
  const warm=new T.PointLight('#ffd48c',16,16,2);warm.position.set(layout.shop.terminal.x+1,2.6,layout.shop.terminal.z+1);scene.add(warm);
  const lamps=[];for(const p of layout.props.filter(p=>p.type==='lamp').filter((_,i)=>i%12===0)){const l=new T.PointLight('#8daac8',5,11,2);l.position.set(p.x,4.7,p.z);scene.add(l);lamps.push(l);}
+ const weatherDetails=new CityWeatherDetails(scene,layout);
  const particles=new AtmosphereParticles(scene,layout.buildings,lamps);
- return {update(time,powered,quality='medium',position={x:0,z:0},dt=0){particles.update(dt,position,quality,powered);lamps.forEach((l,i)=>{l.visible=quality!=='low'&&(quality!=='medium'||i%2===0);l.intensity=quality==='low'||quality==='medium'&&i%2?0:powered?8:5*(i===0&&Math.sin(time*9)*Math.sin(time*2)>.72?.15:1);});warm.intensity=powered?23:16;}};
+ return {update(time,powered,quality='medium',position={x:0,z:0},dt=0,weather='overcast'){weatherDetails.update(dt,time,weather,quality);particles.update(dt,position,quality,powered);lamps.forEach((l,i)=>{l.visible=quality!=='low'&&(quality!=='medium'||i%2===0);l.intensity=quality==='low'||quality==='medium'&&i%2?0:powered?8:5*(i===0&&Math.sin(time*9)*Math.sin(time*2)>.72?.15:1);});warm.intensity=powered?23:16;}};
 }

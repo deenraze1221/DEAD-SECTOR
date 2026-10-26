@@ -25,8 +25,8 @@ test('zombies leave collectable cash, not free ammo or medicine, with monotonic 
 });
 test('five seconds of sprint drain stamina, five seconds of recovery refill it, no stationary drain',()=>{
  const p=new Player({x:0,y:0,z:0}),input={forward:true,backward:false,left:false,right:false,sprint:true,jump:false};
- for(let i=0;i<600;i++)p.step(FIXED_STEP,input,[]);assert.equal(p.stamina,0);assert.ok(Math.abs(p.position.z+37.5)<1e-6);
- const z=p.position.z;for(let i=0;i<600;i++)p.step(FIXED_STEP,input,[]);assert.equal(p.stamina,5);assert.ok(Math.abs(p.position.z-z+22.5)<1e-6);
+ for(let i=0;i<600;i++)p.step(FIXED_STEP,input,[]);assert.equal(p.stamina,0);assert.ok(-p.position.z>36.5&&-p.position.z<37.5);
+ const z=p.position.z;for(let i=0;i<600;i++)p.step(FIXED_STEP,input,[]);assert.equal(p.stamina,5);assert.ok(z-p.position.z>=22.5&&z-p.position.z<23);
  for(let i=0;i<600;i++)p.step(FIXED_STEP,{...input,forward:false},[]);assert.equal(p.stamina,5);
 });
 test('town adds exactly 15 percent street population, four architectural families, unique furnished market and varied plans',()=>{

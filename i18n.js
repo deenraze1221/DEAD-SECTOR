@@ -1,4 +1,14 @@
 const entries={
+'ЗАДАНИЕ':'MISSION','ГРУЗ':'SUPPLY','ЗАДАНИЕ ВЫПОЛНЕНО':'MISSION COMPLETE','НОВОЕ ОБЩЕЕ ЗАДАНИЕ':'NEW SHARED MISSION',
+
+'Язык':'Language',
+
+'Капкан':'Bear trap',
+
+'· ПАТРОНЫ':'· AMMO',
+
+"ЗАВЕРШЕНА":"COMPLETED","Фонарик":"Flashlight","Капканы":"Traps","Фонарик · 300 секунд":"Flashlight · 300 seconds","Батарея · 300 секунд":"Battery · 300 seconds","Капкан · 300 урона":"Bear trap · 300 damage","F · Свет на 300 секунд":"F · 300 seconds of light","B · Заменить батарею":"B · Replace battery","T · Установить капкан, 300 урона":"3 + LMB · Place trap, 300 damage","Сначала купите фонарик":"Buy a flashlight first","Подобрать пакет в здании":"Collect building package","Удержать зону терминала":"Hold terminal zone","Ящик снабжения":"Supply crate","Спускается":"Descending","Удерживайте E 10 секунд":"Hold E for 10 seconds","Следующий груз":"Next airdrop","Удерживайте E · Открыть ящик":"Hold E · Open supply crate","E · Подобрать пакет задания":"E · Collect mission package","ЛКМ · Поставить под себя":"LMB · Place underfoot","ФАЗА":"PHASE","Фонарик / Батарея":"Flashlight / Battery","Капкан / Установить":"Trap / Place","3 / ЛКМ":"3 / LMB","ЛКМ / R":"LMB / R","Состояние обновлено":"State updated","Деньги подобраны":"Cash collected","Ошибка подключения":"Connection failed","Подключение…":"Connecting…","Комната":"Room","Комната закрыта":"Room closed","Сервер недоступен":"Server unavailable","Переподключение…":"Reconnecting…","Отключено":"Disconnected","Уже подключено":"Already connected","Нет сохранённой комнаты":"No saved room","Лобби недоступно, заполнено или матч уже начался":"Lobby unavailable, full or already started","Сервер заполнен":"Server full","Повторный вход истёк или игрок уже подключён":"Resume expired or already connected","Неверный пакет":"Invalid packet","Капкан активирован":"Trap triggered",
+
 'Для сети нужен общий сервер. Одиночная игра работает без него.':'Online play requires a shared server. Solo play works without one.',
 'Укажите адрес общего сервера в настройках. Одиночная игра доступна без сервера.':'Enter a shared server address in Settings. Solo play needs no server.',
 "ЗВУК":"AUDIO",

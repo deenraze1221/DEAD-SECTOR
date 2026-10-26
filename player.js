@@ -12,7 +12,7 @@ export class Player {
   constructor(spawn) { this.spawn = { ...spawn }; this.reset(); }
   reset() {
     this.position = { ...this.spawn }; this.yaw = 0; this.pitch = 0;
-    this.velocityY = 0; this.grounded = true; this.distance = 0;this.stamina=5;this.exhausted=false;this.sprinting=false;
+    this.velocityX=0;this.velocityZ=0;this.speed=0;this.velocityY = 0; this.grounded = true; this.distance = 0;this.stamina=5;this.exhausted=false;this.sprinting=false;
   }
   look(dx, dy, sensitivity) {
     if(!Number.isFinite(dx)||!Number.isFinite(dy)||!Number.isFinite(sensitivity))return;
@@ -24,12 +24,10 @@ export class Player {
     let right = Number(input.right) - Number(input.left);
     const magnitude = Math.hypot(forward, right);
     if (magnitude > 0) { forward /= magnitude; right /= magnitude; }
-    this.sprinting=Boolean(input.sprint&&magnitude>0&&this.stamina>1e-8&&!this.exhausted);
-    if(this.sprinting){this.stamina=Math.max(0,this.stamina-dt);if(this.stamina<1e-8){this.stamina=0;this.exhausted=true;}}
-    else{this.stamina=Math.min(5,this.stamina+dt);if(this.stamina>=5-1e-8){this.stamina=5;this.exhausted=false;}}
-    const speed = this.sprinting ? PLAYER.run : PLAYER.walk;
-    const dx = (right * Math.cos(this.yaw) - forward * Math.sin(this.yaw)) * speed * dt;
-    const dz = (-right * Math.sin(this.yaw) - forward * Math.cos(this.yaw)) * speed * dt;
+    const wantsSprint=Boolean(input.sprint&&magnitude>0&&this.stamina>1e-8&&!this.exhausted),speed=wantsSprint?PLAYER.run:PLAYER.walk;
+    const targetX=(right*Math.cos(this.yaw)-forward*Math.sin(this.yaw))*speed,targetZ=(-right*Math.sin(this.yaw)-forward*Math.cos(this.yaw))*speed;
+    const vx=targetX-this.velocityX,vz=targetZ-this.velocityZ,difference=Math.hypot(vx,vz),limit=(magnitude>0?36:55)*dt,factor=difference>0?Math.min(1,limit/difference):1;this.velocityX+=vx*factor;this.velocityZ+=vz*factor;
+    const dx=this.velocityX*dt,dz=this.velocityZ*dt;
     const oldX = this.position.x, oldZ = this.position.z;
     // Resolve axes separately: the player slides along walls instead of sticking.
     for (const [axis, delta, min, max] of [['x', dx, 'minX', 'maxX'], ['z', dz, 'minZ', 'maxZ']]) {
@@ -38,9 +36,12 @@ export class Player {
         if (!overlapsBody(this.position, box)) continue;
         if (delta > 0) this.position[axis] = box[min] - PLAYER.radius;
         else if (delta < 0) this.position[axis] = box[max] + PLAYER.radius;
+        if(axis==='x')this.velocityX=0;else this.velocityZ=0;
       }
     }
-    this.distance += Math.hypot(this.position.x - oldX, this.position.z - oldZ);
+    const travel=Math.hypot(this.position.x-oldX,this.position.z-oldZ);this.distance+=travel;this.speed=travel/Math.max(dt,1e-6);this.sprinting=wantsSprint&&this.speed>.1;
+    if(this.sprinting){this.stamina=Math.max(0,this.stamina-dt);if(this.stamina<1e-8){this.stamina=0;this.exhausted=true;}}else{this.stamina=Math.min(5,this.stamina+dt);if(this.stamina>=5-1e-8){this.stamina=5;this.exhausted=false;}}
+
     if (input.jump && this.grounded) { this.velocityY = PLAYER.jump; this.grounded = false; }
     const previousY = this.position.y;
     this.velocityY -= PLAYER.gravity * dt;

@@ -10,7 +10,7 @@ try{
  const read=()=>p.evaluate(()=>readGame());
  async function wait(predicate,description,timeout=45000){const end=Date.now()+timeout;while(Date.now()<end){const s=await read();if(predicate(s))return s;await p.waitForTimeout(50);}throw Error(description+': '+JSON.stringify(await read())+' errors '+JSON.stringify(errors));}
  let s=await read();assert.equal(s.weapon,'Pistol');assert.equal(s.money,0);assert.equal(s.totalAmmo,92);assert.deepEqual(s.supplies,[]);
- await p.locator('#settings-button').click();await p.locator('#server-url').fill('ws://127.0.0.1:'+game.server.address().port);await p.locator('#start').click();await p.locator('#host-room').click();s=await wait(s=>s.networkActive,'room');const room=game.rooms.get(s.room);
+ await p.locator('#settings-button').click();await p.locator('#server-url').fill('ws://127.0.0.1:'+game.server.address().port);await p.locator('#close-settings').click();await p.locator('#start').click();await p.locator('#host-room').click();s=await wait(s=>s.networkActive,'room');const room=game.rooms.get(s.room);
  const pushAccount=()=>{room.host.account.revision++;room.host.socket.send(JSON.stringify({type:'economy',account:room.host.account}));};
  await launchLobby(p);await wait(s=>s.running,'play');
  room.cash.set('cash-ui',{id:'cash-ui',x:STORE.spawn.x,z:STORE.spawn.z,value:30,taken:false});room.host.socket.send(JSON.stringify({type:'loot-state',cash:[...room.cash.values()]}));await wait(s=>s.drops.length===1,'cash appears');
@@ -26,7 +26,8 @@ try{
   const before=(await read()).money;await p.locator(`[data-shop-action=buy][data-item=${item.id}]`).click();s=await wait(s=>s.weapon===item.id,'buy '+item.id);
   assert.equal(s.money,before-item.price);assert.deepEqual(Object.keys(s.inventory.weapons).sort(),['Pistol',item.id].sort());console.log('PASS buy/equip and replace primary',item.id);
  }
- await p.locator('[data-shop-tab=gear]').click();assert.equal(await p.locator('.supply-silhouette svg').count(),4);
+ await p.locator('[data-shop-tab=gear]').click();assert.equal(await p.locator('.supply-silhouette svg').count(),7);
+ for(const id of ['flashlight','battery','trap']){await p.locator(`[data-shop-action=buy][data-item=${id}]`).click();await wait(s=>id==='flashlight'?s.inventory.flashlight:id==='battery'?s.inventory.batteries===1:s.inventory.traps===1,'buy '+id);}
  for(const id of ['smallMedkit','largeMedkit']){await p.locator(`[data-shop-action=buy][data-item=${id}]`).click();await wait(s=>s.inventory[id]===1,'buy '+id);}
  room.host.account.health=10;room.host.pose.hp=10;room.host.account.weapons.G36.durability=30;room.host.account.reserve=492;pushAccount();await wait(s=>s.hp===10&&s.durability===30&&s.totalAmmo===500,'condition and ammo fixture');
  await p.locator('[data-shop-action=buy][data-item=smallMedkit]').click();await wait(s=>s.hp===35,'purchase immediately heals');await p.locator('[data-shop-action=buy][data-item=largeMedkit]').click();await wait(s=>s.hp===100,'large purchase heals to cap');room.host.account.health=10;room.host.pose.hp=10;pushAccount();await wait(s=>s.hp===10,'stored kit fixture');
@@ -35,6 +36,7 @@ try{
  await p.locator('[data-shop-action=buy][data-item=repair]').click();await wait(s=>s.durability===100,'repair capped');assert.equal(await p.locator('[data-shop-action=buy][data-item=repair]').isDisabled(),true);
  const artifacts=process.env.ARTIFACT_DIR;if(artifacts){await mkdir(artifacts,{recursive:true});await p.screenshot({path:artifacts+'/market-terminal.png'});}
  await p.locator('#close-shop').click();await wait(s=>s.running&&!s.shopOpen,'return to play');
+ await p.keyboard.press('KeyF');await wait(s=>s.flashlightOn&&s.inventory.flashlightCharge<300,'flashlight drains');await p.keyboard.press('KeyF');await p.keyboard.press('KeyB');await wait(s=>s.inventory.batteries===0&&s.inventory.flashlightCharge===300,'battery refill');await p.keyboard.press('Digit3');await wait(s=>s.trapSelected,'select trap');const ammoBefore=(await read()).ammo;await p.mouse.click(600,400);await wait(s=>s.inventory.traps===0&&s.operations.traps.some(t=>!t.used),'trap underfoot');assert.equal((await read()).ammo,ammoBefore);
  await p.keyboard.press('Digit2');await wait(s=>s.weapon==='Pistol','slot 2 pistol');await p.keyboard.press('Digit1');await wait(s=>s.weapon==='G36','slot 1 primary');
  await p.keyboard.press('KeyR');await wait(s=>s.reloading,'reload starts');await wait(s=>!s.reloading&&s.ammo===30,'reload from universal pool',120000);
  await p.mouse.down();await wait(s=>s.ammo<=28,'automatic primary fires');await p.mouse.up();

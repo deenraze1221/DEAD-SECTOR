@@ -35,8 +35,8 @@ import assert from 'node:assert/strict';
     await waitForState(state => state.grounded);
     await page.mouse.move(800,400,{steps:20});await waitForState(state=>state.yaw!==0);
     assert.notEqual((await snapshot()).yaw,0);
-    for(let i=0;i<5;i++){await page.mouse.move(800,500+i*80,{steps:5});await page.waitForTimeout(100);}
-    await waitForState(state=>state.pitch<-.3&&state.bodyVisible);
+    for(let i=0;i<9;i++){await page.mouse.move(800,500+i*80,{steps:5});await page.waitForTimeout(100);}
+    await waitForState(state=>state.pitch<-.95&&state.bodyVisible);
     for(let i=0;i<5;i++){await page.mouse.move(800,400-i*80,{steps:5});await page.waitForTimeout(100);}
 
     await page.keyboard.down('KeyW');await page.keyboard.press('Escape');await page.waitForTimeout(100);

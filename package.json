@@ -19,7 +19,8 @@
     "test:mutants:browser": "node tests/mutants-browser.js",
     "test:economy:browser": "node tests/economy-browser.js",
     "test:music:browser": "node tests/music-browser.js",
-    "report:economy": "node scripts/economy-report.js"
+    "report:economy": "node scripts/economy-report.js",
+    "test:survival:browser": "node tests/survival-ui-browser.js"
   },
   "dependencies": {
     "three": "0.180.0",
