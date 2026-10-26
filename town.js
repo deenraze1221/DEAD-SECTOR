@@ -31,7 +31,7 @@ function add(type,x,z,options={}){const item={id:'asset-'+next++,type,x,z,y:0,ya
 for(const [x,z,w,d]of [[0,-100,201,1],[0,100,201,1],[-100,0,1,199],[100,0,1,199]]){solid(x,0,z,w,5.8,d);walls.push({x,z,w,h:5.8,d});}
 for(const cx of [-84,-60,-36,-12,12,36,60,84])for(const cz of [-84,-60,-36,-12,12,36,60,84]){
  const id=buildings.length,district=cx<0?(cz<0?'industrial':'residential'):(cz<0?'medical':'market'),type=cx===12&&cz===12?'grocery':BUILDINGS[id<BUILDINGS.length?id:Math.floor(random()*BUILDINGS.length)],variant=(id+Math.floor(random()*32))%32;
- const w=type==='grocery'?STORE.w:8.8+Math.floor(random()*4)*.3,d=type==='grocery'?STORE.d:8.8+Math.floor(random()*3)*.35,h=type==='tower'?10:type==='grocery'?4.5:['garage','workshop','utility'].includes(type)?4.5:['apartment','hotel','office'].includes(type)?10+Math.floor(random()*3)*2.8:6+Math.floor(random()*2)*2.7;
+ const w=type==='grocery'?STORE.w:8.8+Math.floor(random()*4)*.3,d=type==='grocery'?STORE.d:8.8+Math.floor(random()*3)*.35,h=({residentialHighrise:24,corporateTower:32,hospitalTower:21,communicationsTower:28}[type])??(type==='tower'?10:type==='grocery'?4.5:['garage','workshop','utility'].includes(type)?4.5:['apartment','hotel','office'].includes(type)?10+Math.floor(random()*3)*2.8:6+Math.floor(random()*2)*2.7);
  const b={id,type,variant,x:cx-1.65,z:cz-2.05,w,d,h,district,cx,cz,accessibleFloors:1,door:['garage','warehouse','workshop','firestation','grocery','cinema'].includes(type)?3.4:2.2};buildings.push(b);districts.push({name:district,x:cx,z:cz});occupied.push({minX:b.x-w/2,maxX:b.x+w/2,minY:0,maxY:h+.2,minZ:b.z-d/2,maxZ:b.z+d/2,id:'building-'+id});
  const t=.22,door=b.door;solid(b.x,0,b.z-d/2+t/2,w,3.12,t,'wall',id);for(const side of [-1,1])solid(b.x+side*(w/2-t/2),0,b.z,t,3.12,d-2*t,'wall',id);for(const side of [-1,1])solid(b.x+side*(w/4+door/4),0,b.z+d/2-t/2,(w-door)/2,3,t,'wall',id);solid(b.x,3,b.z+d/2-t/2,w,.12,t,'lintel',id);solid(b.x,3.12,b.z,w,.18,d,'ceiling',id);solid(b.x,3.3,b.z,w,h-3.3,d,'upper',id);
  b.structure=colliders.filter(c=>c.owner===id);
@@ -58,7 +58,7 @@ for(const x of [-72,-24,24,72])for(const z of [-72,-24,24,72]){add('hydrant',x+3
 // Parallel traffic occupies one lane per segment and never parks on a crossing.
 for(const road of [-72,-48,-24,24,48,72])for(const z of [-84,-60,-36,-12,12,36,60,84])if(random()<.6){const north=random()<.5;add(random()<.3?'van':'car',road+(north?1.35:-1.35),z,{yaw:north?0:Math.PI,context:'traffic',road,direction:north?'north':'south'});}
 // Increase the existing outdoor population by 15%, with collision-checked semantic pockets.
-const baseStreetCount=props.length,targetStreetCount=Math.ceil(baseStreetCount*1.15),newTypes=['trafficCone','streetClock','newsstand','publicPhone','busMap'];
+const baseStreetCount=props.length,targetStreetCount=Math.ceil(baseStreetCount*1.15),newTypes=['trafficCone','streetClock','newsstand','publicPhone','busMap','atm','vendingMachine','bikeRack','fireExtinguisher','sandbagStack','surveyTripod','constructionLight','noticeBoard','waterTank','concretePipe'];
 for(let round=0;props.length<targetStreetCount&&round<6;round++)for(const b of buildings){
  if(props.length>=targetStreetCount)break;
  const type=newTypes[(b.id+round)%newTypes.length],candidates=[[b.cx+4.05,b.cz+1.0],[b.cx-5.5,b.cz+2.2],[b.cx+.7,b.cz+6.8],[b.cx+4.1,b.cz+5.8],[b.cx-5.5,b.cz+6.9],[b.cx+6.6,b.cz+1.7]];

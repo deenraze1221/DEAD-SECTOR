@@ -16,7 +16,7 @@ try{
  room.cash.set('cash-ui',{id:'cash-ui',x:STORE.spawn.x,z:STORE.spawn.z,value:30,taken:false});room.host.socket.send(JSON.stringify({type:'loot-state',cash:[...room.cash.values()]}));await wait(s=>s.drops.length===1,'cash appears');
  await wait(s=>s.money===30,'cash pickup');assert.equal(room.cash.get('cash-ui').taken,true);
  // Isolated room fixture funds purchases; no debug grant exists in the game client.
- room.host.account.money=90000;pushAccount();await wait(s=>s.money===90000,'fixture funds');
+ room.host.account.completedWave=25;room.host.account.money=90000;pushAccount();await wait(s=>s.money===90000,'fixture funds');
  await p.keyboard.down('KeyW');await wait(s=>s.position.z<=12.3,'walk through shop door');await p.keyboard.up('KeyW');
  await p.keyboard.down('KeyA');await wait(s=>s.position.x<=8.35,'walk to terminal');await p.keyboard.up('KeyA');
  await p.keyboard.press('KeyE');await wait(s=>s.shopOpen,'terminal modal');assert.equal(await p.locator('#menu').isVisible(),false);assert.equal(await p.locator('#shop-panel').isVisible(),true);
@@ -36,9 +36,9 @@ try{
  await p.locator('[data-shop-action=buy][data-item=repair]').click();await wait(s=>s.durability===100,'repair capped');assert.equal(await p.locator('[data-shop-action=buy][data-item=repair]').isDisabled(),true);
  const artifacts=process.env.ARTIFACT_DIR;if(artifacts){await mkdir(artifacts,{recursive:true});await p.screenshot({path:artifacts+'/market-terminal.png'});}
  await p.locator('#close-shop').click();await wait(s=>s.running&&!s.shopOpen,'return to play');
- await p.keyboard.press('KeyF');await wait(s=>s.flashlightOn&&s.inventory.flashlightCharge<300,'flashlight drains');await p.keyboard.press('KeyF');await p.keyboard.press('KeyB');await wait(s=>s.inventory.batteries===0&&s.inventory.flashlightCharge===300,'battery refill');await p.keyboard.press('Digit3');await wait(s=>s.trapSelected,'select trap');const ammoBefore=(await read()).ammo;await p.mouse.click(600,400);await wait(s=>s.inventory.traps===0&&s.operations.traps.some(t=>!t.used),'trap underfoot');assert.equal((await read()).ammo,ammoBefore);
+ await p.keyboard.press('KeyF');await wait(s=>s.flashlightOn&&s.inventory.flashlightCharge<300,'flashlight drains');await p.keyboard.press('KeyF');await p.keyboard.press('KeyB');await wait(s=>s.inventory.batteries===0&&s.inventory.flashlightCharge===300,'battery refill');await p.keyboard.press('Digit3');await wait(s=>s.trapSelected,'select trap');await wait(s=>s.selectionReady,'selection animation');const ammoBefore=(await read()).ammo;await p.mouse.click(600,400);await wait(s=>s.inventory.traps===0&&s.operations.traps.some(t=>!t.used),'trap underfoot');assert.equal((await read()).ammo,ammoBefore);
  await p.keyboard.press('Digit2');await wait(s=>s.weapon==='Pistol','slot 2 pistol');await p.keyboard.press('Digit1');await wait(s=>s.weapon==='G36','slot 1 primary');
- await p.keyboard.press('KeyR');await wait(s=>s.reloading,'reload starts');await wait(s=>!s.reloading&&s.ammo===30,'reload from universal pool',120000);
+ await wait(s=>s.selectionReady,'selection animation');await p.keyboard.press('KeyR');await wait(s=>s.reloading,'reload starts');await wait(s=>!s.reloading&&s.ammo===35,'reload from universal pool',120000);
  await p.mouse.down();await wait(s=>s.ammo<=28,'automatic primary fires');await p.mouse.up();
  await p.keyboard.press('KeyH');await wait(s=>s.hp===35,'small medkit');await p.keyboard.press('KeyJ');await wait(s=>s.hp===100,'large medkit');
  assert.equal((await read()).inventory.smallMedkit,0);assert.equal((await read()).inventory.largeMedkit,0);

@@ -25,7 +25,7 @@ const reward=(key,amount)=>{if(r.rewarded.has(key))return;r.rewarded.add(key);fo
 if(m.operations?.mission?.status==='complete'){const q=m.operations.mission;if(/^mission-\d+$/.test(q.key)&&Number.isInteger(q.reward)&&q.reward>=300&&q.reward<=600)reward(q.key,q.reward);}
 for(const d of m.operations?.drops||[])if(d.status==='opened'&&/^airdrop-\d+$/.test(d.id)&&Number.isInteger(d.reward)&&d.reward>=100&&d.reward<=500&&ROLES.includes(d.opener)&&!r.rewarded.has(d.id)){r.rewarded.add(d.id);const a=r[d.opener];if(a){a.account.money+=d.reward;a.account.revision++;send(a.socket,{type:'economy',account:a.account,reason:'Награда получена'});}}
 
-if(m.wave?.rest&&Number.isInteger(m.wave.number))reward('wave-'+m.wave.number,m.wave.number%5===0?500:75+m.wave.number*25);
+if(m.wave?.rest&&Number.isInteger(m.wave.number)){for(const role of ROLES)if(r[role])r[role].account.completedWave=Math.max(r[role].account.completedWave||0,m.wave.number);reward('wave-'+m.wave.number,m.wave.number%5===0?500:75+m.wave.number*25);}
 broadcast(r,m,'host');}
 else if(r&&m.type==='shot'&&s.role!=='host'&&r[s.role].pose?.hp>0&&Array.isArray(m.direction)&&m.direction.length===3&&m.direction.every(Number.isFinite)){const damage=WEAPON_BY_ID[m.weapon]?.damage,p=r[s.role].pose;if(damage)send(r.host.socket,{type:'shot',origin:[p.x,p.y+1.65,p.z],direction:m.direction,damage});}
 else if(r&&m.type==='damage'&&s.role==='host'&&ROLES.slice(1).includes(m.target))send(r[m.target]?.socket,{type:'damage',amount:[15,25,30,40,55].includes(m.amount)?m.amount:25});

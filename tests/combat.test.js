@@ -1,9 +1,9 @@
 import test from 'node:test';import assert from 'node:assert/strict';import * as T from 'three';import {Rifle,WEAPONS} from '../weapons.js';import {Enemies} from '../enemies.js';const audio={play(){},shot(){}};
 test('all ten weapons use the requested capacities, damage, reloads and automatic modes',()=>{
- const expected={Pistol:[8,45,1.15,false],Helsing:[40,30,4,true],Tikhar:[1,55,3,false],Shambler:[5,50,3,false],Shotgun:[2,80,2,false],Kalash:[30,40,3,true],VSV:[12,70,6,true],Scorpion:[35,35,4,true],Vector:[20,35,3,true],G36:[30,45,4,true]};
+ const expected={Pistol:[8,45,1.15,false],Helsing:[60,35,4,true],Tikhar:[1,130,3,false],Shambler:[5,65,3,false],Shotgun:[2,90,2,false],Kalash:[30,50,3,true],VSV:[12,80,6,true],Scorpion:[35,45,4,true],Vector:[20,40,3,true],G36:[35,40,4,true]};
  assert.equal(WEAPONS.length,10);
  for(const [i,spec] of WEAPONS.entries()){
-  const g=new Rifle(audio,()=>(i+.1)/WEAPONS.length),[capacity,damage,reload,automatic]=expected[spec.id];g.reset(spec.id);
+  const g=new Rifle(audio,()=>(i+.1)/WEAPONS.length),[capacity,damage,reload,automatic]=expected[spec.id];g.reset(spec.id);g.step(1.5);
   assert.equal(g.config.id,spec.id);assert.deepEqual([g.ammo,g.config.damage,g.config.reload,g.config.automatic],[capacity,damage,reload,automatic]);
   assert.equal(g.gun.name,spec.id);assert.ok(g.gun.geometry.attributes.position.count>500);assert.ok(g.variants.every(v=>!['RifleGod','RifleBran','SMG'].includes(v.record.id)));
   if(Array.isArray(g.gun.material)){assert.ok(g.gun.geometry.groups.length>0);assert.ok(g.gun.geometry.groups.every(group=>group.materialIndex<g.gun.material.length));}

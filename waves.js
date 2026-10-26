@@ -1,5 +1,5 @@
 export const ENEMY_TYPES={
- boss:{hp:1800,speed:1.3,damage:55,weight:0,radius:.7,height:2.2,scale:1.1},
+ boss:{hp:1800,speed:1.3,damage:55,weight:0,radius:2.1,height:6.6,scale:3.3},
  zombie:{hp:250,speed:2.2,damage:25,weight:55,radius:.5,height:2,scale:1},
  runner:{hp:125,speed:3.6,damage:15,weight:20,radius:.38,height:1.5,scale:.75},
  eye:{hp:300,speed:2.3,damage:30,weight:20,radius:.7,height:1.5,scale:1},
@@ -35,3 +35,5 @@ export class Waves {
  snapshot(){return {warmup:this.warmup,seed:this.seed,number:this.number,time:this.time,variant:this.variant,spawned:this.spawned,rest:this.rest,clearing:this.clearing};}
  restore(v){const {variant,...state}=v;Object.assign(this,state);this.clearing=Boolean(v.clearing);this.warmup=Boolean(v.warmup);}
 }
+
+export function bossHealth(wave=5){return 1800+Math.max(0,Math.floor(wave/5)-1)*600;}

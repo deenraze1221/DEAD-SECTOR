@@ -12,26 +12,26 @@ Sprinting lasts five seconds from full stamina. Stamina recovers in five seconds
 
 ## Money, shop and condition
 
-A dead enemy leaves a cash bundle on the ground. Walking within 0.85 m collects it automatically with a cash sound. Rewards derive from maximum HP, clamped to $5–100: runner 125 HP → $5; zombie 250 HP → $30; eye 300 HP → $40; brute 600 HP → $100. Cash remains until collected, and a bundle can be collected once. In co-op, the collector receives the money in their individual wallet.
+A dead enemy leaves a cash bundle on the ground. Walking within 0.85 m collects it automatically with a cash sound. Rewards derive from maximum HP, clamped to $10–100: runner 125 HP → $10; zombie 250 HP → $30; eye 300 HP → $40; brute 600 HP → $100. Cash remains until collected, and a bundle can be collected once. In co-op, the collector receives the money in their individual wallet.
 
 SECTOR MART is a unique grocery building in the central quarter. Its large terminal opens within 2.1 m. The shop contains ten prop families: stocked shelves, produce stand, refrigerated case, freezer, checkout with cash register, shopping cart, basket stand, display rack, stock boxes and the terminal. Entrances and the route to the terminal have physical player-clearance checks.
 
 | Weapon | Magazine | Damage | Fire interval | Reload | Mode | Price |
 | --- | --- | --- | --- | --- | --- | --- |
 | Pistol | 8 | 45 | 0.28 s | 1.15 s | single press | starter |
-| Helsing | 40 | 30 | 0.075 s | 4 s | automatic | $6,000 |
-| Tikhar | 1 | 55 | 0.45 s | 3 s | single press | $3,500 |
-| Shambler | 5 | 50 | 0.50 s | 3 s | single press | $3,000 |
-| Shotgun | 2 | 80 | 0.60 s | 2 s | single press | $2,000 |
-| Kalash | 30 | 40 | 0.14 s | 3 s | automatic | $4,000 |
-| VSV | 12 | 70 | 0.24 s | 6 s | automatic | $5,500 |
-| Scorpion | 35 | 35 | 0.10 s | 4 s | automatic | $4,500 |
-| Vector | 20 | 35 | 0.09 s | 3 s | automatic | $2,500 |
-| G36 | 30 | 45 | 0.14 s | 4 s | automatic | $5,000 |
+| Helsing | 60 | 35 | 0.075 s | 4 s | automatic | $6,500 |
+| Tikhar | 1 | 130 | 0.45 s | 3 s | single press | $4,000 |
+| Shambler | 5 | 65 | 0.50 s | 3 s | single press | $3,500 |
+| Shotgun | 2 | 90 | 0.60 s | 2 s | single press | $2,000 |
+| Kalash | 30 | 50 | 0.14 s | 3 s | automatic | $4,500 |
+| VSV | 12 | 80 | 0.24 s | 6 s | automatic | $6,000 |
+| Scorpion | 35 | 45 | 0.10 s | 4 s | automatic | $5,000 |
+| Vector | 20 | 40 | 0.09 s | 3 s | automatic | $3,000 |
+| G36 | 35 | 40 | 0.14 s | 4 s | automatic | $5,500 |
 
-Damage includes the latest +15 to every weapon. Pistol also retains the preceding +20 increase (10 + 20 + 15 = 45). Fire intervals resolve qualitative rate requests; Shambler/Shotgun damage is total per shot. There is no aiming mode. Each weapon has a distinct synthesized report.
+The table reflects the latest balance; pistol remains45 damage. There is no aiming mode. Each weapon has a distinct synthesized report.
 
-- Universal ammunition: **30 rounds for $50**. The **500-round limit includes reserve and both loaded magazines**. A full pack is refused if it would exceed the limit; no money is deducted.
+- Universal ammunition: **50 rounds for $50**. The **500-round limit includes reserve and both loaded magazines**. A full pack is refused if it would exceed the limit; no money is deducted.
 - Small medkit: **$100**, immediately restores **25 HP** when purchased while injured; stored at full health for H.
 - Large medkit: **$250**, immediately restores **75 HP** when purchased while injured; stored at full health for J. Health caps at 100; using a kit at full health consumes nothing.
 - Every weapon has **100 condition**, losing **5 condition after each 100 shots actually fired**. Empty clicks do not cause wear. At zero condition it cannot shoot.
@@ -41,7 +41,7 @@ The updated FBX uses painted metal, brown stock/grip and blue pneumatic accents 
 
 ## City generation
 
-The town has 64 buildings and 20 repeatable architecture families, including the new cinema, fire station, motel and a tower with a 10 m structural height, plus the unique grocery. Ground floors use three floor plans: central spine, front lounge with rear rooms, and open floor with rear service band. Furniture, wall orientation and room use vary deterministically. Wide entrances have clear vestibules. Upper stories are closed architectural volumes; stairs and upper-floor access are not implemented.
+The town has 64 buildings and 24 repeatable architecture families, including the new cinema, fire station, motel and a tower with a 10 m structural height, plus the unique grocery. Ground floors use three floor plans: central spine, front lounge with rear rooms, and open floor with rear service band. Furniture, wall orientation and room use vary deterministically. Wide entrances have clear vestibules. Upper stories are closed architectural volumes; stairs and upper-floor access are not implemented.
 
 Street population is increased by 15% after the baseline placement pass. Added families are traffic cones, street clocks, newspaper stands, public telephones and bus route boards. Reservations reject collisions with buildings, cars and existing props. Benches face pedestrian areas, bins pair with seating/shelters, lamps follow uniform pavement lines, cars fit lanes or marked bays, and fences form connected boundary runs of at least 14.6 m. The five extra prop families and all repeatable architectural families appear in each tested town.
 
@@ -128,7 +128,7 @@ Enemy progression: waves1–5 contain only zombies/runners (weights55:20 normali
 The fifth enemy family is the armored Warden: distinct mask, shoulder armor and horns, slimmer body and separate navigation clearance. Regular brute unlock remains wave11.
 
 
-Latest visual/control changes: the first assault contains15 enemies, then20,25 and +5 thereafter. A10m lattice landmark rises above the grocery roof with four SECTOR MART signs and a beacon. The terminal has a proper display, keypad, payment slot, trim and stereo beeps attenuated to silence at8m. The soundtrack now has four original calm and four original tense procedural compositions with different tempo, harmony, melody and timbre, rotating by wave while preserving the2.5s mood crossfade. Pointer-lock re-entry resets buffered input; non-finite/warp deltas are discarded and bounded direct input prevents sudden180° spikes. A top compass shows heading, azimuth ticks, localized N/E/S/W, and distance markers for the shop and up to three teammates. Targets behind the field of view are pinned to an edge.
+Latest visual/control changes: the first assault contains15 enemies, then20,25 and +5 thereafter. A10m lattice landmark rises above the grocery roof with four SECTOR MART signs and a beacon. The terminal has a proper display, keypad, payment slot, trim and stereo beeps attenuated to silence at8m. The soundtrack now has five original calm and five original tense procedural compositions with different tempo, harmony, melody and timbre, rotating by wave while preserving the2.5s mood crossfade. Pointer-lock re-entry resets buffered input; non-finite/warp deltas are discarded and bounded direct input prevents sudden180° spikes. A top compass shows heading, azimuth ticks, localized N/E/S/W, and distance markers for the shop and up to three teammates. Targets behind the field of view are pinned to an edge.
 
 
 Per-wave weather uses independent seeded rolls: overcast55%, rain20%, storm15%, clear10%. Fog is rolled separately: light60%, medium30%, heavy10%, and can overlay any weather. Rain is masked under building roofs; storms add brief lightning and delayed thunder. The four-wave day/night cycle is day for waves1–2 and night for3–4, repeating; each wave advances six in-game hours. Clock starts at06:00, freezes during preparation/clearance waits/intermissions and does not rewind during breaks. Weather, fog and day phase derive from the shared seed/wave and match across a lobby.
@@ -156,3 +156,13 @@ A successfully rolled mission announces itself to every player with a sound and 
 `npm run test:survival:browser` verifies mission announcement/audio/compass, wave-end notification, sector/weather spacing and English HUD. Its browser-only fixture forces a qualifying wave via the Waves prototype; it does not add a debug interface to the shipped game. Other checks cover equipment purchases, real flashlight drain/battery replacement and selecting/placing a trap without firing the gun.
 
 Generator and growth are now full shared missions in Operations, alongside package and terminal. The duplicate old crossroads task is removed. The generator is an original diesel model with wheeled chassis, fuel tank, engine vents, exhaust, control panel, gauge and cable. The growth has fleshy lobes, pulsing emissive core, veins/roots and bone spines. Its health is500 +500×floor(wave/10):500 on waves1–9,1000 on10–19,1500 on20–29. When an active growth crosses a tenth-wave boundary, its maximum and current HP rise by500, preserving damage already dealt. Health replicates to all clients.
+
+Enemy voices now use distinct layered procedural living/death sounds for zombies, runners, brutes/bosses and eyes, distance attenuated within25m/30m. Hosts and guests play living calls locally; replicated deaths sound once per enemy, without replay on repeated snapshots.
+
+Primary weapons unlock after completing waves: Shotgun2, Vector5, Shambler8, Tikhar10, Kalash10, Scorpion15, G3618, VSV20, Helsing25. Locked cards show the requirement; the server validates completed-wave progress for all players. The first Warden on wave5 has1800HP; each subsequent five-wave encounter adds600HP (wave10:2400, wave15:3000). Its actual maximum HP replicates to guests.
+
+Locked weapon cards are darkened with a lock over the silhouette; the price remains visible and a footer states the required completed wave.
+
+Warden size is tripled (scale3.3, radius2.1m, height6.6m) with matching navigation and melee reach. First-person view magnification: Shambler×1.5, Kalash×1.4, Scorpion×1.3, G36×1.25, Vector×1.2; Helsing combines×1.1 proximity with×1.4 size (×1.54). World camera and third-person gun sizes are unchanged. Weapon/utility switching takes1.5s:0.75s lowering,0.75s raising, with firing/reloading blocked until completion.
+
+City expansion adds residential highrise24m, corporate tower32m, hospital tower21m and communications tower28m plus rooftop aerial. Ten street props: ATM, vending machine, bicycle rack, extinguisher, sandbags, survey tripod, construction light, notice board, water tank and concrete pipe. The five calm/five tense scores now include Cold Dawn and Blackout.

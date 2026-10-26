@@ -15,7 +15,7 @@ export class GameAudio {
     if(!this.stems){this.stems={};for(const name of ['calm','tense']){const bus=c.createGain();bus.gain.value=0;bus.connect(this.musicBus||c.destination);const voices=[],gains=[],filters=[];for(let n=0;n<4;n++){const o=c.createOscillator(),g=c.createGain(),f=c.createBiquadFilter();g.gain.value=n===3?.001:.009;o.connect(f);f.connect(g);g.connect(bus);o.start();voices.push(o);gains.push(g);filters.push(f);}this.stems[name]={bus,voices,gains,filters};}}
     if(this.musicMood!==mood){this.musicMood=mood;for(const [name,stem]of Object.entries(this.stems)){const g=stem.bus.gain;g.cancelScheduledValues(c.currentTime);g.setValueAtTime(g.value,c.currentTime);g.linearRampToValueAtTime(name===mood?1:0,c.currentTime+2.5);}}
     for(const [name,stem]of Object.entries(this.stems)){
-      const index=((sequence-1)%4+4)%4;
+      const count=MUSIC_TRACKS[name].length,index=((sequence-1)%count+count)%count;
       if(stem.trackIndex!==index&&(name===mood||stem.bus.gain.value<.05)){stem.trackIndex=index;stem.trackName=MUSIC_TRACKS[name][index].name;stem.tick=-1;const t=MUSIC_TRACKS[name][index];stem.voices.forEach((o,i)=>o.type=i===3?'sine':t.wave);stem.filters.forEach(f=>f.frequency.setTargetAtTime(t.cutoff,c.currentTime,.2));}
       const track=MUSIC_TRACKS[name][stem.trackIndex??0],duration=60/track.bpm/(name==='tense'?2:1),tick=Math.floor(c.currentTime/duration);
       if(stem.tick===tick)continue;stem.tick=tick;const chord=track.chords[Math.floor(tick/8)%4];stem.voices.slice(0,3).forEach((o,i)=>o.frequency.setTargetAtTime(noteHz(chord[i]),c.currentTime,.15));stem.voices[3].frequency.setTargetAtTime(noteHz(track.melody[tick%8]),c.currentTime,.025);const g=stem.gains[3].gain;g.cancelScheduledValues(c.currentTime);g.setValueAtTime(.001,c.currentTime);g.linearRampToValueAtTime(name==='tense'?.015:.01,c.currentTime+.025);g.exponentialRampToValueAtTime(.001,c.currentTime+duration*.85);
@@ -29,6 +29,11 @@ export class GameAudio {
   ui(kind='click'){
     if(kind==='hover'&&this.context?.state!=='running')return;this.unlock();const c=this.context;if(!c||c.state!=='running')return;const now=c.currentTime;if(kind==='hover'&&now-(this.lastHover??-1)<.07)return;if(kind==='hover')this.lastHover=now;
     const o=c.createOscillator(),g=c.createGain();o.type='sine';o.frequency.setValueAtTime(kind==='hover'?620:880,now);o.frequency.exponentialRampToValueAtTime(kind==='hover'?780:480,now+.055);g.gain.setValueAtTime(kind==='hover'?.018:.04,now);g.gain.exponentialRampToValueAtTime(.001,now+.065);o.connect(g);g.connect(this.master);o.start(now);o.stop(now+.075);
+  }
+  creature(kind,type,volume=1,id=0){
+    const c=this.context;if(!c||c.state!=='running'||volume<=0)return;const death=kind==='death',eye=type==='eye',brute=type==='brute'||type==='boss',duration=death?.8:eye?.42:.65,t=c.currentTime,base=(eye?380:brute?58:type==='runner'?140:95)*(1+(id%5-2)*.045),out=c.createGain();out.connect(this.master);out.gain.setValueAtTime(.001,t);out.gain.linearRampToValueAtTime(.12*volume,t+.07);out.gain.exponentialRampToValueAtTime(.001,t+duration);
+    const noise=c.createBuffer(1,Math.ceil(c.sampleRate*duration),c.sampleRate),data=noise.getChannelData(0);let low=0;for(let i=0;i<data.length;i++){low=.8*low+.2*(Math.random()*2-1);data[i]=low;}const source=c.createBufferSource(),filter=c.createBiquadFilter();source.buffer=noise;filter.type='bandpass';filter.frequency.setValueAtTime(eye?1400:brute?260:600,t);filter.frequency.exponentialRampToValueAtTime(death?100:eye?950:400,t+duration);filter.Q.value=1.3;source.connect(filter);filter.connect(out);source.start(t);source.stop(t+duration);
+    for(const harmonic of [1,1.97]){const osc=c.createOscillator(),gain=c.createGain();osc.type=eye?'sine':'triangle';osc.frequency.setValueAtTime(base*harmonic*(death?1.5:1),t);osc.frequency.exponentialRampToValueAtTime(base*harmonic*(death?.28:.78),t+duration);gain.gain.value=eye?.35:.45;osc.connect(gain);gain.connect(out);osc.start(t);osc.stop(t+duration);}
   }
   shot(id){
     const c=this.context;if(!c||c.state!=='running')return;

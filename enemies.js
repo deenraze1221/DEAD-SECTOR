@@ -1,6 +1,6 @@
 import * as T from 'three';
 import {createNavigation} from './navigation.js';
-import {ENEMY_TYPES} from './waves.js';
+import {ENEMY_TYPES,bossHealth} from './waves.js';
 import {createMutantVisuals,poseMutant,ZOMBIE_SKINS} from './mutant-visuals.js';
 import {GoreParticles} from './gore-particles.js';
 const collisionBoxes=new WeakMap();
@@ -10,7 +10,7 @@ export function obstacleDistance(origin,direction,colliders,max=100){
  for(const b of cached.boxes){if(b.max.x<minX||b.min.x>maxX||b.max.y<minY||b.min.y>maxY||b.max.z<minZ||b.min.z>maxZ)continue;if(ray.intersectBox(b,point))nearest=Math.min(nearest,point.distanceTo(origin));}return nearest;
 }
 export class Enemies{
- constructor(scene,colliders,audio,spawns=[]){this.scene=scene;this.colliders=colliders;this.audio=audio;this.items=[];this.projectiles=[];this.nextId=0;this.clock=0;this.nav=createNavigation(colliders,.5);this.bossNav=createNavigation(colliders,.7,2.2);this.fatNav=createNavigation(colliders,2.15,6);this.airNav=createNavigation(colliders,.8,2,3.5);this.geometry=new Map();this.skinMaterials=new Map();this.blood=new GoreParticles(scene);this.materials={flesh:new T.MeshStandardMaterial({color:'#8f7060',roughness:1,flatShading:true}),uniform:new T.MeshStandardMaterial({color:'#454f36',roughness:1}),wound:new T.MeshStandardMaterial({color:'#773d37',roughness:1}),bone:new T.MeshStandardMaterial({color:'#b5b49b'}),iris:new T.MeshBasicMaterial({color:'#cb9d35'}),black:new T.MeshBasicMaterial({color:'#17201c'}),bullet:new T.MeshBasicMaterial({color:'#ee9360'})};for(const [x,z]of spawns)this.spawn('zombie',x,z);}
+ constructor(scene,colliders,audio,spawns=[]){this.scene=scene;this.colliders=colliders;this.audio=audio;this.items=[];this.projectiles=[];this.nextId=0;this.clock=0;this.nav=createNavigation(colliders,.5);this.bossNav=createNavigation(colliders,2.1,6.6);this.fatNav=createNavigation(colliders,2.15,6);this.airNav=createNavigation(colliders,.8,2,3.5);this.geometry=new Map();this.skinMaterials=new Map();this.blood=new GoreParticles(scene);this.materials={flesh:new T.MeshStandardMaterial({color:'#8f7060',roughness:1,flatShading:true}),uniform:new T.MeshStandardMaterial({color:'#454f36',roughness:1}),wound:new T.MeshStandardMaterial({color:'#773d37',roughness:1}),bone:new T.MeshStandardMaterial({color:'#b5b49b'}),iris:new T.MeshBasicMaterial({color:'#cb9d35'}),black:new T.MeshBasicMaterial({color:'#17201c'}),bullet:new T.MeshBasicMaterial({color:'#ee9360'})};for(const [x,z]of spawns)this.spawn('zombie',x,z);}
  material(color,basic=false){const key=color+basic;if(!this.skinMaterials.has(key))this.skinMaterials.set(key,basic?new T.MeshBasicMaterial({color}):new T.MeshStandardMaterial({color,roughness:.94,flatShading:true}));return this.skinMaterials.get(key);}
  mesh(parent,kind,size,material,x,y,z){
   const key=kind+size.join(',');
@@ -22,14 +22,15 @@ export class Enemies{
   skin=Math.max(0,Math.min(ZOMBIE_SKINS.length-1,Math.floor(skin)));
   const visual=createMutantVisuals(this,type,skin);rig.add(visual.root);
   const e={id,type,skin,...stats,maxHp:stats.hp,rig,visual,limbs:visual.limbs,phase:id*1.37,motion:0,attackTime:0,attack:1,repath:0,path:[],aggro:true,stagger:0,windup:0,pendingAttack:false,reaction:0,sound:2+id%3,corpse:0,dead:false};
-  if(options.boss||type==='boss'){e.boss=true;e.hp=e.maxHp=1800;e.damage=55;e.speed=1.3;for(const side of [-1,1])this.mesh(visual.torso,'box',[.10,.32,.05],this.material('#d34d33',true),side*.18,.38,.34).name='boss-mark';visual.root.traverse(m=>{if(m.isMesh&&m.material?.color&&m.visible)m.userData.boss=true;});}
+  if(options.boss||type==='boss'){e.boss=true;e.hp=e.maxHp=options.maxHp||bossHealth(options.wave);e.damage=55;e.speed=1.3;for(const side of [-1,1])this.mesh(visual.torso,'box',[.10,.32,.05],this.material('#d34d33',true),side*.18,.38,.34).name='boss-mark';visual.root.traverse(m=>{if(m.isMesh&&m.material?.color&&m.visible)m.userData.boss=true;});}
   if(e.boss){e.warning=new T.Mesh(new T.RingGeometry(.95,1,40),new T.MeshBasicMaterial({color:'#e67c47',side:T.DoubleSide,transparent:true,opacity:.45,depthWrite:false}));e.warning.rotation.x=-Math.PI/2;e.warning.position.y=.03;e.warning.visible=false;e.rig.add(e.warning);}
   e.memory={x:0,y:0,z:0};e.sense=0;this.items.push(e);this.nextId=Math.max(this.nextId,id+1);poseMutant(e);return e;
  }
- die(enemy,emit=true,notify=true){if(enemy.dead)return;enemy.dead=true;enemy.hp=0;enemy.corpse=0;enemy.rig.visible=false;if(emit){this.blood.burst(enemy);if(notify)this.onDeath?.(enemy);}}
+ die(enemy,emit=true,notify=true){if(enemy.dead)return;enemy.dead=true;enemy.hp=0;enemy.corpse=0;enemy.rig.visible=false;if(emit){this.blood.burst(enemy);this.voice(enemy,'death');if(notify)this.onDeath?.(enemy);}}
+ voice(e,kind){if(!this.listener)return;const p=e.rig.position,d=Math.hypot(p.x-this.listener.x,p.z-this.listener.z),range=kind==='death'?30:25;if(d>=range)return;this.audio.creature?.(kind,e.type,(1-d/range)*.85,e.id);}
  updateEffects(dt,remote=false){
   this.blood.step(dt);
-  if(remote)for(const e of this.items){if(e.hp<=0)continue;e.phase+=dt*e.speed/(e.scale*.9)*Math.PI*2*e.motion;e.attackTime=Math.max(0,e.attackTime-dt);e.attack-=dt;if(e.type==='eye')e.visual.root.scale.setScalar(e.attack<.55?1+Math.sin(e.attack*35)*.06:1);poseMutant(e);}
+  if(remote)for(const e of this.items){if(e.hp<=0)continue;e.sound-=dt;if(e.sound<=0){this.voice(e,'living');e.sound=3+e.id%3;}e.phase+=dt*e.speed/(e.scale*.9)*Math.PI*2*e.motion;e.attackTime=Math.max(0,e.attackTime-dt);e.attack-=dt;if(e.type==='eye')e.visual.root.scale.setScalar(e.attack<.55?1+Math.sin(e.attack*35)*.06:1);poseMutant(e);}
  }
  get alive(){return this.items.reduce((n,e)=>n+(e.hp>0),0);}
  reset(){this.blood.clear();for(const e of this.items){e.hp=e.maxHp;e.stagger=0;e.corpse=0;e.dead=false;e.motion=0;e.attackTime=0;e.rig.visible=true;e.rig.rotation.set(0,0,0);poseMutant(e);}}
@@ -44,7 +45,7 @@ export class Enemies{
  let pursuit=e.hasSight||distance<10?goal:e.memory;
  if(e.type!=='eye'&&!e.boss&&e.hasSight&&distance>6&&distance<25&&e.id%3!==0){const side=e.id%4;pursuit={x:goal.x+[5,0,-5,0][side],y:goal.y,z:goal.z+[0,5,0,-5][side]};}
  if(e.type==='eye'&&(!e.hasSight||distance<12||distance>24||e.attack>1.5)){if(!e.firingGoal||e.repath<=0){let best=null;for(let n=0;n<6;n++){const angle=(n+(e.id%6))*Math.PI/3,candidate={x:goal.x+Math.cos(angle)*18,y:4.5,z:goal.z+Math.sin(angle)*18},from=new T.Vector3(candidate.x,4.5,candidate.z),ray=new T.Vector3(goal.x,goal.y+1,goal.z).sub(from),len=ray.length();if(Math.abs(candidate.x)<94&&Math.abs(candidate.z)<94&&obstacleDistance(from,ray.normalize(),this.colliders,len)>=len-.1){best=candidate;break;}}e.firingGoal=best||pursuit;}pursuit=e.firingGoal;}
- if(e.sound<=0){if(distance<25)this.audio.play(e.type==='eye'?'eye':e.type==='brute'?'brutegrowl':e.type==='runner'?'snarl':'growl',1-distance/28);e.sound=3+e.id%3;}const beforeX=p.x,beforeZ=p.z,yaw=Math.atan2(goal.x-p.x,goal.z-p.z),turn=Math.atan2(Math.sin(yaw-e.rig.rotation.y),Math.cos(yaw-e.rig.rotation.y));e.rig.rotation.y+=T.MathUtils.clamp(turn,-dt*3,dt*3);
+ if(e.sound<=0){this.voice(e,'living');e.sound=3+e.id%3;}const beforeX=p.x,beforeZ=p.z,yaw=Math.atan2(goal.x-p.x,goal.z-p.z),turn=Math.atan2(Math.sin(yaw-e.rig.rotation.y),Math.cos(yaw-e.rig.rotation.y));e.rig.rotation.y+=T.MathUtils.clamp(turn,-dt*3,dt*3);
  if(e.stagger>0){e.rig.rotation.z=Math.sin(e.stagger*45)*.035;e.motion=0;poseMutant(e);continue;}e.rig.rotation.z=0;
  if(e.type==='eye')p.y=4.5+Math.sin(e.phase*.4)*.3;
  const melee=e.type!=='eye'&&distance<e.radius+.85&&Math.abs(goal.y-p.y)<e.height;
@@ -71,7 +72,7 @@ export class Enemies{
   const keep=new Set(records.map(v=>v.id));
   this.items=this.items.filter(e=>{if(keep.has(e.id))return true;this.scene.remove(e.rig);return false;});
   for(const v of records){
-   const existing=this.items.find(e=>e.id===v.id),e=existing||this.spawn(v.type,v.x,v.z,v.id,v.skin,{boss:v.boss});
+   const existing=this.items.find(e=>e.id===v.id),e=existing||this.spawn(v.type,v.x,v.z,v.id,v.skin,{boss:v.boss,maxHp:v.maxHp});
    const wasAlive=existing?.hp>0;e.hp=v.hp;e.rig.position.set(v.x,v.y??0,v.z);if(v.rotation)e.rig.rotation.fromArray(v.rotation);
    if(e.hp<=0){this.die(e,wasAlive||(v.corpse??0)<.3,false);e.corpse=v.corpse??0;}
    else{e.rig.visible=true;e.dead=false;e.phase=v.phase??e.phase;e.motion=v.motion??0;e.attackTime=v.attackTime??0;e.attack=v.attack??1;e.bossPhase=v.bossPhase||1;e.attackKind=v.attackKind||'melee';if(e.warning){e.warning.visible=!!v.pendingAttack&&e.attackKind==='slam';e.warning.scale.setScalar((e.bossPhase===3?4.5:3)/e.scale);}e.windup=v.windup??0;e.pendingAttack=!!v.pendingAttack;poseMutant(e);}

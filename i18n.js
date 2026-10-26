@@ -1,4 +1,12 @@
 const entries={
+'СМЕНА ОРУЖИЯ…':'SWITCHING…',
+
+'Доступно после завершения волны':'Available after completing wave',
+
+'ПОСЛЕ ВОЛНЫ':'AFTER WAVE','Оружие ещё не открыто':'Weapon is not unlocked yet',
+
+'50 универсальных патронов':'50 universal rounds','Нет места для 50 патронов':'Not enough room for 50 rounds',
+
 'ЗАДАНИЕ':'MISSION','ГРУЗ':'SUPPLY','ЗАДАНИЕ ВЫПОЛНЕНО':'MISSION COMPLETE','НОВОЕ ОБЩЕЕ ЗАДАНИЕ':'NEW SHARED MISSION',
 
 'Язык':'Language',
