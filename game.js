@@ -70,7 +70,7 @@ $('settings-button').addEventListener('click', () => {
 
 function clearInput() {if(player){player.velocityX=0;player.velocityZ=0;player.speed=0;} lookInput.reset(performance.now());keys.clear(); shooting=false; triggerPressed=false; jumpQueued = false; accumulator = 0; }
 function setRunning(value) {
-  value=!!value&&matchReady;if(value)needsCapture=false;$('capture-mouse').hidden=!needsCapture;running = value; clearInput();
+  value=!!value&&matchReady;if(value){needsCapture=false;$('settings').hidden=true;$('settings-button').setAttribute('aria-expanded','false');}$('capture-mouse').hidden=!needsCapture;running = value; clearInput();
   document.body.classList.toggle('playing', value||shopOpen||needsCapture);
   for (const id of ['menu', 'briefing', 'footer']) $(id).hidden = value||shopOpen||lobbyOpen||needsCapture;
   $('hud').hidden = !value&&!shopOpen&&!needsCapture;

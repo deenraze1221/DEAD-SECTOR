@@ -8,7 +8,7 @@ export const WEAPONS = Object.freeze([
   {id:'Kalash',viewZoom:1.4,unlockAfter:10,label:'KALASH',capacity:30,reserve:240,damage:50,interval:.14,reload:3,automatic:true,reloadStyle:'action'},
   {id:'VSV',unlockAfter:20,label:'VSV',capacity:12,reserve:120,damage:80,interval:.24,reload:6,automatic:true,reloadStyle:'action'},
   {id:'Scorpion',viewZoom:1.3,unlockAfter:15,label:'SCORPION',capacity:35,reserve:280,damage:45,interval:.10,reload:4,automatic:true,reloadStyle:'action'},
-  {id:'Vector',viewZoom:1.2,unlockAfter:5,label:'VECTOR',capacity:20,reserve:200,damage:40,interval:.09,reload:3,automatic:true,reloadStyle:'action'},
+  {id:'Vector',viewZoom:1.2,viewLower:1.5,unlockAfter:5,label:'VECTOR',capacity:20,reserve:200,damage:40,interval:.09,reload:3,automatic:true,reloadStyle:'action'},
   {id:'G36',viewZoom:1.25,unlockAfter:18,label:'G36',capacity:35,reserve:240,damage:40,interval:.14,reload:4,automatic:true,reloadStyle:'action'},
 ]);
 export const WEAPON_BY_ID = Object.freeze(Object.fromEntries(WEAPONS.map(w=>[w.id,w])));

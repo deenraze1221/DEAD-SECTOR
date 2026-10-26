@@ -73,7 +73,7 @@ export class Rifle {
     if(this.utilityModel){this.utilityModel.position.y=-.20-switchDrop;this.utilityModel.rotation.x=.7+switchDrop*.35;}
 
     const progress=this.reloadTime?1-this.reloadTime/this.config.reload:0,drop=this.reloadTime?Math.sin(progress*Math.PI):0;
-    this.model.position.set(.16/zoom,(-.16)/zoom-drop*.15-switchDrop,-.48+this.recoil);const motion=MOTION[this.config.id];this.model.rotation.set(this.recoil*motion.pitch*12,Math.sin(time*17)*this.recoil*motion.yaw*8,-drop*(motion.action==='drum'?.65:.25));
+    const viewLower=shown.utility?1:(WEAPONS.find(w=>w.id===shown.variant.record.id)?.viewLower||1);this.model.position.set(.16/zoom,(-.16*viewLower)/zoom-drop*.15-switchDrop,-.48+this.recoil);const motion=MOTION[this.config.id];this.model.rotation.set(this.recoil*motion.pitch*12,Math.sin(time*17)*this.recoil*motion.yaw*8,-drop*(motion.action==='drum'?.65:.25));
     this.model.rotation.x+=switchDrop*.35;
     this.magazine.position.y=-drop*.22;this.magazine.rotation.x=drop*.2;
     const loading=this.reloadTime&&this.config.reloadStyle!=='magazine'?Math.sin(progress*Math.PI*6)*drop:0;
