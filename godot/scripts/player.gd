@@ -1,5 +1,8 @@
 extends CharacterBody3D
 var camera: Camera3D
+var weapon_camera: Camera3D
+var weapon_viewport: SubViewport
+var mouse_guard=0.0
 var gun: Node3D
 var stamina=5.0
 var ammo=8
@@ -27,10 +30,12 @@ func _ready() -> void:
  add_child(collider)
  camera=Camera3D.new()
  camera.fov=73
+ camera.cull_mask=1
  camera.near=.04
  camera.far=600
  camera.position.y=1.65
  add_child(camera)
+ setup_weapon_view()
  gun=Node3D.new()
  gun.position=base_gun
  camera.add_child(gun)
@@ -65,10 +70,11 @@ func _ready() -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
  if not active: return
- if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED:
+ if event is InputEventMouseMotion and Input.mouse_mode==Input.MOUSE_MODE_CAPTURED and mouse_guard<=0:
   # Relative input is used exactly once, independent of frame rate.
-  if abs(event.relative.x)>600 or abs(event.relative.y)>600: return
-  look(event.relative)
+  var motion=event.screen_relative
+  if abs(motion.x)>600 or abs(motion.y)>600: return
+  look(motion)
  if event.is_action_pressed("fire"): fire()
  if event.is_action_pressed("reload") and reloading<=0 and ammo<int(config.capacity) and reserve>0: reloading=float(config.reload)
  if event.is_action_pressed("flashlight"):
@@ -76,6 +82,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
  if not active: return
+ mouse_guard=maxf(0,mouse_guard-delta)
  cooldown=maxf(0,cooldown-delta)
  if config.automatic and Input.is_action_pressed("fire"): fire()
  flash.light_energy=maxf(0,flash.light_energy-delta*80)
@@ -129,3 +136,45 @@ func fire() -> void:
 func look(relative: Vector2) -> void:
  rotate_y(-relative.x*.002)
  camera.rotation.x=clamp(camera.rotation.x-relative.y*.002,-PI/3,PI/2-.02)
+
+func setup_weapon_view() -> void:
+ var layer=CanvasLayer.new()
+ layer.layer=0
+ add_child(layer)
+ var container=SubViewportContainer.new()
+ container.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+ container.stretch=true
+ container.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ layer.add_child(container)
+ weapon_viewport=SubViewport.new()
+ weapon_viewport.size=Vector2i(1280,720)
+ weapon_viewport.transparent_bg=true
+ weapon_viewport.world_3d=get_world_3d()
+ weapon_viewport.render_target_update_mode=SubViewport.UPDATE_ALWAYS
+ container.add_child(weapon_viewport)
+ weapon_camera=Camera3D.new()
+ weapon_camera.cull_mask=2
+ weapon_camera.fov=55
+ weapon_camera.near=.015
+ var environment=Environment.new()
+ environment.background_mode=Environment.BG_CLEAR_COLOR
+ environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
+ environment.ambient_light_color=Color("#9da8ad")
+ environment.ambient_light_energy=.65
+ weapon_camera.environment=environment
+ weapon_viewport.add_child(weapon_camera)
+ var key_light=OmniLight3D.new()
+ key_light.light_cull_mask=2
+ key_light.omni_range=4
+ key_light.light_energy=1.2
+ key_light.position=Vector3(-.2,.45,.1)
+ weapon_camera.add_child(key_light)
+ var fill=DirectionalLight3D.new()
+ fill.light_cull_mask=2
+ fill.light_energy=.5
+ fill.rotation_degrees=Vector3(-35,-25,0)
+ weapon_viewport.add_child(fill)
+
+func _process(_delta: float) -> void:
+ if is_instance_valid(weapon_camera):
+  weapon_camera.global_transform=camera.global_transform

@@ -23,10 +23,14 @@ This is an actual runnable Godot project, not a Windows executable. For an execu
 
 ## Next stages (not implemented yet)
 
-Zombie AI, waves, economy / actual purchases, player body and rigged hands, quests, weather transitions, full sound/music library, multiplayer/Steam and full UI/localization parity. Current gun sound is a shared placeholder. City is an exported seed-42 snapshot, not a native procedural generator yet. Browser shaders are adapted; graphics and physics are not guaranteed 1:1. This build does not connect to Render or the HTML lobby.
+Zombie AI, waves, economy / actual purchases, player body and full skeletal hand animations, quests, weather transitions, full sound/music library, multiplayer/Steam and full UI/localization parity. Current gun sound is a shared placeholder. City is an exported seed-42 snapshot, not a native procedural generator yet. Browser shaders are adapted; graphics and physics are not guaranteed 1:1. This build does not connect to Render or the HTML lobby.
 
 ## Asset bridge (developer only)
 
 From the repository root with npm dependencies and Chromium installed run: node scripts/export-godot.mjs
 
 This regenerates city.json and label textures using current browser models. Coordinates/materials are converted by scripts/bridge.gd; triangle winding is reversed for Godot. The bridge does not modify the HTML build.
+
+## Visual/handling revision
+
+Transparent browser lamp decals are excluded from the static mesh bridge, preventing opaque white pavement patches. Per-instance colors are preserved. Materials use filtered world-space brick/sidewalk detail, softer overcast lighting, denser distance fog and restrained color grading. Weapons render in a separate transparent viewport, with grip-aligned glove/sleeve meshes for each gun and their own fill light; walls no longer cut through the viewmodel. HUD has bottom-corner vitals/ammo, a top-center bearing and FPS at the top right. Resuming capture has a short mouse guard. Hands remain procedural, not a finished animated soldier rig.

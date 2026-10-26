@@ -8,8 +8,13 @@ func run() -> void:
  await RenderingServer.frame_post_draw
  root.get_texture().get_image().save_png("user://godot-menu.png")
  scene.set_playing(true)
+ scene.player.position=Vector3(10.35,.05,24)
+ scene.player.rotation.y=PI
+ for i in range(3): await process_frame
+ await RenderingServer.frame_post_draw
+ root.get_texture().get_image().save_png("user://godot-street.png")
  scene.player.rotation.y=-.4
- for id in scene.bridge.data.weapons:
+ for id in (["Pistol"] if "--quick" in OS.get_cmdline_user_args() else scene.bridge.data.weapons.keys()):
   scene.equip(id)
   for i in range(3): await process_frame
   await RenderingServer.frame_post_draw

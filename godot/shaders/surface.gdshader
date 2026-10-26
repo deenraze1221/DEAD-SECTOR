@@ -10,15 +10,23 @@ void vertex(){
 float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
 void fragment(){
  vec2 p=abs(world_normal.y)>0.7?world_pos.xz:vec2(abs(world_normal.x)>0.7?world_pos.z:world_pos.x,world_pos.y);
- float detail=0.94+hash(floor(p*42.0))*0.12;
+ float detail=.97+hash(floor(p*12.0))*.06;
  if(surface_kind==1){
   float row=floor(p.y/.25);
-  vec2 brick=vec2(fract((p.x+mod(row,2.0)*.3)/.6),fract(p.y/.25));
-  float mortar=step(brick.x,.025)+step(brick.y,.055);
-  detail*=mix(.92+hash(vec2(floor((p.x+mod(row,2.0)*.3)/.6),row))*.16,.5,clamp(mortar,0.,1.));
+  vec2 cell=vec2((p.x+mod(row,2.0)*.3)/.6,p.y/.25);
+  vec2 brick=fract(cell);
+  vec2 edge=min(brick,1.0-brick);
+  vec2 width=max(fwidth(cell),vec2(.001));
+  vec2 line=1.0-smoothstep(vec2(.014,.025),vec2(.014,.025)+width,edge);
+  float mortar=max(line.x,line.y);
+  detail*=mix(.88+hash(floor(cell))*.15,.65,mortar);
  }
- if(surface_kind==3){vec2 tile=fract(p*.8);detail*=mix(.95,.6,step(tile.x,.015)+step(tile.y,.015));}
- if(surface_kind==5){detail*=.9+.1*sin(p.x*95.+sin(p.y*3.)*2.);}
- ALBEDO=tint.rgb*detail;
+ if(surface_kind==3){
+  vec2 cell=p*.8,edge=min(fract(cell),1.0-fract(cell));
+  vec2 line=1.0-smoothstep(vec2(.008),vec2(.008)+max(fwidth(cell),vec2(.001)),edge);
+  detail*=mix(.96,.72,max(line.x,line.y));
+ }
+ if(surface_kind==5){detail*=.94+.06*sin(p.x*70.+sin(p.y*3.)*2.);}
+ ALBEDO=tint.rgb*detail*COLOR.rgb;
  ROUGHNESS=.92;
 }

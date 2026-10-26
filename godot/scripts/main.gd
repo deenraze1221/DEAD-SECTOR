@@ -7,6 +7,10 @@ var menu: PanelContainer
 var hud: Label
 var armory: OptionButton
 var fullscreen=false
+var stamina_bar: ProgressBar
+var ammo_label: Label
+var fps_label: Label
+var bearing_label: Label
 
 func _ready() -> void:
  setup_inputs()
@@ -53,8 +57,8 @@ func equip(id: String) -> void:
  player.reserve=int(player.config.reserve)
  player.reloading=0
  player.cooldown=0
- player.gun.scale=Vector3.ONE*float(player.config.get("viewZoom",1.0))
- player.base_gun=Vector3(.22,-.22-float(player.config.get("viewLower",0))*.05,-.38)
+ player.gun.scale=Vector3.ONE*(.64 if id=="Pistol" else minf(1.15,float(player.config.get("viewZoom",1.0)))*.82)
+ player.base_gun=Vector3(.19,-.19-float(player.config.get("viewLower",0))*.025,-.48)
  player.gun.position=player.base_gun
 
 func setup_environment() -> void:
@@ -71,20 +75,28 @@ func setup_environment() -> void:
  env.sky=sky
  env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
  env.ambient_light_color=Color("#87959c")
- env.ambient_light_energy=.7
+ env.ambient_light_energy=.38
  env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
  env.fog_enabled=true
  env.fog_light_color=Color("#34434a")
- env.fog_density=.006
+ env.fog_density=.009
  world_environment.environment=env
  add_child(world_environment)
  var sun=DirectionalLight3D.new()
  sun.rotation_degrees=Vector3(-38,-28,0)
- sun.light_color=Color("#bac9d2")
- sun.light_energy=1.1
+ sun.light_color=Color("#9daeb9")
+ sun.light_cull_mask=1
+ sun.light_energy=.65
  sun.shadow_enabled=true
  sun.directional_shadow_max_distance=90
  add_child(sun)
+ var store_light=OmniLight3D.new()
+ store_light.position=Vector3(bridge.data.terminal.x,2.5,bridge.data.terminal.z)
+ store_light.light_color=Color("#d5b882")
+ store_light.omni_range=9
+ store_light.light_energy=1.3
+ store_light.light_cull_mask=1
+ add_child(store_light)
 
 func add_targets() -> void:
  for i in range(3):
@@ -142,9 +154,56 @@ func setup_ui() -> void:
  crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
  crosshair.position-=Vector2(7,14)
  screen.add_child(crosshair)
- hud=label("",20)
- hud.position=Vector2(24,24)
+ hud=label("SECTOR 00
+GODOT · TRAINING SECTOR",18)
+ hud.position=Vector2(28,28)
  screen.add_child(hud)
+ var panel=PanelContainer.new()
+ panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
+ panel.position=Vector2(24,-128)
+ panel.custom_minimum_size=Vector2(300,100)
+ var backing=StyleBoxFlat.new()
+ backing.bg_color=Color(.035,.045,.05,.78)
+ backing.set_content_margin_all(16)
+ backing.set_corner_radius_all(5)
+ panel.add_theme_stylebox_override("panel",backing)
+ screen.add_child(panel)
+ var vitals=VBoxContainer.new()
+ vitals.add_theme_constant_override("separation",10)
+ panel.add_child(vitals)
+ vitals.add_child(label("HEALTH  100     /     STAMINA",16))
+ stamina_bar=ProgressBar.new()
+ var bar_fill=StyleBoxFlat.new()
+ bar_fill.bg_color=Color("#b8bd87")
+ bar_fill.set_corner_radius_all(3)
+ stamina_bar.add_theme_stylebox_override("fill",bar_fill)
+ var bar_back=StyleBoxFlat.new()
+ bar_back.bg_color=Color("#303736")
+ bar_back.set_corner_radius_all(3)
+ stamina_bar.add_theme_stylebox_override("background",bar_back)
+ stamina_bar.max_value=5
+ stamina_bar.value=5
+ stamina_bar.show_percentage=false
+ stamina_bar.custom_minimum_size=Vector2(270,8)
+ vitals.add_child(stamina_bar)
+ ammo_label=label("",22)
+ ammo_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
+ ammo_label.position=Vector2(-285,-125)
+ ammo_label.custom_minimum_size=Vector2(255,90)
+ ammo_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+ screen.add_child(ammo_label)
+ fps_label=label("",14)
+ fps_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+ fps_label.position=Vector2(-130,12)
+ fps_label.custom_minimum_size.x=115
+ fps_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
+ screen.add_child(fps_label)
+ bearing_label=label("",17)
+ bearing_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+ bearing_label.position=Vector2(-175,24)
+ bearing_label.custom_minimum_size.x=350
+ bearing_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+ screen.add_child(bearing_label)
  var status=label("GODOT PORT · STAGE 1 / TRAINING BUILD",15)
  status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
  status.position=Vector2(24,-40)
@@ -182,6 +241,8 @@ func toggle_fullscreen() -> void:
 
 func set_playing(value: bool) -> void:
  player.active=value
+ player.mouse_guard=.1
+ if not value: player.flash.light_energy=0
  menu.visible=not value
  Input.mouse_mode=Input.MOUSE_MODE_CAPTURED if value else Input.MOUSE_MODE_VISIBLE
 
@@ -193,5 +254,12 @@ func _notification(what: int) -> void:
 
 func _process(_delta: float) -> void:
  if not is_instance_valid(player) or not is_instance_valid(hud): return
- hud.text="SECTOR 00   |   %s\nHEALTH 100   STAMINA %d%%\nAMMO %d / %d   %s\n%d FPS" % [player.config.id,roundi(player.stamina*20),player.ammo,player.reserve,"RELOADING" if player.reloading>0 else "",Engine.get_frames_per_second()]
+ stamina_bar.value=player.stamina
+ ammo_label.text="%s
+%d / %d
+%s" % [player.config.id.to_upper(),player.ammo,player.reserve,"RELOADING" if player.reloading>0 else "R · RELOAD"]
+ fps_label.text="%d FPS" % Engine.get_frames_per_second()
+ var azimuth=fposmod(-rad_to_deg(player.rotation.y),360)
+ var direction=["N","NE","E","SE","S","SW","W","NW"][int(round(azimuth/45))%8]
+ bearing_label.text="·     %s    %03d°     ·" % [direction,int(azimuth)]
  if player.position.y < -10: reset_position()

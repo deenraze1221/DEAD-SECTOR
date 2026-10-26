@@ -23,6 +23,7 @@ func load_data() -> void:
    standard.roughness=record.roughness
    standard.metallic=record.metalness
    standard.vertex_color_use_as_albedo=true
+   standard.vertex_color_is_srgb=false
    if record.unlit: standard.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
    if record.texture>=0:
     standard.albedo_texture=load("res://assets/label-%d.png" % int(record.texture))
@@ -70,8 +71,12 @@ func build_world(parent: Node3D) -> void:
   var multi=MultiMesh.new()
   multi.transform_format=MultiMesh.TRANSFORM_3D
   multi.mesh=make_mesh(batch)
+  multi.use_colors=true
   multi.instance_count=batch.transforms.size()
-  for i in range(multi.instance_count): multi.set_instance_transform(i,matrix(batch.transforms[i]))
+  for i in range(multi.instance_count):
+   multi.set_instance_transform(i,matrix(batch.transforms[i]))
+   var colors: Array=batch.get("colors",[])
+   if colors.size()>=i*3+3: multi.set_instance_color(i,Color(colors[i*3],colors[i*3+1],colors[i*3+2]))
   instance.multimesh=multi
   parent.add_child(instance)
  # Compound static body avoids thousands of separate physics bodies.
@@ -97,6 +102,61 @@ func build_weapon(parent: Node3D, id: String) -> void:
  for part in data.weapons[id].parts:
   var instance=MeshInstance3D.new()
   instance.mesh=make_mesh(part)
+  if id=="Pistol":
+   for surface in range(instance.mesh.get_surface_count()):
+    var source: StandardMaterial3D=instance.mesh.surface_get_material(surface)
+    var finish=source.duplicate()
+    finish.albedo_color=Color("#47514b") if source.albedo_color.v<.2 else Color("#919b92")
+    finish.roughness=.72
+    instance.mesh.surface_set_material(surface,finish)
   instance.transform=matrix(part.transform)
+  instance.layers=2
   instance.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
   parent.add_child(instance)
+
+ build_hands(parent,data.weapons[id].grips)
+
+func build_hands(parent: Node3D, grips: Dictionary) -> void:
+ var sleeve=StandardMaterial3D.new()
+ sleeve.albedo_color=Color("#677359")
+ sleeve.roughness=.95
+ var glove=StandardMaterial3D.new()
+ glove.albedo_color=Color("#535d4d")
+ glove.roughness=.9
+ for side in [-1,1]:
+  var raw: Array=grips.support if side<0 else grips.trigger
+  var wrist=Vector3(raw[0],raw[1],raw[2])
+  var elbow=Vector3(-.29 if side<0 else .23,-.28,.27)
+  var arm=MeshInstance3D.new()
+  var cylinder=CylinderMesh.new()
+  cylinder.top_radius=.035
+  cylinder.bottom_radius=.049
+  cylinder.height=wrist.distance_to(elbow)
+  arm.mesh=cylinder
+  arm.material_override=sleeve
+  parent.add_child(arm)
+  arm.position=(wrist+elbow)*.5
+  var axis=(wrist-elbow).normalized()
+  arm.quaternion=Quaternion(Vector3.UP,axis)
+  arm.layers=2
+  arm.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+  var hand=Node3D.new()
+  hand.name="SupportHand" if side<0 else "TriggerHand"
+  hand.position=wrist
+  parent.add_child(hand)
+  var palm=MeshInstance3D.new()
+  var box=BoxMesh.new()
+  box.size=Vector3(.062,.078,.068)
+  palm.mesh=box
+  palm.material_override=glove
+  palm.layers=2
+  hand.add_child(palm)
+  for finger in range(4):
+   var mesh=MeshInstance3D.new()
+   var shape=BoxMesh.new()
+   shape.size=Vector3(.027,.014,.04)
+   mesh.mesh=shape
+   mesh.position=Vector3(-side*.025,-.026+finger*.017,-.025)
+   mesh.material_override=glove
+   mesh.layers=2
+   hand.add_child(mesh)

@@ -37,6 +37,12 @@ func run() -> void:
  for id in scene.bridge.data.weapons:
   scene.equip(id)
   check(p.gun.get_child_count()>0,id+" model missing")
+  check(p.gun.has_node("SupportHand") and p.gun.has_node("TriggerHand"),id+" grip hands missing")
+  var grips: Dictionary=p.config.grips
+  for name_and_grip in [["SupportHand","support"],["TriggerHand","trigger"]]:
+   var point: Array=grips[name_and_grip[1]]
+   check(p.gun.get_node(name_and_grip[0]).position.distance_to(Vector3(point[0],point[1],point[2]))<.00001,id+" hand misses grip")
+  check(p.camera.cull_mask==1 and p.weapon_camera.cull_mask==2,"World/weapon cameras must be isolated")
   check(p.ammo==int(p.config.capacity),id+" magazine incorrect")
   p.fire()
   check(p.ammo==int(p.config.capacity)-1,id+" shot did not consume one round")
