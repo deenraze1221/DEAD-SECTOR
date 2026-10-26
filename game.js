@@ -28,7 +28,7 @@ let weather,events,cashCooldown=0,lastAnnouncedWave=0,waveNoticeUntil=0;
 let psx, rifle, enemies, colliders=[], world, waves, peer, peerPose=null, netTime=0,loot,account=createInventory(),shopOpen=false,footstep=0,downed=false;
 let seed=crypto.getRandomValues(new Uint32Array(1))[0];
 const session=new Session(receiveNetwork,text=>{$('network-status').textContent=text;$('lobby-status').textContent=text;});
-const lobby=new LobbyUI({start:startLobby,open:()=>session.connect($('server-url').value,'create',seed),leave:leaveLobby});
+const lobby=new LobbyUI({start:startLobby,open:()=>connectRoom('create'),leave:leaveLobby});
 const audio = new GameAudio();
 const preferences=settingsUI(applyPreferences);audio.setVolumes(preferences);
 const shop=new ShopUI(submitAction,closeShop);
@@ -255,9 +255,10 @@ function receiveNetwork(m){
  if(m.type==='end'&&!session.host)finish(m.result);
 }
 $('join-toggle').addEventListener('click',()=>{$('settings').hidden=true;$('network-panel').hidden=!$('network-panel').hidden;});
-$('join-room').addEventListener('click',()=>{const code=$('room-code').value.trim();if(!/^\d{8}$/.test(code)){$('network-status').textContent=t('Введите 8 цифр');return;}session.connect($('server-url').value,'join',seed,code);});
+$('join-room').addEventListener('click',()=>{const code=$('room-code').value.trim();if(!/^\d{8}$/.test(code)){$('network-status').textContent=t('Введите 8 цифр');return;}connectRoom('join',code);});
+function connectRoom(mode,code){const url=$('server-url').value.trim();if(!url){const text=t('Укажите адрес общего сервера в настройках. Одиночная игра доступна без сервера.');$('network-status').textContent=text;$('lobby-status').textContent=text;return;}session.connect(url,mode,seed,code);}
 $('resume-room').addEventListener('click',()=>session.resumeSaved());
-$('server-url').value=location.protocol==='https:'?`wss://${location.host}`:location.protocol==='http:'?`ws://${location.hostname}:3000`:'ws://localhost:3000';
+$('server-url').value=location.protocol==='https:'?`wss://${location.host}`:location.protocol==='http:'?`ws://${location.hostname}:3000`:'';
 window.addEventListener('game-language-change',()=>{setRunning(false);$('message').textContent=t($('message').textContent);});
 
 function openShop(){shopOpen=true;pause();shop.message('');shop.show(account);}
@@ -284,3 +285,5 @@ function startLobby(){audio.unlock();$('scene').requestPointerLock().catch(()=>{
 function beginMatch(){needsCapture=document.pointerLockElement!==$('scene');matchReady=true;started=true;lobbyOpen=false;countdownAt=0;lobbyPhase='playing';lobby.root.hidden=true;setRunning(document.pointerLockElement===$('scene'));updateCamera();}
 
 function applyPreferences(v){audio.setVolumes(v);if(!renderer||!scene)return;renderer.shadowMap.enabled=v.quality!=='low';const sun=scene.userData.sun||scene.children.find(o=>o.isDirectionalLight&&o.castShadow);if(sun){sun.castShadow=v.quality!=='low';const size=v.quality==='high'?2048:1024;if(sun.shadow.mapSize.x!==size){sun.shadow.map?.dispose();sun.shadow.map=null;sun.shadow.mapSize.set(size,size);}sun.shadow.needsUpdate=true;}if(scene.userData.appliedQuality!==v.quality){scene.traverse(o=>{for(const m of Array.isArray(o.material)?o.material:[o.material])if(m)m.needsUpdate=true;});scene.userData.appliedQuality=v.quality;}}
+
+try{$('resume-room').hidden=!sessionStorage.getItem('dead-sector:room');}catch{$('resume-room').hidden=true;}

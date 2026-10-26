@@ -1,4 +1,6 @@
 const entries={
+'Для сети нужен общий сервер. Одиночная игра работает без него.':'Online play requires a shared server. Solo play works without one.',
+'Укажите адрес общего сервера в настройках. Одиночная игра доступна без сервера.':'Enter a shared server address in Settings. Solo play needs no server.',
 "ЗВУК":"AUDIO",
 "УПРАВЛЕНИЕ":"CONTROLS",
 "ГРАФИКА":"GRAPHICS",

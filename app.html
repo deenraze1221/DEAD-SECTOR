@@ -30,7 +30,7 @@
         <input id="sensitivity" type="range" min="0.2" max="2" value="1" step="0.1" />
         <dl class="controls-map"><dt>WASD</dt><dd>Движение</dd><dt>МЫШЬ</dt><dd>Обзор</dd><dt>SHIFT / SPACE</dt><dd>Бег / Прыжок</dd><dt>ЛКМ / R</dt><dd>Огонь / Перезарядка</dd><dt>1 / 2</dt><dd>Основное / Пистолет</dd><dt>E</dt><dd>Терминал / Помощь</dd><dt>H / J</dt><dd>Малая / Большая аптечка</dd><dt>ESC</dt><dd>Пауза</dd></dl></div>
         <div data-setting-panel="graphics" hidden><label for="graphics-quality">Качество графики</label><select id="graphics-quality"><option value="low">Низкая</option><option value="medium">Средняя</option><option value="high">Высокая</option></select></div>
-        <div class="connection-settings"><label for="server-url">СЕРВЕР</label><input id="server-url" placeholder="ws://server:3000" /><button id="resume-room">ПЕРЕПОДКЛЮЧИТЬСЯ</button><label for="language">Language / Язык</label><select id="language"><option value="en">English</option><option value="ru">Русский</option></select>
+        <div class="connection-settings"><label for="server-url">СЕРВЕР</label><input id="server-url" placeholder="wss://your-server.example" /><p class="server-help">Для сети нужен общий сервер. Одиночная игра работает без него.</p><button id="resume-room" type="button">ПЕРЕПОДКЛЮЧИТЬСЯ</button><label for="language">Language / Язык</label><select id="language"><option value="en">English</option><option value="ru">Русский</option></select>
 </div>
       </section>
       <p id="message" class="message" role="status">60 секунд подготовки · Уничтожь всех · 30 секунд перерыва.</p>
