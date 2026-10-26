@@ -178,3 +178,7 @@ Graphics settings include an optional metrics overlay: basic FPS; extended FPS, 
 Flashlight charge is shown as a120s battery meter and percentage; purchases/refills use the same120s capacity. Nearby live enemies within25m appear as red squares on the compass, replacing the nearest-enemy interaction text.
 
 The local body fades in over the look-down angle and roughly0.25s of motion using cloned, dithered materials, without changing remote soldiers. Slot3 requires an owned trap; spending the last trap returns to the firearm through the existing smooth switch. The original supply transport has a tapered fuselage, cockpit, four animated propellers, wings, tail and navigation lights.
+
+## Surface and lighting upgrade
+
+Materials use metre-scaled world coordinates: staggered brick courses, pavement joints, damp concrete bases and wood grain retain their scale on differently sized meshes. Road patches become reflective puddles as the existing rain wetness accumulates, then dry gradually. A cached, original sky environment supplies soft reflections to metal, glass and wet asphalt, with reduced intensity at night. The shadow frustum follows the player over a140m area for better local detail. Street-light pools and halos are instanced/world-anchored and disabled on low quality; night skies gain sparse stars behind cloud cover. Geometry and gameplay colliders are unchanged.

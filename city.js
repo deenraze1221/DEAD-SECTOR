@@ -1,4 +1,5 @@
 import * as T from 'three';
+import {installSurfaceDetail} from './surface-detail.js';
 import {generateSkyline} from './skyline.js';
 // Instanced construction keeps detailed models practical in a 64-building city.
 export function createCity(scene,layout){
@@ -6,17 +7,9 @@ export function createCity(scene,layout){
  const geometries={box:new T.BoxGeometry(1,1,1),cylinder:new T.CylinderGeometry(1,1,1,10),sphere:new T.IcosahedronGeometry(1,1),torus:new T.TorusGeometry(1,.1,5,12),cone:new T.ConeGeometry(1,1,8),plane:new T.PlaneGeometry(1,1)},materials={},batches=new Map();
  for(const [name,color]of Object.entries(palettes)){const m=name==='light'?new T.MeshBasicMaterial({color}):new T.MeshStandardMaterial({color,roughness:name==='glass'?.45:.92,metalness:name==='steel'?.35:0});
  if(name==='paint'||name==='glass'){m.polygonOffset=true;m.polygonOffsetFactor=-2;m.polygonOffsetUnits=-2;}
- if(!['light','glass','paint','leaf'].includes(name)){m.onBeforeCompile=shader=>{shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 surfacePosition;').replace('#include <begin_vertex>',`#include <begin_vertex>
- vec4 surfaceVertex=vec4(transformed,1.);
- #ifdef USE_INSTANCING
- surfaceVertex=instanceMatrix*surfaceVertex;
- #endif
- surfacePosition=(modelMatrix*surfaceVertex).xyz;`);shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
- varying vec3 surfacePosition;
- float cityGrain(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(fract(sin(dot(i,vec2(12.98,78.23)))*43758.54),fract(sin(dot(i+vec2(1,0),vec2(12.98,78.23)))*43758.54),f.x),mix(fract(sin(dot(i+vec2(0,1),vec2(12.98,78.23)))*43758.54),fract(sin(dot(i+vec2(1,1),vec2(12.98,78.23)))*43758.54),f.x),f.y);}`).replace('#include <color_fragment>',`#include <color_fragment>
- float grime=cityGrain(surfacePosition.xz*.7+surfacePosition.y*.23);diffuseColor.rgb*=mix(.82,1.06,grime);`);};}
+ if(!['light','glass','paint','leaf'].includes(name))installSurfaceDetail(m,name);
  materials[name]=m;}
- materials.road.dispose();materials.road=new T.MeshPhysicalMaterial({color:palettes.road,roughness:.92,clearcoat:.0001,clearcoatRoughness:.08});scene.userData.roadMaterial=materials.road;
+ materials.road.dispose();materials.road=new T.MeshPhysicalMaterial({color:palettes.road,roughness:.92,clearcoat:.0001,clearcoatRoughness:.08});installSurfaceDetail(materials.road,'road');scene.userData.roadMaterial=materials.road;
  for(const type of new Set(layout.buildings.map(b=>b.type))){const canvas=document.createElement('canvas');canvas.width=256;canvas.height=48;const ctx=canvas.getContext('2d');ctx.fillStyle='#ded9ba';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 28px monospace';ctx.fillText(type==='grocery'?'SECTOR MART':({residentialHighrise:'NORTH RESIDENCES',corporateTower:'CIVIC OFFICES',hospitalTower:'MEDICAL TOWER',communicationsTower:'RELAY STATION'}[type]||type.toUpperCase()),128,25,242);const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;texture.magFilter=T.NearestFilter;materials['label-'+type]=new T.MeshBasicMaterial({map:texture,alphaTest:.4,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});}
  const screen=document.createElement('canvas');screen.width=256;screen.height=160;const sc=screen.getContext('2d');sc.fillStyle='#0a1d17';sc.fillRect(0,0,256,160);sc.fillStyle='#c7e1a0';sc.font='bold 24px monospace';sc.fillText('SECTOR MART',12,32);sc.font='15px monospace';sc.fillText('> WEAPONS',12,70);sc.fillText('> SUPPLIES',12,98);sc.fillStyle='#6eae91';sc.fillRect(12,119,232,2);sc.fillText('ACCESS TERMINAL',12,145);const sm=new T.CanvasTexture(screen);sm.colorSpace=T.SRGBColorSpace;sm.magFilter=T.NearestFilter;materials['terminal-screen']=new T.MeshBasicMaterial({map:sm,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});
  const anchor=new T.Matrix4(),local=new T.Matrix4(),q=new T.Quaternion(),scale=new T.Vector3(),position=new T.Vector3();let model=null;const actualBounds=new Map();for(const geo of Object.values(geometries))geo.computeBoundingBox();

@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {t} from './i18n.js';
 import {PerformanceMetrics} from './metrics.js';
+import {applyEnvironmentLight} from './environment-light.js';
 import {CitySky} from './city-sky.js';
 import {BodyVisibility,canSelectTrap} from './body-visibility.js';
 import { Player, PLAYER, FIXED_STEP } from './player.js';
@@ -81,7 +82,7 @@ function setRunning(value) {
 function rebuild(seedValue){
   if(shopOpen){shopOpen=false;shop.hide();}
   if(scene){scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m){m.map?.dispose();m.dispose();}});}
-  scene=new THREE.Scene();world=createMap(scene,seedValue);seed=world.seed;colliders=world.colliders;
+  scene=new THREE.Scene();world=createMap(scene,seedValue);applyEnvironmentLight(scene,renderer);seed=world.seed;colliders=world.colliders;
   selfAvatar=new PeerAvatar();selfAvatar.head.visible=false;selfAvatar.upper.visible=false;selfAvatar.root.visible=false;selfBody=new BodyVisibility(selfAvatar.root);scene.add(selfAvatar.root);flashlight=new Flashlight(scene);operations=new Operations(scene,world,seed);trapSelected=false;queuedEquip=null;lastMissionKey='';lastMissionCompleteKey='';announcedMissionCompletions.clear();missionNoticeUntil=0;missionNoticeRecord=null;player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.base={...world.spawn};scene.userData.citySky=new CitySky(scene);enemies.listener=player.position;enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);lastAnnouncedWave=0;lastCompletedWave=0;waveNoticeMessage='';waveNoticeUntil=0;events=new EncounterEvents(scene,seed);weather=new WeatherEffects(scene,seed,world.buildings);
   peer=new THREE.Group();const material=new THREE.MeshStandardMaterial({color:'#7d9676'});const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,3,6),material);body.position.y=1;peer.add(body);const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),material);head.position.y=1.75;peer.add(head);peer.visible=false;scene.add(peer);peerPose=null;peers.clear();if(renderer)applyPreferences(preferences);
 }
@@ -230,7 +231,7 @@ try {
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
     const event=events.state;$('event-objective').textContent=event?.status==='active'?`${t(event.label)} · $${event.reward} · ${Math.round(Math.hypot(player.position.x-event.x,player.position.z-event.z))}m${event.id==='defend'?` · ${Math.floor(event.progress)}/25s`:event.id==='growth'?` · ${event.hp} HP`:t(' · E рядом')}`:event?.status==='complete'&&event.wave===waves.number?t('Событие выполнено'):'';
     weather.maxDrops={low:160,medium:350,high:650}[preferences.quality];weather.step(delta,waves,player.position,audio,matchReady&&(running||session.active));$('weather-status').textContent=`${String(Math.floor(weather.cycle?.hour??6)).padStart(2,'0')}:${String(Math.floor(((weather.cycle?.hour??6)%1)*60)).padStart(2,'0')} · ${t(weather.cycle?.night?'Ночь':'День')} · ${t({overcast:'Пасмурно',rain:'Дождь',storm:'Гроза',clear:'Ясно'}[weather.state.weather])} · ${t({light:'Слабый туман',medium:'Средний туман',heavy:'Сильный туман'}[weather.state.fog])}`;
-    scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta,weather.state.weather);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
+    scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta,weather.state.weather,weather.cycle?.night);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
     events.step(delta);flashlight.update(camera,account,preferences.quality);operations.visualStep(player.position,audio,running||(session.active&&started&&!outcome));updateSurvivalUI();updateMissionNotice();
     const near=loot.nearby(player.position);
     $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&nearDowned()?t('E · Поднять напарника'):near?`$${near.value} · ${t('Автоподбор')}`:nearTerminal(player.position)?t('E · Открыть магазин'):'';
