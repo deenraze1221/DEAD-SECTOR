@@ -113,14 +113,14 @@ export function createCity(scene,layout){
  for(const f of layout.furniture)furnishing(f);
  const posts=new Set();
  for(const p of layout.props){begin(p);const {type,w,h,d,variant:v}=p;
-  if(type==='recyclingStation'){for(const side of [-1,1]){box(side<0?'leaf':'steel',.6,1.1,d,side*.33,.55,0);box('dark',.35,.12,.02,side*.33,.88,d/2-.06);box('white',.18,.2,.025,side*.33,.6,d/2-.05);}box('dark',w,.08,d,0,1.16,0);}
-  else if(type==='parcelLocker'){box('steel',w,h,d,0,h/2,0);for(let row=0;row<4;row++)for(let col=0;col<3;col++){const x=-.51+col*.51,y=.25+row*.45;box('dark',.48,.42,.015,x,y,d/2-.06);box('rust',.43,.37,.018,x,y,d/2-.045);box('white',.06,.02,.02,x+.12,y,d/2-.03);}}
+  if(type==='recyclingStation'){for(const side of [-1,1]){box(side<0?'leaf':'steel',.6,1.1,d-.08,side*.33,.55,-.04);box('dark',.35,.12,.02,side*.33,.88,d/2-.06);box('white',.18,.2,.025,side*.33,.6,d/2-.05);}box('dark',w,.08,d,0,1.16,0);}
+  else if(type==='parcelLocker'){box('steel',w,h,d-.08,0,h/2,-.04);for(let row=0;row<4;row++)for(let col=0;col<3;col++){const x=-.51+col*.51,y=.25+row*.45;box('dark',.48,.42,.015,x,y,d/2-.06);box('rust',.43,.37,.018,x,y,d/2-.045);box('white',.06,.02,.02,x+.12,y,d/2-.03);}}
   else if(type==='busShelterSign'){cyl('steel',.035,2.1,0,1.05,0);box('leaf',w,.65,.12,0,2.075,0);box('white',w*.7,.08,.015,0,2.2,.07);box('white',w*.5,.2,.015,0,1.96,.07);}
   else if(type==='roadBlock'){box('concrete',w,.64,d,0,.32,0);box('rust',w,.16,d,0,.72,0);for(let x=-.5;x<.7;x+=.35)box('white',.14,.16,.012,x,.72,d/2-.06);}
   else if(type==='cableReel'){cyl('wood',.45,.07,0,.5,-.36,Math.PI/2);cyl('wood',.45,.07,0,.5,.36,Math.PI/2);cyl('rubber',.32,.65,0,.5,0,Math.PI/2);cyl('dark',.08,.8,0,.5,0,Math.PI/2);box('wood',.7,.1,.7,0,.05,0);}
-  else if(type==='utilityCabinet'){box('steel',w,h,d,0,h/2,0);for(const side of [-1,1]){box('dark',.48,1.3,.018,side*.27,.72,d/2-.06);for(let n=0;n<4;n++)box('steel',.35,.025,.02,side*.27,.3+n*.1,d/2-.044);box('white',.06,.18,.022,side*.12,.9,d/2-.04);}}
+  else if(type==='utilityCabinet'){box('steel',w,h,d-.10,0,h/2,-.05);for(const side of [-1,1]){box('dark',.48,1.3,.018,side*.27,.72,d/2-.06);for(let n=0;n<4;n++)box('steel',.35,.025,.02,side*.27,.3+n*.1,d/2-.044);box('white',.06,.18,.022,side*.12,.9,d/2-.04);}}
   else if(type==='flowerBox'){box('concrete',w,.35,d,0,.175,0);box('yard',w-.1,.02,d-.1,0,.36,0);for(let n=0;n<5;n++){part('sphere','leaf',-.4+n*.2,.47,0,.13,.17,.20);part('sphere',n%2?'rust':'white',-.4+n*.2,.62,0,.05,.03,.05);}}
-  else if(type==='streetKiosk'){box('steel',w,h-.12,d,0,(h-.12)/2,0);box('rust',w,.12,d,0,h-.06,0);box('dark',w-.1,1.3,.04,0,1.1,d/2-.06);box('white',w-.18,.6,.015,0,1.3,d/2-.03);for(let n=0;n<4;n++)box('leaf',w-.3,.04,.018,0,1.1+n*.12,d/2-.02);}
+  else if(type==='streetKiosk'){box('steel',w,h-.12,d-.10,0,(h-.12)/2,-.05);box('rust',w,.12,d,0,h-.06,0);box('dark',w-.1,1.3,.04,0,1.1,d/2-.06);box('white',w-.18,.6,.015,0,1.3,d/2-.03);for(let n=0;n<4;n++)box('leaf',w-.3,.04,.018,0,1.1+n*.12,d/2-.02);}
   else if(type==='deliveryTrolley'){box('steel',w,.07,d,0,.18,0);for(const x of [-w*.4,w*.4]){cyl('steel',.025,1,x,.63,-d*.4);for(const z of [-d*.35,d*.35])cyl('rubber',.10,.07,x,.1,z,0,Math.PI/2);}box('steel',w,.05,.05,0,1.12,-d*.4);box('wood',w-.08,.48,d-.1,0,.455,0);}
   else if(type==='solarBollard'){cyl('steel',.10,.9,0,.45,0);cyl('light',.12,.13,0,.965,0);box('glass',.26,.06,.26,0,1.06,0);}
   else if(type==='atm'){box('steel',w,h,d-.08,0,h/2,-.04);box('dark',w*.8,.65,.035,0,1.25,d/2-.035);box('glass',w*.6,.34,.012,0,1.35,d/2-.012);box('dark',.42,.035,.03,0,.77,d/2-.0125);for(let i=0;i<3;i++)box('light',.08,.04,.012,-.12+i*.12,.98,d/2-.012);}
@@ -131,10 +131,10 @@ export function createCity(scene,layout){
   else if(type==='surveyTripod'||type==='constructionLight'){
    const hub=h*.64;for(let n=0;n<3;n++){const angle=n*Math.PI*2/3,foot=new T.Vector3(Math.sin(angle)*(w*.43),.035,Math.cos(angle)*(d*.43)),top=new T.Vector3(0,hub,0),v=top.clone().sub(foot),rotation=new T.Euler().setFromQuaternion(new T.Quaternion().setFromUnitVectors(new T.Vector3(0,1,0),v.clone().normalize())),mid=top.clone().add(foot).multiplyScalar(.5);box('steel',.035,v.length(),.035,mid.x,mid.y,mid.z,rotation.x,rotation.y,rotation.z);box('rubber',.09,.055,.09,foot.x,.0275,foot.z);}cyl('steel',.035,h*.30,0,hub+h*.15,0);box('rust',w*.7,.25,d*.65,0,h-.15,0);box(type==='constructionLight'?'light':'glass',w*.5,.14,.025,0,h-.15,d*.34);
   }
-  else if(type==='ticketMachine'){box('steel',w,h,d,0,h/2,0);box('glass',w*.7,.3,.02,0,1.1,d/2-.015);box('dark',.3,.04,.025,0,.75,d/2-.01);for(let n=0;n<3;n++)box('white',.05,.05,.025,-.1+n*.1,.9,d/2-.01);}
+  else if(type==='ticketMachine'){box('steel',w,h,d-.06,0,h/2,-.03);box('glass',w*.7,.3,.02,0,1.1,d/2-.015);box('dark',.3,.04,.025,0,.75,d/2-.01);for(let n=0;n<3;n++)box('white',.05,.05,.025,-.1+n*.1,.9,d/2-.01);}
   else if(type==='drinkingFountain'){box('concrete',.35,.8,.30,0,.4,0);box('steel',w,.12,d,0,.86,0);cyl('steel',.025,.08,.15,.96,0);box('dark',.25,.01,.18,0,.925,0);}
   else if(type==='ventStack'){box('concrete',w,.15,d,0,.075,0);cyl('rust',.18,1.35,0,.825,0);cyl('steel',.3,.12,0,1.56,0);cyl('dark',.2,.06,0,1.65,0);}
-  else if(type==='fireHoseCabinet'){box('steel',.08,.4,.12,-w*.35,.2,0);box('steel',.08,.4,.12,w*.35,.2,0);box('rust',w,1.2,d,0,1,0);box('dark',w-.08,1.05,.025,0,1,d/2-.015);part('torus','rust',0,1.05,d/2-.025,.24,.24,.24);box('white',.3,.08,.02,0,.65,d/2-.01);}
+  else if(type==='fireHoseCabinet'){box('steel',.08,.4,.12,-w*.35,.2,0);box('steel',.08,.4,.12,w*.35,.2,0);box('rust',w,1.2,d-.08,0,1,-.04);box('dark',w-.08,1.05,.025,0,1,d/2-.015);part('torus','rust',0,1.05,d/2-.025,.24,.24,.24);box('white',.3,.08,.02,0,.65,d/2-.01);}
   else if(type==='foldingBarricade'){for(const side of [-1,1])for(const z of [-.15,.15])box('steel',.06,.9,.06,side*.56,.45,z,z<0?-.2:.2);box('rust',w,.26,.10,0,.84,0);for(let n=0;n<5;n++)box('white',.12,.24,.012,-.56+n*.28,.84,.056);}
   else if(type==='noticeBoard'){for(const x of [-w*.4,w*.4])box('wood',.08,h,.08,x,h/2,0);box('wood',w,1,.12,0,h-.55,0);for(let n=0;n<4;n++)box('white',.27,.55,.015,-.52+n*.34,h-.55,.07);}
   else if(type==='waterTank'){for(const x of [-.45,.45])for(const z of [-.45,.45])box('steel',.1,.4,.1,x,.2,z);cyl('steel',.60,1.25,0,1.0,0);cyl('dark',.62,.07,0,1.65,0);cyl('steel',.12,.1,0,1.74,0);}
