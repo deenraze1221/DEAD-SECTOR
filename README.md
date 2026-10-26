@@ -1,3 +1,7 @@
+## Two versions: HTML and Godot
+
+The existing HTML game remains in the repository root. A separate **Godot 4.6 Standard** first-stage port is in [godot/](godot/README.md): import [godot/project.godot](godot/project.godot) and press F5. It includes the original city snapshot, native movement and all ten weapons in a test armory. Zombies, waves, shop/economy and multiplayer have not been ported yet. The HTML and Godot versions currently cannot share a multiplayer match.
+
 # DEAD SECTOR
 
 Browser wave-survival FPS with seeded 250 × 250 m towns, English/Russian UI and private four-player lobbies. All environment models are original procedural geometry. Weapon models come from the user's updated `gunsv2.fbx`, with the original pistol retained.
