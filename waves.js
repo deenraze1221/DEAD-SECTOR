@@ -24,10 +24,10 @@ export class Waves {
    this.time+=chunk;remaining-=chunk;
    if(!this.rest){
     const due=Math.min(this.total,Math.floor((this.time+1e-8)*this.total/120));
-    while(this.spawned<due){const roll=this.random(),type=this.variant==='rush'&&roll<.5?'runner':chooseEnemy(()=>roll,this.number),hive=this.variant==='siege'?this.number%4:Math.floor(this.random()*4),boss=this.variant==='boss'&&this.spawned===this.total-1;const vomit=!boss&&this.number>=6&&this.vomiters<Math.floor(this.total*.1)&&this.random()<.1;if(vomit)this.vomiters++;spawn(boss?'boss':vomit?'vomiter':type,hive,{boss});this.spawned++;}
+    while(this.spawned<due){const roll=this.random(),type=this.variant==='rush'&&roll<.5?'runner':chooseEnemy(()=>roll,this.number),hive=this.variant==='siege'?this.number%4:Math.floor(this.random()*4),boss=this.variant==='boss'&&this.spawned===this.total-1;const vomit=!boss&&this.number>=6&&this.vomiters<Math.floor(this.total*.15)&&this.random()<.15;if(vomit)this.vomiters++;spawn(boss?'boss':vomit?'vomiter':type,hive,{boss});this.spawned++;}
    }
    if(this.time>=limit-1e-9){
-    if(this.rest){this.number++;this.spawned=0;this.vomiters=0;this.vomiters=0;this.rest=false;this.time=0;}
+    if(this.rest){this.number++;this.spawned=0;this.vomiters=0;this.rest=false;this.time=0;}
     else if(getAlive()>0){this.time=120;this.clearing=true;}
     else{this.rest=true;this.time=0;}
    }
