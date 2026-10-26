@@ -72,20 +72,21 @@ func _process(delta: float) -> void:
  var progress=0.0 if main.battle.phase=="PREPARATION" else 1.0 if main.battle.phase in ["CLEARANCE","INTERMISSION"] else minf(1,main.battle.time/120)
  hour=fposmod(6+phase*6+progress*6,24)
  # Dawn/dusk blend according to the same clock; two day waves, two night waves.
- var daylight=clampf(sin((hour-6)/24*TAU)*1.4,0,1)
  var env=main.get_node("WorldEnvironment").environment
  var sky=env.sky.sky_material
- var day_color=Color("#58665b") if kind=="clear" else Color("#334b43") if kind=="overcast" else Color("#233933")
- var color=Color("#09130f").lerp(day_color,daylight)
- env.fog_light_color=color
+ var base=Color({"overcast":"#202b30","rain":"#1a2831","storm":"#131e29","clear":"#3c4a4d"}[kind])
+ var color=base.lerp(Color("#090f1a") if night else Color("#47534f"),.65 if night else .45)
+ var blend=1-exp(-delta*.7)
+ env.fog_light_color=env.fog_light_color.lerp(color,blend)
  env.fog_density={"light":.009,"medium":.016,"heavy":.058}[fog]
- env.ambient_light_energy=lerpf(.16,.42,daylight)
- sky.sky_top_color=color*.75
- sky.sky_horizon_color=color
- sky.ground_horizon_color=color
+ env.ambient_light_energy=lerpf(env.ambient_light_energy,.22 if night else .48,blend)
+ sky.sky_top_color=sky.sky_top_color.lerp(color*.75,blend)
+ sky.sky_horizon_color=sky.sky_horizon_color.lerp(color,blend)
+ sky.ground_horizon_color=sky.ground_horizon_color.lerp(color,blend)
  var sun=main.get_node("Sun")
- sun.rotation_degrees.x=-maxf(8,sin((hour-6)/24*TAU)*55)
- sun.light_energy=lerpf(.08,.85 if kind=="clear" else .5,daylight)
+ sun.rotation_degrees=Vector3(-57,-30,0)
+ sun.light_color=Color("#9cb8de") if night else Color("#ddbb92") if hour>16 else Color("#b8cbd7")
+ sun.light_energy=lerpf(sun.light_energy,.135 if night else .9 if kind=="clear" else .75,blend)
  wetness=move_toward(wetness,1.0 if kind in ["rain","storm"] else 0.0,delta*(.08 if kind in ["rain","storm"] else .012))
  for material in weather_materials: material.set_shader_parameter("wetness",wetness)
  flash_timer=maxf(0,flash_timer-delta)

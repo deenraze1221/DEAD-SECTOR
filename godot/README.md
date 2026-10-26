@@ -49,3 +49,17 @@ The local soldier waist, belt and legs are exported from the HTML body, with cam
 The UI is English-only. Courier-compatible Liberation Mono and Arial-compatible Liberation Sans Bold are bundled with their license. Audio, Controls, Graphics and World settings persist in user://settings.cfg. PSX processing stays mandatory.
 
 Additional checks: tests/expansion.gd and tests/expansion_render.gd. Audio can be regenerated with node scripts/export-godot-audio.mjs. No browser or Node.js is required for players.
+
+## UI reference pass
+
+The supplied UI and Visuals screenshots now guide the native presentation: orbiting city panorama behind a transparent left menu, a two-color Arial logo, compact dark blue-gray HUD panels, right-hand settings and a centered three-column store. Locked cards have an actual lock over a dimmed silhouette; weapon statistics are available on hover/focus. Supplies reuse the actual HTML SVG paths, not substitute icons.
+
+SystemFont requests Arial for branding and Courier New for terminal UI on Windows, matching the browser's font families; bundled Liberation fonts provide compatible fallbacks elsewhere. Rendering/hinting can still differ between browsers and Godot.
+
+Weapon view FOV/zoom/position now use the HTML formula, and the Pistol's metal/green/gold material palette matches weapons.js. Fog/light colors and the subtle color grade/sharpen/grain were aligned with weather.js and psx.js. Pixelation remains mandatory. Pause retains the player view; only the initial main menu uses the cinematic camera.
+
+Join by code is visibly disabled with an explanation: native multiplayer remains a later task. No fake lobby or invitation code is generated.
+
+UI checks: godot --headless --path godot --script tests/ui_geometry.gd
+Visual checks: godot --path godot --script tests/reference_render.gd
+Supply icons can be regenerated with node scripts/export-godot-icons.mjs.

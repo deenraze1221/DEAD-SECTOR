@@ -1,4 +1,6 @@
 extends Node3D
+const ReferenceUI=preload("res://scripts/reference_ui.gd")
+var reference_ui
 const Generator=preload("res://scripts/city_generator.gd")
 const Climate=preload("res://scripts/climate.gd")
 const Soundscape=preload("res://scripts/soundscape.gd")
@@ -107,8 +109,10 @@ func equip(id: String) -> void:
  player.reserve=int(player.config.reserve)
  player.reloading=0
  player.cooldown=0
- player.gun.scale=Vector3.ONE*(.64 if id=="Pistol" else minf(1.15,float(player.config.get("viewZoom",1.0)))*.82)
- player.base_gun=Vector3(.19,-.19-float(player.config.get("viewLower",0))*.025,-.48)
+ var zoom=float(player.config.get("viewZoom",1.0))
+ player.weapon_camera.fov=rad_to_deg(2*atan(tan(deg_to_rad(45)*.5)/zoom))
+ player.gun.scale=Vector3.ONE
+ player.base_gun=Vector3(.16/zoom,-.16*float(player.config.get("viewLower",1))/zoom,-.48)
  player.gun.position=player.base_gun
 
 func setup_environment() -> void:
@@ -166,138 +170,9 @@ func button(text: String, callback: Callable) -> Button:
  return node
 
 func setup_ui() -> void:
- var effects=CanvasLayer.new()
- effects.layer=1
- add_child(effects)
- var post=ColorRect.new()
- post.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
- post.mouse_filter=Control.MOUSE_FILTER_IGNORE
- var material=ShaderMaterial.new()
- material.shader=load("res://shaders/pixels.gdshader")
- post.material=material
- set_meta("post_material",material)
- effects.add_child(post)
- var overlay=CanvasLayer.new()
- overlay.layer=2
- add_child(overlay)
- screen=Control.new()
- var theme=Theme.new()
- theme.default_font=load("res://assets/terminal.ttf")
- theme.default_font_size=16
- theme.set_color("font_shadow_color","Label",Color(0,0,0,.8))
- theme.set_constant("shadow_offset_x","Label",1)
- theme.set_constant("shadow_offset_y","Label",1)
- theme.set_color("font_color","Label",Color("#d4dfba"))
- theme.set_color("font_color","Button",Color("#d4dfba"))
- theme.set_color("font_disabled_color","Button",Color("#67735e"))
- for state in ["normal","hover","pressed","disabled"]:
-  var style=StyleBoxFlat.new()
-  style.bg_color=Color("#24352a") if state=="hover" else Color("#0e1914") if state=="disabled" else Color("#18251d")
-  style.border_color=Color("#a8b879") if state=="hover" else Color("#53664b")
-  style.set_border_width_all(1)
-  style.set_content_margin_all(12)
-  theme.set_stylebox(state,"Button",style)
- screen.theme=theme
- screen.set_meta("post_material",get_meta("post_material"))
- screen.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
- screen.mouse_filter=Control.MOUSE_FILTER_IGNORE
- overlay.add_child(screen)
- var crosshair=label("+",20)
- crosshair.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
- crosshair.position-=Vector2(7,14)
- screen.add_child(crosshair)
- hud=label("SECTOR 00
-COMBAT ZONE",18)
- hud.position=Vector2(28,28)
- screen.add_child(hud)
- setup_battle_hud()
- var panel=PanelContainer.new()
- panel.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
- panel.position=Vector2(24,-128)
- panel.custom_minimum_size=Vector2(300,100)
- var backing=StyleBoxFlat.new()
- backing.bg_color=Color(.035,.045,.05,.78)
- backing.set_content_margin_all(16)
- backing.set_corner_radius_all(5)
- panel.add_theme_stylebox_override("panel",backing)
- screen.add_child(panel)
- var vitals=VBoxContainer.new()
- vitals.add_theme_constant_override("separation",10)
- panel.add_child(vitals)
- vitals.add_child(label("STAMINA",16))
- stamina_bar=ProgressBar.new()
- var bar_fill=StyleBoxFlat.new()
- bar_fill.bg_color=Color("#b8bd87")
- bar_fill.set_corner_radius_all(3)
- stamina_bar.add_theme_stylebox_override("fill",bar_fill)
- var bar_back=StyleBoxFlat.new()
- bar_back.bg_color=Color("#303736")
- bar_back.set_corner_radius_all(3)
- stamina_bar.add_theme_stylebox_override("background",bar_back)
- stamina_bar.max_value=5
- stamina_bar.value=5
- stamina_bar.show_percentage=false
- stamina_bar.custom_minimum_size=Vector2(270,8)
- vitals.add_child(stamina_bar)
- ammo_label=label("",22)
- ammo_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_RIGHT)
- ammo_label.position=Vector2(-285,-125)
- ammo_label.custom_minimum_size=Vector2(255,90)
- ammo_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
- screen.add_child(ammo_label)
- fps_label=label("",14)
- fps_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
- fps_label.position=Vector2(-130,12)
- fps_label.custom_minimum_size.x=115
- fps_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
- screen.add_child(fps_label)
- bearing_label=label("",17)
- bearing_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
- bearing_label.position=Vector2(-175,24)
- bearing_label.custom_minimum_size.x=350
- bearing_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
- screen.add_child(bearing_label)
- compass_markers=Control.new()
- compass_markers.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
- compass_markers.position=Vector2(-250,54)
- compass_markers.mouse_filter=Control.MOUSE_FILTER_IGNORE
- compass_markers.add_to_group("match_hud")
- screen.add_child(compass_markers)
- var status=label("F · FLASHLIGHT   B · BATTERY   3 · TRAP   H / J · MEDKITS",15)
- status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
- status.position=Vector2(24,-220)
- status.add_theme_font_size_override("font_size",12)
- gear_label=status
- screen.add_child(status)
- menu=PanelContainer.new()
- menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
- menu.position=Vector2(64,-300)
- menu.custom_minimum_size=Vector2(560,520)
- var style=StyleBoxFlat.new()
- style.bg_color=Color(.035,.065,.05,.96)
- style.border_color=Color("#9ea971")
- style.set_border_width_all(1)
- style.set_content_margin_all(24)
- menu.add_theme_stylebox_override("panel",style)
- screen.add_child(menu)
- var column=VBoxContainer.new()
- column.add_theme_constant_override("separation",14)
- menu.add_child(column)
- var title=label("DEAD
-SECTOR®",64)
- title.add_theme_font_override("font",load("res://assets/title.ttf"))
- title.add_theme_constant_override("line_spacing",-8)
- title.add_theme_color_override("font_color",Color("#c6db78"))
- column.add_child(title)
- column.add_child(label("FIELD SYSTEMS / BUILD 0.3",16))
- column.add_child(label("Behind the perimeter — silence.\nWASD Move / Shift Sprint / Space Jump\nMouse Look / LMB Fire / R Reload\nF Flashlight / Esc Pause",17))
- column.add_child(button("PLAY / RESUME",func(): set_playing(true)))
- column.add_child(button("NEW MATCH",func(): get_tree().reload_current_scene()))
- column.add_child(button("SETTINGS",open_settings))
- column.add_child(button("FULLSCREEN / WINDOW",toggle_fullscreen))
- column.add_child(button("QUIT",func(): get_tree().quit()))
- for child in screen.get_children():
-  if child!=menu: child.add_to_group("match_hud")
+ reference_ui=ReferenceUI.new()
+ reference_ui.main=self
+ reference_ui.build()
 
 func toggle_fullscreen() -> void:
  fullscreen=not fullscreen
@@ -305,8 +180,11 @@ func toggle_fullscreen() -> void:
 
 func set_playing(value: bool) -> void:
  if value and player.health<=0: return
+ if value:
+  reference_ui.started=true
+  player.camera.make_current()
  player.active=value
- player.gun.visible=value
+ player.gun.visible=value or reference_ui.started
  player.mouse_guard=.1
  if not value: player.flash.light_energy=0
  menu.visible=not value
@@ -349,26 +227,7 @@ COMBAT ZONE
  compass_timer-=_delta
  if compass_timer<=0: compass_timer=.1;update_markers(azimuth)
  if player.position.y < -10: reset_position()
-
-func setup_battle_hud() -> void:
- wave_label=label("",15)
- wave_label.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
- wave_label.position=Vector2(-380,95)
- screen.add_child(wave_label)
- wallet_label=label("",15)
- wallet_label.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
- wallet_label.position=Vector2(24,-165)
- screen.add_child(wallet_label)
- notice_label=label("",21)
- notice_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
- notice_label.position=Vector2(-450,-150)
- notice_label.custom_minimum_size.x=900
- notice_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
- screen.add_child(notice_label)
- vignette=ColorRect.new()
- vignette.mouse_filter=Control.MOUSE_FILTER_IGNORE
- vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
- screen.add_child(vignette)
+ reference_ui.refresh(_delta)
 
 func near_store() -> bool:
  var terminal: Dictionary=bridge.data.terminal
@@ -380,38 +239,7 @@ func show_death() -> void:
  battle.notice_time=99999
 
 func setup_store() -> void:
- store_panel=PanelContainer.new()
- store_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
- store_panel.position=Vector2(-530,-325)
- store_panel.custom_minimum_size=Vector2(1060,650)
- var backing=StyleBoxFlat.new()
- backing.bg_color=Color(.035,.06,.045,.98)
- backing.set_content_margin_all(20)
- backing.border_color=Color("#8d9c69")
- backing.set_border_width_all(1)
- store_panel.add_theme_stylebox_override("panel",backing)
- screen.add_child(store_panel)
- var column=VBoxContainer.new()
- store_panel.add_child(column)
- column.add_child(label("SECTOR MART / SUPPLY TERMINAL",26))
- var tabs=HBoxContainer.new()
- column.add_child(tabs)
- tabs.add_child(button("WEAPONS",func(): store_tab="weapon";render_store()))
- tabs.add_child(button("SUPPLIES & REPAIR",func(): store_tab="supplies";render_store()))
- tabs.add_child(button("CLOSE",close_store))
- var scroll=ScrollContainer.new()
- scroll.vertical_scroll_mode=ScrollContainer.SCROLL_MODE_SHOW_NEVER
- scroll.horizontal_scroll_mode=ScrollContainer.SCROLL_MODE_DISABLED
- scroll.size_flags_vertical=Control.SIZE_EXPAND_FILL
- column.add_child(scroll)
- store_grid=GridContainer.new()
- store_grid.columns=3
- store_grid.add_theme_constant_override("h_separation",12)
- store_grid.add_theme_constant_override("v_separation",12)
- scroll.add_child(store_grid)
- store_message=label("",16)
- column.add_child(store_message)
- store_panel.hide()
+ reference_ui.build_store()
 
 func open_store() -> void:
  set_playing(false)
@@ -426,60 +254,29 @@ func close_store() -> void:
  set_playing(true)
 
 func render_store() -> void:
- for child in store_grid.get_children(): store_grid.remove_child(child);child.queue_free()
- var items: Array=bridge.data.shop_items.duplicate()
- items.sort_custom(func(a,b): return a.price<b.price)
- for item in items:
-  if (item.kind=="weapon")!=(store_tab=="weapon"): continue
-  var display_name={"ammo":"UNIVERSAL AMMO","smallMedkit":"SMALL MEDKIT","largeMedkit":"LARGE MEDKIT","flashlight":"FLASHLIGHT","battery":"BATTERY","trap":"BEAR TRAP","repair":"REPAIR WEAPON"}.get(item.id,item.id.to_upper())
-  var text="%s · $%d" % [display_name,int(item.price)]
-  var locked=false
-  if item.kind=="weapon":
-   var config: Dictionary=bridge.data.weapons[item.id]
-   text+="
-DAMAGE %d / MAG %d
-%.1f ROUNDS/SEC" % [config.damage,config.capacity,1.0/config.interval]
-   locked=battle.completed<int(config.unlockAfter)
-   if locked: text+="
-LOCKED · AFTER WAVE %d" % int(config.unlockAfter)
-  elif item.id=="ammo": text+="
-50 UNIVERSAL ROUNDS / MAX 500"
-  elif item.id=="smallMedkit": text+="
-+25 HEALTH"
-  elif item.id=="largeMedkit": text+="
-+75 HEALTH"
-  elif item.id=="repair": text+="
-+50 WEAPON CONDITION"
-  else: text+="
-"+("120 SECONDS" if item.id in ["battery","flashlight"] else "300 DAMAGE / ENEMIES ONLY")
-  var card=button(text,func(): store_feedback=battle.buy(item.id);render_store())
-  var icon_id=item.id if item.kind=="weapon" else "medkit" if item.kind=="medkit" else "ammo" if item.id=="ammo" else "repair" if item.id=="repair" else "equipment"
-  card.icon=load("res://assets/icons/"+icon_id+".svg")
-  card.expand_icon=true
-  card.add_theme_constant_override("icon_max_width",105)
-  card.custom_minimum_size=Vector2(330,140)
-  card.disabled=locked or battle.money<int(item.price)
-  store_grid.add_child(card)
- store_message.text=store_feedback+"
-BALANCE $%d · COMPLETE WAVE %d · 1 PRIMARY / 1 PISTOL" % [battle.money,battle.completed]
+ reference_ui.render_store()
 
 func open_settings() -> void:
  if is_instance_valid(settings_panel): settings_panel.queue_free()
  settings_panel=PanelContainer.new()
  settings_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
  settings_panel.position=Vector2(-570,-300)
- settings_panel.custom_minimum_size=Vector2(540,600)
+ settings_panel.custom_minimum_size=Vector2(540,550)
+ var theme=screen.theme.duplicate()
+ theme.default_font_size=16
+ settings_panel.theme=theme
  var backing=StyleBoxFlat.new()
- backing.bg_color=Color(.035,.06,.045,.98)
+ backing.bg_color=Color(.047,.07,.09,.98)
  backing.set_content_margin_all(20)
  backing.set_border_width_all(1)
- backing.border_color=Color("#75875b")
+ backing.border_color=Color("#44514e")
+ backing.set_corner_radius_all(7)
  settings_panel.add_theme_stylebox_override("panel",backing)
  screen.add_child(settings_panel)
  var column=VBoxContainer.new()
  column.add_theme_constant_override("separation",16)
  settings_panel.add_child(column)
- column.add_child(label("SETTINGS",26))
+ column.add_child(label("SETTINGS",21))
  var tabs=TabContainer.new()
  tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL
  column.add_child(tabs)
@@ -489,15 +286,22 @@ func open_settings() -> void:
   page.name=title
   page.add_theme_constant_override("separation",18)
   tabs.add_child(page)
+  tabs.set_tab_title(tabs.get_tab_count()-1,title.to_upper())
   panels[title]=page
  for setting in [["MASTER VOLUME","master_volume"],["MUSIC VOLUME","music_volume"],["WEATHER VOLUME","weather_volume"]]:
-  panels.Audio.add_child(label(setting[0],16))
+  var row=HBoxContainer.new()
+  var caption=label(setting[0],16)
+  caption.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  row.add_child(caption)
+  var amount=label("%d%%" % int(get(setting[1])*100),16)
+  row.add_child(amount)
+  panels.Audio.add_child(row)
   var slider=HSlider.new()
   slider.min_value=0
   slider.max_value=1
   slider.step=.01
   slider.value=get(setting[1])
-  slider.value_changed.connect(func(value): set(setting[1],value);save_user_settings())
+  slider.value_changed.connect(func(value): set(setting[1],value);amount.text="%d%%" % int(value*100);save_user_settings())
   panels.Audio.add_child(slider)
  panels.Controls.add_child(label("MOUSE SENSITIVITY",16))
  var mouse=HSlider.new()
@@ -545,6 +349,7 @@ Buildings and interiors move together.
 
 Interface language: English" % [generation.seed,generation.moved_blocks],15))
  column.add_child(button("CLOSE",func(): settings_panel.hide()))
+ reference_ui.layout()
 
 func load_user_settings() -> void:
  var config=ConfigFile.new()
@@ -565,6 +370,7 @@ func save_user_settings() -> void:
  AudioServer.set_bus_volume_db(0,linear_to_db(maxf(.0001,master_volume)))
 
 func apply_quality() -> void:
+ if is_instance_valid(screen): screen.get_meta("post_material").set_shader_parameter("detail",[0.0,.65,1.0][graphics_quality])
  get_node("Sun").shadow_enabled=graphics_quality>0
  get_node("Sun").directional_shadow_max_distance=[60,90,120][graphics_quality]
  player.camera.far=[350,600,650][graphics_quality]
