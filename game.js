@@ -123,8 +123,8 @@ document.addEventListener('keydown', event => {
   if (event.code === 'Escape' && running) { pause(); return; }
   if(running && event.code==='KeyE'){keys.add('KeyE');if(operations.nearby(player.position))return;
     const down=nearDowned();if(session.active&&down){session.send({type:'revive',target:down.id});return;}
-    const event=events.state;if(session.active&&!session.host&&event?.id==='generator'&&event.status==='active'&&Math.hypot(player.position.x-event.x,player.position.z-event.z)<2.4){session.send({type:'event-interact'});return;}
-    if(events.interact(player.position)){rewardEvent();return;}
+    $('event-objective').textContent='';
+    if(events.interact(player.position))return;
     if(nearTerminal(player.position)){openShop();return;}
 
   }
@@ -194,8 +194,8 @@ try {
         triggerPressed=false;
         if(!session.active||session.host){
           waves.step(FIXED_STEP,(type,index,options)=>{const h=world.hives[index];enemies.spawn(type,h.x-Math.sign(h.x)*1.5,h.z-Math.sign(h.z)*1.5,undefined,undefined,options);},()=>enemies.alive);
-          events.suppressSpawn=operations.mission?.status==='active';if(events.step(FIXED_STEP,waves,[{hp,position:player.position},...[...peers.values()].filter(v=>v.pose).map(v=>({hp:v.pose.hp,position:v.pose}))],enemies.items))rewardEvent();
-          operations.step(FIXED_STEP,{...waves,questBusy:events.state?.status==='active'},[{id:session.active?session.role:'solo',hp,position:player.position,interacting:running&&keys.has('KeyE')},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({id,hp:v.pose.hp,position:v.pose,interacting:!!v.pose.interacting}))],enemies);rewardOperations();
+
+          operations.step(FIXED_STEP,waves,[{id:session.active?session.role:'solo',hp,position:player.position,interacting:running&&keys.has('KeyE')},...[...peers].filter(([,v])=>v.pose).map(([id,v])=>({id,hp:v.pose.hp,position:v.pose,interacting:!!v.pose.interacting}))],enemies);events.bind(operations.mission);rewardOperations();
           player.hp=hp;const targets=[...peers].filter(([,v])=>v.pose?.hp>0).map(([id,v])=>({p:{hp:v.pose.hp,position:v.pose},hurt:amount=>session.send({type:'damage',target:id,amount})}));if(hp>0||targets.length)enemies.step(FIXED_STEP,player,receiveDamage,targets);else if(session.active)finish('dead');
         }
         hitTime=Math.max(0,hitTime-FIXED_STEP);hurtTime=Math.max(0,hurtTime-FIXED_STEP);
@@ -227,7 +227,7 @@ try {
     const event=events.state;$('event-objective').textContent=event?.status==='active'?`${t(event.label)} · $${event.reward} · ${Math.round(Math.hypot(player.position.x-event.x,player.position.z-event.z))}m${event.id==='defend'?` · ${Math.floor(event.progress)}/25s`:event.id==='growth'?` · ${event.hp} HP`:t(' · E рядом')}`:event?.status==='complete'&&event.wave===waves.number?t('Событие выполнено'):'';
     weather.maxDrops={low:160,medium:350,high:650}[preferences.quality];weather.step(delta,waves,player.position,audio,matchReady&&(running||session.active));$('weather-status').textContent=`${String(Math.floor(weather.cycle?.hour??6)).padStart(2,'0')}:${String(Math.floor(((weather.cycle?.hour??6)%1)*60)).padStart(2,'0')} · ${t(weather.cycle?.night?'Ночь':'День')} · ${t({overcast:'Пасмурно',rain:'Дождь',storm:'Гроза',clear:'Ясно'}[weather.state.weather])} · ${t({light:'Слабый туман',medium:'Средний туман',heavy:'Сильный туман'}[weather.state.fog])}`;
     scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta,weather.state.weather);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
-    flashlight.update(camera,account,preferences.quality);operations.visualStep(player.position,audio);updateSurvivalUI();updateMissionNotice();
+    events.step(delta);flashlight.update(camera,account,preferences.quality);operations.visualStep(player.position,audio);updateSurvivalUI();updateMissionNotice();
     const near=loot.nearby(player.position);const living=enemies.items.filter(e=>e.hp>0);const nearest=living.sort((a,b)=>a.rig.position.distanceTo(camera.position)-b.rig.position.distanceTo(camera.position))[0];
     $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&nearDowned()?t('E · Поднять напарника'):near?`$${near.value} · ${t('Автоподбор')}`:nearTerminal(player.position)?t('E · Открыть магазин'):nearest&&nearest.rig.position.distanceTo(camera.position)<25?`${t('Ближайший враг')} · ${Math.round(Math.hypot(nearest.rig.position.x-player.position.x,nearest.rig.position.z-player.position.z))}m`:'';
     enemies.updateEffects((running||(session.active&&started&&!outcome))?delta:0,session.active&&!session.host);
@@ -248,7 +248,7 @@ try {
   $('message').textContent = t('Не удалось запустить 3D-сцену. Нужен браузер с WebGL 2 и включённым аппаратным ускорением.');
 }
 
-function applyState(m){events.restore(m.event);operations.restore(m.operations);if(m.wave)waves.restore(m.wave);loot.apply(m.cash||[]);enemies.apply(m.enemies);
+function applyState(m){events.restore(m.event);operations.restore(m.operations);events.bind(operations.mission);if(m.wave)waves.restore(m.wave);loot.apply(m.cash||[]);enemies.apply(m.enemies);
  if(!session.host){for(const p of enemies.projectiles)scene.remove(p.mesh);enemies.projectiles=(m.projectiles||[]).map(pos=>({mesh:enemies.mesh(scene,'sphere',[.2,0],'bullet',...pos),life:6,velocity:new THREE.Vector3()}));}}
 function receiveNetwork(m){
  if(m.type==='transport-lost'||(m.type==='away'&&m.role==='host')){pause();$('message').textContent=t('Переподключение. Дождитесь хозяина комнаты.');}
@@ -273,7 +273,7 @@ function receiveNetwork(m){
  if(m.type==='shot'&&session.host){const direction=new THREE.Vector3(...m.direction);if(direction.lengthSq()>.1){const origin=new THREE.Vector3(...m.origin);enemies.hear(origin,90);direction.normalize();combatShot(origin,direction,m.damage);}}
  if(m.type==='damage')receiveDamage(m.amount);
  if(m.type==='revived'){hp=m.hp;account.health=hp;downed=false;outcome='';$('message').textContent=t('Напарник помог. Продолжайте игру.');}
- if(m.type==='event-interact'&&session.host&&events.interact(m.position))rewardEvent();
+ if(m.type==='event-interact'&&session.host)events.interact(m.position);
  if(m.type==='economy'){if(m.reason==='Деньги подобраны')audio.play('cash');account=m.account;hp=account.health;rifle.bindInventory(account);shop.pending=false;shop.message(m.reason||'');if(shopOpen)shop.render(account);}
  if(m.type==='loot-state')loot.apply(m.cash);
  if(m.type==='end'&&!session.host)finish(m.result);
@@ -297,9 +297,9 @@ function submitAction(action,id){
  shop.message(result.reason);if(shopOpen)shop.render(account);
 }
 
-function rewardEvent(){if(!session.active&&events.state&&!events.state.paid){events.state.paid=true;account.money+=events.state.reward;audio.play('reload');}}
 
-function combatShot(origin,direction,damage){const wall=obstacleDistance(origin,direction,colliders),distance=events.distance(origin,direction);if(enemies.shoot(origin,direction,damage,Math.min(wall,distance)))return true;if(events.shoot(origin,direction,damage,wall)){if(events.state.status==='complete')rewardEvent();return true;}return false;}
+
+function combatShot(origin,direction,damage){const wall=obstacleDistance(origin,direction,colliders),distance=events.distance(origin,direction);if(enemies.shoot(origin,direction,damage,Math.min(wall,distance)))return true;if(events.shoot(origin,direction,damage,wall))return true;return false;}
 
 function nearDowned(){return [...peers].map(([id,v])=>({...v.pose,id})).find(p=>p.hp<=0&&Math.hypot(p.x-player.position.x,p.z-player.position.z)<2.5);}
 function renderLobby(){lobby.root.hidden=!lobbyOpen;lobby.render(session.active?members.map(m=>({...m,self:m.id===session.role})):[{id:'host',slot:0,connected:true,self:true}],!session.active||session.host,session.code,lobbyPhase);setRunning(false);}
@@ -314,7 +314,8 @@ try{$('resume-room').hidden=!sessionStorage.getItem('dead-sector:room');}catch{$
 
 function placeTrap(){if(hp<=0||!account.traps)return;if(session.active){submitAction('trap','trap');return;}const id='solo-trap-'+Math.floor(elapsed*1000);if(operations.placeTrap(player.position,id)){consumeTrap(account);audio.ui();}}
 function rewardOperations(){if(session.active)return;const m=operations.mission;if(m?.status==='complete'&&!m.paid){m.paid=true;account.money+=m.reward;audio.play('cash');}for(const d of operations.drops)if(d.status==='opened'&&!d.paid){d.paid=true;account.money+=d.reward;}}
-function updateSurvivalUI(){const m=operations.mission;$('survival-objective').textContent=m&&(m.status==='active'||operations.time-(m.completedAt||0)<8)?`${t(m.id==='package'?'Collect building package':'Hold terminal zone')} · $${m.reward} · ${m.status==='complete'?t('Событие выполнено'):`${Math.round(Math.hypot(m.x-player.position.x,m.z-player.position.z))}m${m.id==='zone'?` · ${Math.floor(m.progress)}/30s`:''}`}`:'';const drop=operations.drops.find(d=>d.status!=='opened');$('airdrop-status').textContent=drop?`${t('Supply crate')} · ${Math.round(Math.hypot(drop.x-player.position.x,drop.z-player.position.z))}m · ${t(drop.status==='falling'?'Descending':'Hold E for 10 seconds')}`:`${t('Next airdrop')} · ${Math.ceil(360-operations.time%360)}s`;$('gear-status').textContent=`F · ${t('Flashlight')} ${account.flashlight?Math.ceil(account.flashlightCharge)+'s':'—'} · B ×${account.batteries||0} · 3 ${t('Traps')} ×${account.traps||0}${trapSelected?' · '+t('LMB · Place underfoot'):''}`;}
+function updateSurvivalUI(){const m=operations.mission;$('survival-objective').textContent=m&&(m.status==='active'||operations.time-(m.completedAt||0)<8)?`${missionLabel(m.id)} · $${m.reward} · ${m.status==='complete'?t('Событие выполнено'):`${Math.round(Math.hypot(m.x-player.position.x,m.z-player.position.z))}m${m.id==='zone'?` · ${Math.floor(m.progress)}/30s`:m.id==='growth'?` · ${m.hp}/${m.maxHp} HP`:m.id==='generator'?t(' · E рядом'):''}`}`:'';const drop=operations.drops.find(d=>d.status!=='opened');$('airdrop-status').textContent=drop?`${t('Supply crate')} · ${Math.round(Math.hypot(drop.x-player.position.x,drop.z-player.position.z))}m · ${t(drop.status==='falling'?'Descending':'Hold E for 10 seconds')}`:`${t('Next airdrop')} · ${Math.ceil(360-operations.time%360)}s`;$('gear-status').textContent=`F · ${t('Flashlight')} ${account.flashlight?Math.ceil(account.flashlightCharge)+'s':'—'} · B ×${account.batteries||0} · 3 ${t('Traps')} ×${account.traps||0}${trapSelected?' · '+t('LMB · Place underfoot'):''}`;}
 
-function activeMission(){const m=operations?.mission;if(m?.status==='active')return {...m,label:t(m.id==='package'?'Collect building package':'Hold terminal zone')};const e=events?.state;if(e?.status==='active')return {...e,key:'event-'+e.wave,label:t(e.label)};return null;}
-function updateMissionNotice(){if(!started){$('mission-notice').hidden=true;return;}const m=activeMission();if(m&&m.key!==lastMissionKey){lastMissionKey=m.key;missionNoticeRecord={...m,complete:false};missionNoticeUntil=performance.now()+6000;audio.play('mission');}const completed=[operations.mission,events.state?{...events.state,key:'event-'+events.state.wave}:null].find(e=>e?.status==='complete'&&!announcedMissionCompletions.has(e.key));if(completed){announcedMissionCompletions.add(completed.key);lastMissionCompleteKey=completed.key;missionNoticeRecord={...completed,complete:true};missionNoticeUntil=performance.now()+5000;audio.play('wave-clear');}const r=missionNoticeRecord;$('mission-notice').hidden=!r||performance.now()>missionNoticeUntil;if(r)$('mission-notice').textContent=r.complete?`${t('MISSION COMPLETE')} · +$${r.reward}`:`${t('NEW SHARED MISSION')} · ${t(r.id==='package'?'Collect building package':r.id==='zone'?'Hold terminal zone':r.label)} · $${r.reward}`;}
+function missionLabel(id){return t({package:'Collect building package',zone:'Hold terminal zone',generator:'Запустить генератор',growth:'Уничтожить нарост'}[id]);}
+function activeMission(){const m=operations?.mission;return m?.status==='active'?{...m,label:missionLabel(m.id)}:null;}
+function updateMissionNotice(){if(!started){$('mission-notice').hidden=true;return;}const m=activeMission();if(m&&m.key!==lastMissionKey){lastMissionKey=m.key;missionNoticeRecord={...m,complete:false};missionNoticeUntil=performance.now()+6000;audio.play('mission');}const completed=[operations.mission].find(e=>e?.status==='complete'&&!announcedMissionCompletions.has(e.key));if(completed){announcedMissionCompletions.add(completed.key);lastMissionCompleteKey=completed.key;missionNoticeRecord={...completed,complete:true};missionNoticeUntil=performance.now()+5000;audio.play('wave-clear');}const r=missionNoticeRecord;$('mission-notice').hidden=!r||performance.now()>missionNoticeUntil;if(r)$('mission-notice').textContent=r.complete?`${t('MISSION COMPLETE')} · +$${r.reward}`:`${t('NEW SHARED MISSION')} · ${missionLabel(r.id)} · $${r.reward}`;}
