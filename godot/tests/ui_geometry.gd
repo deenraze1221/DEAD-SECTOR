@@ -11,7 +11,7 @@ func run() -> void:
  check(ui.mono.font_names[0]=="Courier New","Terminal uses browser monospace family on Windows")
  check(ui.heading.font_names[0]=="Arial","Brand uses browser Arial family")
  check(is_equal_approx(main.player.weapon_camera.fov,45),"Pistol uses original HTML viewmodel projection")
- check(main.player.gun.scale==Vector3.ONE,"Weapon uses source model scale")
+ check(main.player.gun.scale.is_equal_approx(Vector3.ONE*.65),"Pistol has a compact viewmodel scale")
  check(ui.menu_camera.current and not ui.started,"Fresh launch shows real cinematic city camera")
  check(not ui.hud_root.visible,"Gameplay HUD hidden in menu")
  for size in [Vector2(960,600),Vector2(1280,720),Vector2(1920,1080)]:

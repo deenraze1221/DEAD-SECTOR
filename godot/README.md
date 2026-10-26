@@ -63,3 +63,5 @@ Join by code is visibly disabled with an explanation: native multiplayer remains
 UI checks: godot --headless --path godot --script tests/ui_geometry.gd
 Visual checks: godot --path godot --script tests/reference_render.gd
 Supply icons can be regenerated with node scripts/export-godot-icons.mjs.
+
+Pistol framing adjustment: its viewmodel and attached hands use65% model scale to keep more of the lower-right view clear. Other weapon framing remains unchanged.

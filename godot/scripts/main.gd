@@ -111,7 +111,7 @@ func equip(id: String) -> void:
  player.cooldown=0
  var zoom=float(player.config.get("viewZoom",1.0))
  player.weapon_camera.fov=rad_to_deg(2*atan(tan(deg_to_rad(45)*.5)/zoom))
- player.gun.scale=Vector3.ONE
+ player.gun.scale=Vector3.ONE*(.65 if id=="Pistol" else 1.0)
  player.base_gun=Vector3(.16/zoom,-.16*float(player.config.get("viewLower",1))/zoom,-.48)
  player.gun.position=player.base_gun
 
