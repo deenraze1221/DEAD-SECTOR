@@ -57,7 +57,7 @@ export class Enemies{
  this.projectiles=this.projectiles.filter(s=>{if(s.life<=0){this.scene.remove(s.mesh);return false;}return true;});
  }
  shoot(origin,direction,damage=35,max=100){const wall=Math.min(max,obstacleDistance(origin,direction,this.colliders)),ray=new T.Ray(origin,direction);let nearest=wall,hit=null;for(const e of this.items){if(e.hp<=0)continue;const p=e.rig.position,r=e.radius,box=new T.Box3(new T.Vector3(p.x-r,p.y-(e.type==='eye'?r:0),p.z-r),new T.Vector3(p.x+r,p.y+(e.type==='eye'?r:e.height),p.z+r)),point=ray.intersectBox(box,new T.Vector3());if(point&&point.distanceTo(origin)<nearest){nearest=point.distanceTo(origin);hit=e;}}
- if(!hit)return false;hit.hp=Math.max(0,hit.hp-damage);if(hit.hp>0)this.blood.burst(hit,5);hit.stagger=.10;hit.reaction=.22;hit.visual.root.rotation.x=-.10;this.audio.play('hit');if(!hit.hp)this.die(hit);return true;}
+ if(!hit)return false;hit.hp=Math.max(0,hit.hp-damage);if(hit.hp>0)this.blood.burst(hit,12);hit.stagger=.10;hit.reaction=.22;hit.visual.root.rotation.x=-.10;this.audio.play('hit');if(!hit.hp)this.die(hit);return true;}
  snapshot(){return this.items.filter(e=>e.hp>0||e.corpse<2).map(e=>({id:e.id,type:e.type,skin:e.skin,boss:!!e.boss,hp:e.hp,maxHp:e.maxHp,x:e.rig.position.x,y:e.rig.position.y,z:e.rig.position.z,rotation:e.rig.rotation.toArray(),phase:e.phase,motion:e.motion,attackTime:e.attackTime,attack:e.attack,windup:e.windup,pendingAttack:e.pendingAttack,corpse:e.corpse}));}
  apply(records){
   const keep=new Set(records.map(v=>v.id));

@@ -151,7 +151,7 @@ try {
   renderer = new THREE.WebGLRenderer({ canvas: $('scene'), antialias: false, powerPreference: 'high-performance' });
   renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = 1.1;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.toneMappingExposure = .85;
   scene = new THREE.Scene(); camera = new THREE.PerspectiveCamera(78, 1, .1, 260);
   rebuild(seed);rifle=new Rifle(audio);rifle.bindInventory(account);
   psx = createPSX(scene, renderer);applyPreferences(preferences);
@@ -214,7 +214,7 @@ try {
     $('hit-marker').hidden=hitTime<=0;document.body.classList.toggle('hurt',hurtTime>0&&running);
     const event=events.state;$('event-objective').textContent=event?.status==='active'?`${t(event.label)} · $${event.reward} · ${Math.round(Math.hypot(player.position.x-event.x,player.position.z-event.z))}m${event.id==='defend'?` · ${Math.floor(event.progress)}/25s`:event.id==='growth'?` · ${event.hp} HP`:t(' · E рядом')}`:event?.status==='complete'?t('Событие выполнено'):'';
     weather.maxDrops={low:160,medium:350,high:650}[preferences.quality];weather.step(delta,waves,player.position,audio,matchReady&&(running||session.active));$('weather-status').textContent=`${String(Math.floor(weather.cycle?.hour??6)).padStart(2,'0')}:${String(Math.floor(((weather.cycle?.hour??6)%1)*60)).padStart(2,'0')} · ${t(weather.cycle?.night?'Ночь':'День')} · ${t({overcast:'Пасмурно',rain:'Дождь',storm:'Гроза',clear:'Ясно'}[weather.state.weather])} · ${t({light:'Слабый туман',medium:'Средний туман',heavy:'Сильный туман'}[weather.state.fog])}`;
-    scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
+    scene.userData.atmosphere?.update(elapsed,events.powered,preferences.quality,player.position,delta);audio.weatherAmbience(matchReady&&(running||shopOpen||session.active)?weather.state.weather:'paused');
     const near=loot.nearby(player.position);const living=enemies.items.filter(e=>e.hp>0);const nearest=living.sort((a,b)=>a.rig.position.distanceTo(camera.position)-b.rig.position.distanceTo(camera.position))[0];
     $('interaction').textContent=hp<=0?t('Ожидайте помощи напарника · E рядом с раненым'):session.active&&nearDowned()?t('E · Поднять напарника'):near?`$${near.value} · ${t('Автоподбор')}`:nearTerminal(player.position)?t('E · Открыть магазин'):nearest?`${t('Ближайший враг')} · ${Math.round(Math.hypot(nearest.rig.position.x-player.position.x,nearest.rig.position.z-player.position.z))} m · ${Math.atan2(nearest.rig.position.x-player.position.x,player.position.z-nearest.rig.position.z)*180/Math.PI|0}° N`:t('Выживайте. Ульи находятся в четырёх углах города.');
     enemies.updateEffects((running||(session.active&&started&&!outcome))?delta:0,session.active&&!session.host);

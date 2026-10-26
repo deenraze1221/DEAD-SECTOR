@@ -4,7 +4,7 @@ import * as T from 'three';
 export class GoreParticles {
  constructor(scene,capacity=3072){
   this.capacity=capacity;this.cursor=0;this.items=new Array(capacity);this.dummy=new T.Object3D();
-  this.mesh=new T.InstancedMesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial({color:'#b41e2d',roughness:1,flatShading:true}),capacity);
+  this.mesh=new T.InstancedMesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial({color:'#b41e2d',emissive:'#510913',emissiveIntensity:.35,roughness:1,flatShading:true}),capacity);
   this.mesh.name='red-death-particles';this.mesh.count=0;this.mesh.frustumCulled=false;this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);scene.add(this.mesh);
  }
  burst(enemy,amount){

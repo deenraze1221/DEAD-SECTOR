@@ -7,8 +7,8 @@ export {WEAPONS};
 export class Rifle {
   constructor(audio, random = Math.random) {
     this.audio=audio;this.random=random;this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(45,1,.01,10);
-    this.scene.add(new THREE.HemisphereLight('#d5dfcb','#494739',3));
-    const light=new THREE.DirectionalLight('#ece2c4',3);light.position.set(-2,3,2);this.scene.add(light);
+    this.scene.add(new THREE.HemisphereLight('#aebfc0','#333c34',1.7));
+    const light=new THREE.DirectionalLight('#c3d0cc',1.5);light.position.set(-2,3,2);this.scene.add(light);
     this.model=new THREE.Group();this.model.scale.setScalar(.8);this.scene.add(this.model);
     this.variants=weaponModels.map(record=>{
       const group=new THREE.Group();group.name=record.id;
