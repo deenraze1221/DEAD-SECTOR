@@ -112,7 +112,7 @@ const entries={
 'Браузер не разрешил захват мыши. Нажмите «Войти в сектор» ещё раз или откройте игру в отдельной вкладке.':'Mouse capture was denied. Try entering again or open the game in a separate tab.',
 'Не удалось захватить мышь. Повторите вход в сектор в отдельной вкладке браузера.':'Mouse capture failed. Open the game in a separate browser tab.',
 'Графический контекст потерян. Перезагрузите страницу, чтобы восстановить сектор.':'Graphics context lost. Reload the page to restore the sector.',
-'Показатели производительности':'Performance metrics','Детализация показателей':'Metrics detail','Базовые · FPS':'Basic · FPS','Расширенные · FPS, время кадра, пинг':'Extended · FPS, frame time, ping','Продвинутые · FPS, пинг, память':'Advanced · FPS, ping, memory','Температура GPU недоступна в браузере. Данные памяти зависят от браузера.':'GPU temperature is unavailable in browsers. Memory data depends on browser support.','Заряд фонаря':'Flashlight battery','Враг':'Enemy',
+'Показатели производительности':'Performance metrics','Детализация показателей':'Metrics detail','Базовые · FPS':'Basic · FPS','Расширенные · FPS, время кадра, пинг':'Extended · FPS, frame time, ping','Продвинутые · FPS, пинг, память':'Advanced · FPS, ping, memory','Данные памяти зависят от браузера.':'Memory data depends on browser support.','Заряд фонаря':'Flashlight battery','Враг':'Enemy',
 'Не удалось запустить 3D-сцену. Нужен браузер с WebGL 2 и включённым аппаратным ускорением.':'Unable to start 3D. Use a WebGL 2 browser with hardware acceleration.'};
 let language='en';try{if(localStorage.getItem('dead-sector:language')==='ru')language='ru';}catch{}
 const reverse=Object.fromEntries(Object.entries(entries).map(([ru,en])=>[en,ru]));
