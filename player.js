@@ -1,5 +1,5 @@
 // Physics is independent of rendering so fixed-step collision rules can be tested.
-export const PLAYER = Object.freeze({ radius: 0.32, height: 1.8, eye: 1.65, walk: 4.5, run: 7.5, gravity: 20, jump: 7 / Math.SQRT2 });
+export const PLAYER = Object.freeze({ radius: 0.32, height: 1.8, eye: 1.65, lookDown: Math.PI / 3, walk: 4.5, run: 7.5, gravity: 20, jump: 7 / Math.SQRT2 });
 export const FIXED_STEP = 1 / 120;
 
 export function overlapsBody(position, box) {
@@ -17,7 +17,7 @@ export class Player {
   look(dx, dy, sensitivity) {
     if(!Number.isFinite(dx)||!Number.isFinite(dy)||!Number.isFinite(sensitivity))return;
     this.yaw -= dx * 0.002 * sensitivity;
-    this.pitch = Math.max(-Math.PI / 2 + 0.02, Math.min(Math.PI / 2 - 0.02, this.pitch - dy * 0.002 * sensitivity));
+    this.pitch = Math.max(-PLAYER.lookDown, Math.min(Math.PI / 2 - 0.02, this.pitch - dy * 0.002 * sensitivity));
   }
   step(dt, input, colliders) {
     let forward = Number(input.forward) - Number(input.backward);

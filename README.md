@@ -210,3 +210,5 @@ Local body now includes a compact pelvis, belt and lower abdomen joined to strai
 Eye health is200HP; brutes have800HP and unlock on wave21. Vomiters unlock on wave6 with300HP,1.25× standard scale and2.057m/s speed (15% below the standard2.42). They prepare a visible1.5s vomit attack only within5m and with a clear firing line, then launch a green liquid projectile at5m/s with a maximum1s flight. Reload is3–4s after release. Walls stop the projectile. Impact deals10HP and starts five1s poison ticks of5HP each; repeat hits refresh rather than stack poison. Typed hits/projectiles and enemy preparation replicate to guests.
 
 A seeded10% replacement roll is capped at floor(wave total×0.10) Vomiters per wave; zero are possible. The per-wave count survives snapshots and resets between waves. Their death emits harmless green spores for2.5s and a wet sound instead of red gore. Health below25HP displays a persistent red edge vignette during play; poison has a separate countdown.
+
+Player look-down is capped at60degrees below the horizon; the upward limit remains unchanged. The limit applies to accumulated mouse input at every sensitivity.

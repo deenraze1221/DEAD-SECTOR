@@ -47,7 +47,7 @@ test('low ceilings stop upward movement', () => {
 test('yaw rotates forward motion and pitch is clamped', () => {
   const a = new Player({ x: 0, y: 0, z: 0 }); a.yaw = Math.PI / 2;
   advance(a, 1, { forward: true }); assert.ok(a.position.x < -4.1); near(a.position.z, 0);
-  a.look(0, 1e6, 1); assert.ok(a.pitch > -Math.PI / 2);
+  a.look(0, 1e6, 1); near(a.pitch,-Math.PI/3);a.look(0,1e6,2);near(a.pitch,-Math.PI/3);
   a.look(0, -1e6, 1); assert.ok(a.pitch < Math.PI / 2);
 });
 test('spawn is unobstructed; perimeter contains sprinting player', () => {
