@@ -1,13 +1,15 @@
+import {MAP_HALF,BACKDROP_DEPTH} from './world-config.js';
 import * as T from 'three';
 import {installSurfaceDetail} from './surface-detail.js';
 import {generateSkyline} from './skyline.js';
 // Instanced construction keeps detailed models practical in a 64-building city.
 export function createCity(scene,layout){
- const palettes={concrete:'#8b8e7e',brick:'#8d6652',plaster:'#a6a58c',dark:'#303c35',wood:'#806448',steel:'#627269',rust:'#865539',glass:'#3c5654',rubber:'#202924',fabric:'#77816a',white:'#c4c6b3',leaf:'#526a46',bark:'#5d4d3b',light:'#e1d79f',road:'#343c37',pavement:'#808574',yard:'#727e62',floor:'#9a9380',paint:'#b7b79b'};
- const geometries={box:new T.BoxGeometry(1,1,1),cylinder:new T.CylinderGeometry(1,1,1,10),sphere:new T.IcosahedronGeometry(1,1),torus:new T.TorusGeometry(1,.1,5,12),cone:new T.ConeGeometry(1,1,8),plane:new T.PlaneGeometry(1,1)},materials={},batches=new Map();
+ const palettes={concrete:'#8b8e7e',brick:'#8d6652',plaster:'#a6a58c',dark:'#303c35',wood:'#806448',steel:'#627269',rust:'#865539',glass:'#3c5654',window:'#354d50',rubber:'#202924',fabric:'#77816a',white:'#c4c6b3',leaf:'#526a46',bark:'#5d4d3b',light:'#e1d79f',road:'#343c37',pavement:'#808574',yard:'#727e62',floor:'#9a9380',paint:'#b7b79b'};
+ const geometries={dome:new T.SphereGeometry(1,16,8,0,Math.PI*2,0,Math.PI/2),box:new T.BoxGeometry(1,1,1),cylinder:new T.CylinderGeometry(1,1,1,10),sphere:new T.IcosahedronGeometry(1,1),torus:new T.TorusGeometry(1,.1,5,12),cone:new T.ConeGeometry(1,1,8),plane:new T.PlaneGeometry(1,1)},materials={},batches=new Map();
  for(const [name,color]of Object.entries(palettes)){const m=name==='light'?new T.MeshBasicMaterial({color}):new T.MeshStandardMaterial({color,roughness:name==='glass'?.45:.92,metalness:name==='steel'?.35:0});
  if(name==='paint'||name==='glass'){m.polygonOffset=true;m.polygonOffsetFactor=-2;m.polygonOffsetUnits=-2;}
  if(!['light','glass','paint','leaf'].includes(name))installSurfaceDetail(m,name);
+ if(name==='window'){m.customProgramCacheKey=()=> 'city-window-v3';m.emissive.set('#c7a976');m.emissiveIntensity=.02;const compile=m.onBeforeCompile;m.onBeforeCompile=shader=>{compile(shader);shader.fragmentShader=shader.fragmentShader.replace('#include <emissivemap_fragment>','#include <emissivemap_fragment>\n totalEmissiveRadiance*=step(.78,cityHash(floor(vec2(surfacePosition.x+surfacePosition.z,surfacePosition.y)/vec2(1.9,2.8))));');};scene.userData.windowMaterial=m;}
  materials[name]=m;}
  materials.road.dispose();materials.road=new T.MeshPhysicalMaterial({color:palettes.road,roughness:.92,clearcoat:.0001,clearcoatRoughness:.08});installSurfaceDetail(materials.road,'road');scene.userData.roadMaterial=materials.road;
  for(const type of new Set(layout.buildings.map(b=>b.type))){const canvas=document.createElement('canvas');canvas.width=256;canvas.height=48;const ctx=canvas.getContext('2d');ctx.fillStyle='#ded9ba';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 28px monospace';ctx.fillText(type==='grocery'?'SECTOR MART':({residentialHighrise:'NORTH RESIDENCES',corporateTower:'CIVIC OFFICES',hospitalTower:'MEDICAL TOWER',communicationsTower:'RELAY STATION'}[type]||type.toUpperCase()),128,25,242);const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;texture.magFilter=T.NearestFilter;materials['label-'+type]=new T.MeshBasicMaterial({map:texture,alphaTest:.4,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});}
@@ -62,10 +64,10 @@ export function createCity(scene,layout){
     box(wall,uw,top-bottom,ud,ux,(top+bottom)/2,uz);roof={x:ux,z:uz,w:uw,d:ud};
     const wy=bottom+(top-bottom)*.53,wh=Math.min(1.35,top-bottom-.6),spacing=1.8+(v%4)*.15;
     if(wh>.5)for(let x=-uw/2+1.2;x<uw/2-1;x+=spacing){
-      box('glass',.94,wh,.06,ux+x,wy,uz+ud/2+.04);box('concrete',1.1,.08,.22,ux+x,wy-wh/2-.06,uz+ud/2+.11);
+      box('window',.94,wh,.06,ux+x,wy,uz+ud/2+.04);box('concrete',1.1,.08,.22,ux+x,wy-wh/2-.06,uz+ud/2+.11);
       if(v%2){for(const side of [-1,1])box('dark',.05,wh+.1,.07,ux+x+side*.51,wy,uz+ud/2+.08);}
     }
-    if(wh>.5)for(const side of [-1,1])for(let z=-ud/2+1.4;z<ud/2-1;z+=2.3)box('glass',.06,wh,.85,ux+side*(uw/2+.04),wy,uz+z);
+    if(wh>.5)for(const side of [-1,1])for(let z=-ud/2+1.4;z<ud/2-1;z+=2.3)box('window',.06,wh,.85,ux+side*(uw/2+.04),wy,uz+z);
     if(v%2){for(const side of [-1,1]){box('dark',uw+.12,.07,.06,ux,top-.035,uz+side*(ud/2+.03));box('dark',.06,.07,ud,ux+side*(uw/2+.03),top-.035,uz);}}
     if(['apartment','hotel','motel'].includes(b.type)&&level===0){
       const face=uz+ud/2,by=bottom+.28;box('steel',2,.08,.8,ux-uw*.2,by,face+.4);for(const side of [-1,1])box('steel',.05,.7,.05,ux-uw*.2+side*.95,by+.39,face+.75);box('steel',2,.05,.05,ux-uw*.2,by+.765,face+.75);
@@ -93,12 +95,26 @@ export function createCity(scene,layout){
   if(b.type==='corporateTower'){for(let x=-w/2+.5;x<w/2;x+=1.5)box('steel',.12,h-3.4,.12,x,(h+3.4)/2,d/2+.12);for(let y=4;y<h;y+=2.8)box('glass',w-.7,.65,.025,0,y,d/2+.09);box('steel',w*.65,1.4,d*.65,0,h+.7,0);}
   if(b.type==='hospitalTower'){for(const side of [-1,1])box('white',.4,h-3.3,.12,side*(w/2-.4),(h+3.3)/2,d/2+.1);box('light',1.1,.26,.04,0,h-1,d/2+.16);box('light',.26,1.1,.04,0,h-1,d/2+.17);box('paint',2,.035,.25,0,h+.18,0);for(const x of [-.8,.8])box('paint',.25,.035,1.6,x,h+.18,0);}
   if(b.type==='communicationsTower'){for(const side of [-1,1])box('dark',.28,h,.18,side*w*.35,h/2,d/2+.09);box('steel',.14,4,.14,0,h+2,0);for(let n=0;n<4;n++){box('steel',1.8-n*.3,.06,.06,0,h+.8+n*.8,0);box('light',.15,.15,.15,0,h+4,0);}}
+  if(b.type==='courthouse'){for(const side of [-1,1]){cyl('concrete',.2,3,side*w*.35,1.5,d/2+.35);box('concrete',.55,.12,.55,side*w*.35,.06,d/2+.35);}box('white',w,.35,.9,0,3.28,d/2+.25);box('concrete',w*.8,.3,d*.8,0,h+.3,0);for(let x=-w*.32;x<w*.4;x+=1.3)box('white',.2,h-4,.13,x,(h+4)/2,d/2+.13);}
+  if(b.type==='artDecoTower'){for(const side of [-1,1]){box('white',.22,h-3.4,.16,side*w*.35,(h+3.4)/2,d/2+.1);box('steel',.15,3,.15,side*.6,h+1.5,0);}box('concrete',2,1.8,2,0,h+.9,0);box('steel',.14,4,.14,0,h+3,0);box('light',.18,.18,.18,0,h+5,0);}
+  if(b.type==='freightDepot'){for(let n=0;n<5;n++){const x=-w*.4+n*w*.2;box('steel',w*.19,.14,d*.85,x,h+.4,0,0,0,.18);box('glass',w*.16,.25,.8,x,h+.25,d*.28);}for(const side of [-1,1]){box('rust',.3,2.8,.12,side*(door/2+.25),1.4,d/2+.12);box('dark',1.2,.65,.06,side*w*.33,1.8,d/2+.06);}}
+  if(b.type==='observatory'){cyl('concrete',3,.6,0,h+.46,0);part('dome','steel',0,h+.76,0,3,2.6,3);box('dark',.24,2.2,.08,0,h+1.8,2.1);cyl('steel',.25,2.4,0,h+2.2,1.2,Math.PI/3);for(const side of [-1,1])box('white',.18,h-3.4,.12,side*w*.35,(h+3.4)/2,d/2+.08);}
   if(b.type==='tower'){for(const side of [-1,1])box('dark',.18,h,.12,side*(w/2-.5),h/2,d/2+.08);box('steel',1,.3,1,0,h+.31,0);}
  }
  for(const f of layout.furniture)furnishing(f);
  const posts=new Set();
  for(const p of layout.props){begin(p);const {type,w,h,d,variant:v}=p;
-  if(type==='atm'){box('steel',w,h,d-.08,0,h/2,-.04);box('dark',w*.8,.65,.035,0,1.25,d/2-.035);box('glass',w*.6,.34,.012,0,1.35,d/2-.012);box('dark',.42,.035,.03,0,.77,d/2-.0125);for(let i=0;i<3;i++)box('light',.08,.04,.012,-.12+i*.12,.98,d/2-.012);}
+  if(type==='recyclingStation'){for(const side of [-1,1]){box(side<0?'leaf':'steel',.6,1.1,d,side*.33,.55,0);box('dark',.35,.12,.02,side*.33,.88,d/2-.06);box('white',.18,.2,.025,side*.33,.6,d/2-.05);}box('dark',w,.08,d,0,1.16,0);}
+  else if(type==='parcelLocker'){box('steel',w,h,d,0,h/2,0);for(let row=0;row<4;row++)for(let col=0;col<3;col++){const x=-.51+col*.51,y=.25+row*.45;box('dark',.48,.42,.015,x,y,d/2-.06);box('rust',.43,.37,.018,x,y,d/2-.045);box('white',.06,.02,.02,x+.12,y,d/2-.03);}}
+  else if(type==='busShelterSign'){cyl('steel',.035,2.1,0,1.05,0);box('leaf',w,.65,.12,0,2.075,0);box('white',w*.7,.08,.015,0,2.2,.07);box('white',w*.5,.2,.015,0,1.96,.07);}
+  else if(type==='roadBlock'){box('concrete',w,.64,d,0,.32,0);box('rust',w,.16,d,0,.72,0);for(let x=-.5;x<.7;x+=.35)box('white',.14,.16,.012,x,.72,d/2-.06);}
+  else if(type==='cableReel'){cyl('wood',.45,.07,0,.5,-.36,Math.PI/2);cyl('wood',.45,.07,0,.5,.36,Math.PI/2);cyl('rubber',.32,.65,0,.5,0,Math.PI/2);cyl('dark',.08,.8,0,.5,0,Math.PI/2);box('wood',.7,.1,.7,0,.05,0);}
+  else if(type==='utilityCabinet'){box('steel',w,h,d,0,h/2,0);for(const side of [-1,1]){box('dark',.48,1.3,.018,side*.27,.72,d/2-.06);for(let n=0;n<4;n++)box('steel',.35,.025,.02,side*.27,.3+n*.1,d/2-.044);box('white',.06,.18,.022,side*.12,.9,d/2-.04);}}
+  else if(type==='flowerBox'){box('concrete',w,.35,d,0,.175,0);box('yard',w-.1,.02,d-.1,0,.36,0);for(let n=0;n<5;n++){part('sphere','leaf',-.4+n*.2,.47,0,.13,.17,.20);part('sphere',n%2?'rust':'white',-.4+n*.2,.62,0,.05,.03,.05);}}
+  else if(type==='streetKiosk'){box('steel',w,h-.12,d,0,(h-.12)/2,0);box('rust',w,.12,d,0,h-.06,0);box('dark',w-.1,1.3,.04,0,1.1,d/2-.06);box('white',w-.18,.6,.015,0,1.3,d/2-.03);for(let n=0;n<4;n++)box('leaf',w-.3,.04,.018,0,1.1+n*.12,d/2-.02);}
+  else if(type==='deliveryTrolley'){box('steel',w,.07,d,0,.18,0);for(const x of [-w*.4,w*.4]){cyl('steel',.025,1,x,.63,-d*.4);for(const z of [-d*.35,d*.35])cyl('rubber',.10,.07,x,.1,z,0,Math.PI/2);}box('steel',w,.05,.05,0,1.12,-d*.4);box('wood',w-.08,.48,d-.1,0,.455,0);}
+  else if(type==='solarBollard'){cyl('steel',.10,.9,0,.45,0);cyl('light',.12,.13,0,.965,0);box('glass',.26,.06,.26,0,1.06,0);}
+  else if(type==='atm'){box('steel',w,h,d-.08,0,h/2,-.04);box('dark',w*.8,.65,.035,0,1.25,d/2-.035);box('glass',w*.6,.34,.012,0,1.35,d/2-.012);box('dark',.42,.035,.03,0,.77,d/2-.0125);for(let i=0;i<3;i++)box('light',.08,.04,.012,-.12+i*.12,.98,d/2-.012);}
   else if(type==='vendingMachine'){box('rust',w,h,d-.08,0,h/2,-.04);box('glass',w*.70,h*.65,.025,-w*.08,h*.58,d/2-.035);for(let row=0;row<4;row++)for(let col=0;col<3;col++)box((row+col)%2?'white':'leaf',.14,.19,.012,-.33+col*.24,.6+row*.28,d/2-.012);box('dark',.65,.12,.035,0,.24,d/2-.02);}
   else if(type==='bikeRack'){for(const x of [-.65,0,.65]){cyl('steel',.025,.70,x,.35,-.18);cyl('steel',.025,.70,x,.35,.18);box('steel',.05,.05,.41,x,.72,0);}box('steel',w,.06,.50,0,.03,0);}
   else if(type==='fireExtinguisher'){cyl('rust',.13,.63,0,.315,0);cyl('steel',.06,.12,0,.69,0);box('dark',.27,.035,.08,0,.77,0);box('white',.12,.18,.025,0,.40,.125);}
@@ -150,8 +166,8 @@ export function createCity(scene,layout){
  // Background shares instanced materials, without interiors or gameplay colliders.
  const skyline=generateSkyline(layout.seed??1);anchor.identity();model=null;
  for(const b of skyline){anchor.makeTranslation(b.x,0,b.z);const wall=['concrete','brick','plaster'][b.variant%3];box(wall,b.w,b.h,b.d,0,b.h/2,0);box('dark',b.w+.25,.3,b.d+.25,0,b.h+.15,0);box('steel',2,1.2,2,0,b.h+.9,0);for(let y=2.5;y<b.h-1;y+=3.2){for(let x=-b.w/2+1.6;x<b.w/2-1;x+=3.3)for(const side of [-1,1])box('glass',1.15,1.6,.06,x,y,side*(b.d/2+.04));for(let z=-b.d/2+1.6;z<b.d/2-1;z+=3.3)for(const side of [-1,1])box('glass',.06,1.6,1.15,side*(b.w/2+.04),y,z);}}
- anchor.identity();for(const [x,z,w,d]of [[0,-150,400,100],[0,150,400,100],[-150,0,100,200],[150,0,100,200]])surface(x,z,w,d,'road');
- scene.userData.skyline={count:skyline.length,depth:100,extent:200};
+ anchor.identity();for(const [x,z,w,d]of [[0,-(MAP_HALF+50),450,100],[0,MAP_HALF+50,450,100],[-(MAP_HALF+50),0,100,250],[MAP_HALF+50,0,100,250]])surface(x,z,w,d,'road');
+ scene.userData.skyline={count:skyline.length,depth:BACKDROP_DEPTH,extent:MAP_HALF+BACKDROP_DEPTH};
  // Instanced materials support geometry reuse without thousands of draw calls.
  for(const [key,records]of batches){const [shape,mat]=key.split('/'),mesh=new T.InstancedMesh(geometries[shape],materials[mat],records.length);records.forEach((record,i)=>{mesh.setMatrixAt(i,record.matrix);const v=record.tint%16,shade=.9+(v%4)*.035;mesh.setColorAt(i,new T.Color(shade,shade-(v%3)*.015,shade-(v%5)*.012));});mesh.instanceMatrix.needsUpdate=true;mesh.castShadow=shape!=='plane'&&mat!=='glass'&&mat!=='light';// Ground receives cast shadows; solid instanced facades avoid self-shadow acne.
  mesh.receiveShadow=shape==='plane'&&mat!=='light';mesh.computeBoundingBox();mesh.computeBoundingSphere();mesh.name='city/'+key;scene.add(mesh);}

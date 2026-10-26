@@ -1,8 +1,9 @@
 import {BUILDINGS,DIMENSIONS,bounds,intersects} from './asset-catalog.js';
 import {createInteriors} from './interiors.js';
+import {MAP_HALF,BLOCK_CENTERS,ROAD_CENTERS,INNER_ROADS} from './world-config.js';
 import {STORE} from './economy.js';
 export {BUILDINGS};export const PROP_TYPES=['bench','bin','dumpster','lamp','car','barrier','fence','barrel','crate','hydrant','powerbox','busstop','pallet','sign','bollard'];
-export const SPAWN={...STORE.spawn},EXIT={x:0,z:-95},HIVES=[{x:-96,z:-96},{x:96,z:-96},{x:-96,z:96},{x:96,z:96}],ROADS=[-96,-72,-48,-24,0,24,48,72,96];
+export const SPAWN={...STORE.spawn},EXIT={x:0,z:-(MAP_HALF-5)},HIVES=[{x:-122,z:-122},{x:122,z:-122},{x:-122,z:122},{x:122,z:122}],ROADS=ROAD_CENTERS;
 const ROAD_HALF=2.75,PAVEMENT=4.35;
 export function generateTown(seed=1){let state=seed>>>0;const random=()=>{state=(state*1664525+1013904223)>>>0;return state/4294967296;};const buildings=[],props=[],furniture=[],colliders=[],supplies=[],districts=[],walls=[],parking=[],rooms=[],surfaces=[],markings=[];let next=0;
 const solid=(x,y,z,w,h,d,kind='structure',owner)=>{const b={minX:x-w/2,maxX:x+w/2,minY:y,maxY:y+h,minZ:z-d/2,maxZ:z+d/2,kind,owner};colliders.push(b);return b;};
@@ -28,12 +29,13 @@ function add(type,x,z,options={}){const item={id:'asset-'+next++,type,x,z,y:0,ya
  else if(type==='sign'){local(0,0,.07,item.h-.1,.07);local(0,0,item.w,.4,.08,item.h-.4);}
  else local(0,0,item.w,item.h,item.d);
  return item;}
-for(const [x,z,w,d]of [[0,-100,201,1],[0,100,201,1],[-100,0,1,199],[100,0,1,199]]){solid(x,0,z,w,5.8,d);walls.push({x,z,w,h:5.8,d});}
-for(const cx of [-84,-60,-36,-12,12,36,60,84])for(const cz of [-84,-60,-36,-12,12,36,60,84]){
+for(const [x,z,w,d]of [[0,-MAP_HALF,251,1],[0,MAP_HALF,251,1],[-MAP_HALF,0,1,249],[MAP_HALF,0,1,249]]){solid(x,0,z,w,5.8,d);walls.push({x,z,w,h:5.8,d});}
+for(const cx of BLOCK_CENTERS)for(const cz of BLOCK_CENTERS){
  const id=buildings.length,district=cx<0?(cz<0?'industrial':'residential'):(cz<0?'medical':'market'),type=cx===12&&cz===12?'grocery':BUILDINGS[id<BUILDINGS.length?id:Math.floor(random()*BUILDINGS.length)],variant=(id+Math.floor(random()*32))%32;
- const w=type==='grocery'?STORE.w:8.8+Math.floor(random()*4)*.3,d=type==='grocery'?STORE.d:8.8+Math.floor(random()*3)*.35,h=({residentialHighrise:24,corporateTower:32,hospitalTower:21,communicationsTower:28}[type])??(type==='tower'?10:type==='grocery'?4.5:['garage','workshop','utility'].includes(type)?4.5:['apartment','hotel','office'].includes(type)?10+Math.floor(random()*3)*2.8:6+Math.floor(random()*2)*2.7);
- const b={id,type,variant,x:cx-1.65,z:cz-2.05,w,d,h,district,cx,cz,accessibleFloors:1,door:['garage','warehouse','workshop','firestation','grocery','cinema'].includes(type)?3.4:2.2};buildings.push(b);districts.push({name:district,x:cx,z:cz});occupied.push({minX:b.x-w/2,maxX:b.x+w/2,minY:0,maxY:h+.2,minZ:b.z-d/2,maxZ:b.z+d/2,id:'building-'+id});
+ const w=type==='grocery'?STORE.w:8.8+Math.floor(random()*4)*.3,d=type==='grocery'?STORE.d:8.8+Math.floor(random()*3)*.35,h=({residentialHighrise:24,corporateTower:32,hospitalTower:21,communicationsTower:28,courthouse:16,artDecoTower:38,freightDepot:7,observatory:14}[type])??(type==='tower'?10:type==='grocery'?4.5:['garage','workshop','utility'].includes(type)?4.5:['apartment','hotel','office'].includes(type)?10+Math.floor(random()*3)*2.8:6+Math.floor(random()*2)*2.7);
+ const b={id,type,variant,x:cx-1.65,z:cz-2.05,w,d,h,district,cx,cz,accessibleFloors:1,door:['garage','warehouse','workshop','firestation','grocery','cinema','freightDepot'].includes(type)?3.4:2.2};buildings.push(b);districts.push({name:district,x:cx,z:cz});occupied.push({minX:b.x-w/2,maxX:b.x+w/2,minY:0,maxY:h+.2,minZ:b.z-d/2,maxZ:b.z+d/2,id:'building-'+id});
  const t=.22,door=b.door;solid(b.x,0,b.z-d/2+t/2,w,3.12,t,'wall',id);for(const side of [-1,1])solid(b.x+side*(w/2-t/2),0,b.z,t,3.12,d-2*t,'wall',id);for(const side of [-1,1])solid(b.x+side*(w/4+door/4),0,b.z+d/2-t/2,(w-door)/2,3,t,'wall',id);solid(b.x,3,b.z+d/2-t/2,w,.12,t,'lintel',id);solid(b.x,3.12,b.z,w,.18,d,'ceiling',id);solid(b.x,3.3,b.z,w,h-3.3,d,'upper',id);
+ if(type==='courthouse')for(const side of [-1,1])solid(b.x+side*w*.35,0,b.z+d/2+.35,.4,3,.4,'wall',id);
  b.structure=colliders.filter(c=>c.owner===id);
  rooms.push(...createInteriors(b,solid,f=>{furniture.push(f);furnitureSolids(f);},random));
  b.partitions=colliders.filter(c=>c.owner===id&&c.kind==='partition');
@@ -53,12 +55,12 @@ for(const cx of [-84,-60,-36,-12,12,36,60,84])for(const cz of [-84,-60,-36,-12,1
 
 }
 // Uniform lights follow the pavement line; intersections remain unobstructed.
-for(const road of ROADS)for(const along of [-84,-60,-36,-12,12,36,60,84]){if(Math.abs(road)===96&&Math.abs(along)>72)continue;add('lamp',road+(road===96?-3.65:3.65),along,{yaw:Math.PI,context:'streetlight',road});}
-for(const x of [-72,-24,24,72])for(const z of [-72,-24,24,72]){add('hydrant',x+3.65,z+5.4,{context:'intersection',road:x});add('sign',x+3.65,z+7.1,{context:'intersection',road:x});}
+for(const road of ROADS)for(const along of BLOCK_CENTERS){if(Math.abs(road)===120&&Math.abs(along)>96)continue;add('lamp',road+(road===120?-3.65:3.65),along,{yaw:Math.PI,context:'streetlight',road});}
+for(const x of [-96,-48,0,48,96])for(const z of [-96,-48,0,48,96]){add('hydrant',x+3.65,z+5.4,{context:'intersection',road:x});add('sign',x+3.65,z+7.1,{context:'intersection',road:x});}
 // Parallel traffic occupies one lane per segment and never parks on a crossing.
-for(const road of [-72,-48,-24,24,48,72])for(const z of [-84,-60,-36,-12,12,36,60,84])if(random()<.6){const north=random()<.5;add(random()<.3?'van':'car',road+(north?1.35:-1.35),z,{yaw:north?0:Math.PI,context:'traffic',road,direction:north?'north':'south'});}
+for(const road of INNER_ROADS)for(const z of BLOCK_CENTERS)if(random()<.6){const north=random()<.5;add(random()<.3?'van':'car',road+(north?1.35:-1.35),z,{yaw:north?0:Math.PI,context:'traffic',road,direction:north?'north':'south'});}
 // Increase the existing outdoor population by 15%, with collision-checked semantic pockets.
-const baseStreetCount=props.length,targetStreetCount=Math.ceil(baseStreetCount*1.15),newTypes=['trafficCone','streetClock','newsstand','publicPhone','busMap','atm','vendingMachine','bikeRack','fireExtinguisher','sandbagStack','surveyTripod','constructionLight','noticeBoard','waterTank','concretePipe'];
+const baseStreetCount=props.length,targetStreetCount=Math.ceil(baseStreetCount*1.15),newTypes=['trafficCone','streetClock','newsstand','publicPhone','busMap','atm','vendingMachine','bikeRack','fireExtinguisher','sandbagStack','surveyTripod','constructionLight','noticeBoard','waterTank','concretePipe','recyclingStation','parcelLocker','busShelterSign','roadBlock','cableReel','utilityCabinet','flowerBox','streetKiosk','deliveryTrolley','solarBollard'];
 for(let round=0;props.length<targetStreetCount&&round<6;round++)for(const b of buildings){
  if(props.length>=targetStreetCount)break;
  const type=newTypes[(b.id+round)%newTypes.length],candidates=[[b.cx+4.05,b.cz+1.0],[b.cx-5.5,b.cz+2.2],[b.cx+.7,b.cz+6.8],[b.cx+4.1,b.cz+5.8],[b.cx-5.5,b.cz+6.9],[b.cx+6.6,b.cz+1.7]];
@@ -66,7 +68,7 @@ for(let round=0;props.length<targetStreetCount&&round<6;round++)for(const b of b
 }
 const streetDensity={base:baseStreetCount,target:targetStreetCount,actual:props.length};
 // Non-overlapping terrain patches: road/sidewalk crossings share one surface, not stacked planes.
-const cuts=[-100,100];for(const c of ROADS)for(const e of [-PAVEMENT,-ROAD_HALF,ROAD_HALF,PAVEMENT])if(c+e>-100&&c+e<100)cuts.push(c+e);cuts.sort((a,b)=>a-b);
+const cuts=[-MAP_HALF,MAP_HALF];for(const c of ROADS)for(const e of [-PAVEMENT,-ROAD_HALF,ROAD_HALF,PAVEMENT])if(c+e>-MAP_HALF&&c+e<MAP_HALF)cuts.push(c+e);cuts.sort((a,b)=>a-b);
 for(let ix=0;ix<cuts.length-1;ix++)for(let iz=0;iz<cuts.length-1;iz++){const minX=cuts[ix],maxX=cuts[ix+1],minZ=cuts[iz],maxZ=cuts[iz+1],x=(minX+maxX)/2,z=(minZ+maxZ)/2,road=ROADS.some(c=>Math.abs(x-c)<ROAD_HALF||Math.abs(z-c)<ROAD_HALF),walk=ROADS.some(c=>Math.abs(x-c)<PAVEMENT||Math.abs(z-c)<PAVEMENT);surfaces.push({minX,maxX,minZ,maxZ,type:road?'road':walk?'pavement':'yard'});}
-for(const c of ROADS)for(let n=-92;n<96;n+=4)if(!ROADS.some(r=>Math.abs(n-r)<4.5))for(const axis of ['x','z'])markings.push(axis==='x'?{x:n,z:c,w:1.8,d:.09}:{x:c,z:n,w:.09,d:1.8});
-return {seed:seed>>>0,buildings,props,furniture,rooms,colliders,walls,hives:HIVES,spawn:{...SPAWN},exit:{...EXIT},surfaces,markings,parking,supplies:[],shop:{building:buildings.find(b=>b.type==='grocery').id,terminal:{...STORE.terminal}},streetDensity,districts,enemySpawns:[]};}
+for(const c of ROADS)for(let n=-116;n<120;n+=4)if(!ROADS.some(r=>Math.abs(n-r)<4.5))for(const axis of ['x','z'])markings.push(axis==='x'?{x:n,z:c,w:1.8,d:.09}:{x:c,z:n,w:.09,d:1.8});
+return {size:MAP_HALF*2,seed:seed>>>0,buildings,props,furniture,rooms,colliders,walls,hives:HIVES,spawn:{...SPAWN},exit:{...EXIT},surfaces,markings,parking,supplies:[],shop:{building:buildings.find(b=>b.type==='grocery').id,terminal:{...STORE.terminal}},streetDensity,districts,enemySpawns:[]};}

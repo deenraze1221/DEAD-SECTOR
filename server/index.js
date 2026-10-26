@@ -1,3 +1,4 @@
+import {MAP_HALF} from '../world-config.js';
 import {createServer} from 'node:http';import {readFile} from 'node:fs/promises';import {resolve,extname} from 'node:path';import {randomBytes,randomInt} from 'node:crypto';import {WebSocketServer,WebSocket} from 'ws';
 import {WEAPON_BY_ID} from '../weapon-config.js';
 import {createInventory,syncCombat,buy,equipWeapon,useMedkit,useSupply,consumeTrap,nearTerminal,rewardForHP} from '../economy.js';
@@ -20,7 +21,7 @@ else if(r&&m.type==='ping'&&Number.isFinite(m.sent))send(s,{type:'pong',sent:m.s
 else if(r&&m.type==='ready'&&r.phase==='lobby'){r[s.role].ready=!!m.ready;lobby(r);}
 else if(r&&m.type==='start'&&s.role==='host'&&r.phase==='lobby'){r.phase='countdown';r.startAt=Date.now()+5000;broadcast(r,{type:'countdown',startAt:r.startAt});lobby(r);r.startTimer=setTimeout(()=>{if(r.phase==='countdown'&&r.host.socket){r.phase='playing';broadcast(r,{type:'match-start',seed:r.seed});lobby(r);}},5000);}
 else if(r&&m.type==='leave')remove(s,true);
-else if(r&&m.type==='pose'&&[m.x,m.y,m.z,m.yaw,m.hp].every(Number.isFinite)&&Math.abs(m.x)<101&&Math.abs(m.z)<101&&m.y>=0&&m.y<30){const own=r[s.role];if(!m.inventory||m.inventory.revision===own.account.revision)own.account.health=m.hp;else m.hp=own.account.health;own.pose=m;syncCombat(own.account,m.inventory);broadcast(r,{...m,id:s.role},s.role);}
+else if(r&&m.type==='pose'&&[m.x,m.y,m.z,m.yaw,m.hp].every(Number.isFinite)&&Math.abs(m.x)<MAP_HALF&&Math.abs(m.z)<MAP_HALF&&m.y>=0&&m.y<30){const own=r[s.role];if(!m.inventory||m.inventory.revision===own.account.revision)own.account.health=m.hp;else m.hp=own.account.health;own.pose=m;syncCombat(own.account,m.inventory);broadcast(r,{...m,id:s.role},s.role);}
 else if(r&&m.type==='state'&&s.role==='host'&&Array.isArray(m.enemies)&&m.enemies.length<=1000){for(const e of m.enemies){const id='cash-'+e.id;if(e.hp<=0&&ENEMY_TYPES[e.type]&&!r.cash.has(id))r.cash.set(id,{id,x:e.x,z:e.z,value:rewardForHP(ENEMY_TYPES[e.type].hp),taken:false});}m.cash=[...r.cash.values()].filter(c=>!c.taken);r.snapshot=m;for(const t of m.operations?.traps||[])r.pendingTraps?.delete(t.id);
 const reward=(key,amount)=>{if(r.rewarded.has(key))return;r.rewarded.add(key);for(const role of ROLES){const seat=r[role];if(seat){seat.account.money+=amount;seat.account.revision++;send(seat.socket,{type:'economy',account:seat.account,reason:'Награда получена'});}}};
 if(m.operations?.mission?.status==='complete'){const q=m.operations.mission;if(/^mission-\d+$/.test(q.key)&&Number.isInteger(q.reward)&&q.reward>=300&&q.reward<=600)reward(q.key,q.reward);}

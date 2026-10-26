@@ -1,6 +1,7 @@
 // Authored procedural families. Variants alter proportions, construction and finish.
-export const BUILDINGS=['apartment','office','shop','garage','clinic','warehouse','workshop','library','cafe','hotel','bakery','laundry','security','school','postoffice','utility','cinema','firestation','motel','tower','residentialHighrise','corporateTower','hospitalTower','communicationsTower'];
+export const BUILDINGS=['apartment','office','shop','garage','clinic','warehouse','workshop','library','cafe','hotel','bakery','laundry','security','school','postoffice','utility','cinema','firestation','motel','tower','residentialHighrise','corporateTower','hospitalTower','communicationsTower','courthouse','artDecoTower','freightDepot','observatory'];
 export const DIMENSIONS={
+ recyclingStation:[1.3,1.2,.65],parcelLocker:[1.6,1.9,.5],busShelterSign:[.65,2.4,.18],roadBlock:[1.4,.8,.5],cableReel:[.9,1,.8],utilityCabinet:[1.1,1.45,.5],flowerBox:[1.1,.65,.6],streetKiosk:[1.4,2,.65],deliveryTrolley:[.6,1.15,.8],solarBollard:[.28,1.1,.28],
  atm:[.75,1.8,.6],vendingMachine:[1.1,1.9,.75],bikeRack:[1.8,.85,.55],fireExtinguisher:[.35,.8,.35],sandbagStack:[1.6,.75,.6],surveyTripod:[.8,1.4,.8],constructionLight:[.65,1.8,.65],noticeBoard:[1.5,1.9,.2],waterTank:[1.4,1.8,1.4],concretePipe:[1.6,.9,.9],
  trafficCone:[.4,.7,.4],streetClock:[.6,3.3,.6],newsstand:[1.4,1.9,.5],publicPhone:[.6,2,.5],busMap:[.9,2.1,.16],
  groceryShelf:[1.2,1.8,.5],produceStand:[1.5,.95,.8],refrigeratedCase:[1.7,1.9,.65],freezer:[1.6,.95,.8],checkout:[1.6,1.25,.7],shoppingCart:[.65,.95,1.1],basketStand:[.6,1,.55],displayRack:[.9,1.5,.6],stockBoxes:[1,1.2,1],terminal:[.9,2.2,.7],

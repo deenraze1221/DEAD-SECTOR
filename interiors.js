@@ -15,7 +15,7 @@ export function createInteriors(b,wall,addFurniture,random){
    ['terminal',STORE.terminal.x,STORE.terminal.z],['checkout',7.3,13.5],['produceStand',13,13.1],['refrigeratedCase',13.35,6.1],['freezer',10.5,6.1],['basketStand',9,13.8],['shoppingCart',6.7,8.3],['stockBoxes',6.7,6.2],['groceryShelf',10.5,8.9,Math.PI/2],['groceryShelf',10.5,11,Math.PI/2],['displayRack',13.5,9.2]])put(r,type,x,z,yaw);
   b.rooms=rooms;return rooms;
  }
- const residential=['apartment','hotel','motel','residentialHighrise'].includes(b.type),service=['garage','warehouse','workshop','utility','firestation','communicationsTower'].includes(b.type);
+ const residential=['apartment','hotel','motel','residentialHighrise'].includes(b.type),service=['garage','warehouse','workshop','utility','firestation','communicationsTower','freightDepot','observatory'].includes(b.type);
  const mainName=residential?'living-kitchen':service?'workshop':['shop','bakery','laundry','postoffice'].includes(b.type)?'retail':['clinic','hospitalTower'].includes(b.type)?'consultation':'office';
  const secondary=residential?'bedroom':service?'storage':['clinic','hospitalTower'].includes(b.type)?'treatment':'meeting';
  if(b.floorplan==='spine'){

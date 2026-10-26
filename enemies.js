@@ -1,3 +1,4 @@
+import {SAFE_EDGE} from './world-config.js';
 import * as T from 'three';
 import {EnemyMotion} from './enemy-motion.js';
 import {createNavigation} from './navigation.js';
@@ -47,7 +48,7 @@ export class Enemies{
  if(!chasing&&this.clock>(e.heardUntil||0))e.memory={...this.base};
  e.aggro=chasing;let pursuit=chasing?goal:e.memory;
  if(e.type!=='eye'&&!e.boss&&e.hasSight&&distance>6&&distance<25&&e.id%3!==0){const angle=e.id*2.399963;pursuit={x:goal.x+Math.cos(angle)*3,y:goal.y,z:goal.z+Math.sin(angle)*3};}
- if(e.type==='eye'&&chasing&&(!e.hasSight||distance<12||distance>24||e.attack>1.5)){if(!e.firingGoal||e.repath<=0){let best=null;for(let n=0;n<6;n++){const angle=(n+(e.id%6))*Math.PI/3,candidate={x:goal.x+Math.cos(angle)*18,y:4.5,z:goal.z+Math.sin(angle)*18},from=new T.Vector3(candidate.x,4.5,candidate.z),ray=new T.Vector3(goal.x,goal.y+1,goal.z).sub(from),len=ray.length();if(Math.abs(candidate.x)<94&&Math.abs(candidate.z)<94&&obstacleDistance(from,ray.normalize(),this.colliders,len)>=len-.1){best=candidate;break;}}e.firingGoal=best||pursuit;}pursuit=e.firingGoal;}
+ if(e.type==='eye'&&chasing&&(!e.hasSight||distance<12||distance>24||e.attack>1.5)){if(!e.firingGoal||e.repath<=0){let best=null;for(let n=0;n<6;n++){const angle=(n+(e.id%6))*Math.PI/3,candidate={x:goal.x+Math.cos(angle)*18,y:4.5,z:goal.z+Math.sin(angle)*18},from=new T.Vector3(candidate.x,4.5,candidate.z),ray=new T.Vector3(goal.x,goal.y+1,goal.z).sub(from),len=ray.length();if(Math.abs(candidate.x)<SAFE_EDGE&&Math.abs(candidate.z)<SAFE_EDGE&&obstacleDistance(from,ray.normalize(),this.colliders,len)>=len-.1){best=candidate;break;}}e.firingGoal=best||pursuit;}pursuit=e.firingGoal;}
  if(e.sound<=0){this.voice(e,'living');e.sound=3+e.id%3;}const beforeX=p.x,beforeZ=p.z,yaw=Math.atan2(goal.x-p.x,goal.z-p.z),turn=Math.atan2(Math.sin(yaw-e.rig.rotation.y),Math.cos(yaw-e.rig.rotation.y));e.rig.rotation.y+=T.MathUtils.clamp(turn,-dt*3,dt*3);
  if(e.stagger>0){e.rig.rotation.z=Math.sin(e.stagger*45)*.035;e.motion=0;poseMutant(e);continue;}e.rig.rotation.z=0;
  if(e.type==='eye')p.y=4.5+Math.sin(e.phase*.4)*.3;

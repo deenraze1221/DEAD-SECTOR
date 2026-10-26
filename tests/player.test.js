@@ -54,7 +54,7 @@ test('spawn is unobstructed; perimeter contains sprinting player', () => {
   const boxes = getColliders(), a = new Player(SPAWN);
   assert.ok(boxes.every(b => !overlapsBody(a.position, b)));
   a.position={x:0,y:0,z:85};advance(a, 12, { backward: true, sprint: true }, boxes);
-  near(a.position.z, 99.5 - PLAYER.radius);
+  near(a.position.z, 124.5 - PLAYER.radius);
 });
 test('generated building doorway admits player and adjacent facade blocks movement',()=>{
  const layout=generateTown(1),b=layout.buildings[0],front=b.z+b.d/2;

@@ -1,6 +1,6 @@
 # DEAD SECTOR
 
-Browser wave-survival FPS with seeded 200 × 200 m towns, English/Russian UI and private four-player lobbies. All environment models are original procedural geometry. Weapon models come from the user's updated `gunsv2.fbx`, with the original pistol retained.
+Browser wave-survival FPS with seeded 250 × 250 m towns, English/Russian UI and private four-player lobbies. All environment models are original procedural geometry. Weapon models come from the user's updated `gunsv2.fbx`, with the original pistol retained.
 
 ## Play
 
@@ -41,7 +41,7 @@ The updated FBX uses painted metal, brown stock/grip and blue pneumatic accents 
 
 ## City generation
 
-The town has 64 buildings and 24 repeatable architecture families, including the new cinema, fire station, motel and a tower with a 10 m structural height, plus the unique grocery. Ground floors use three floor plans: central spine, front lounge with rear rooms, and open floor with rear service band. Furniture, wall orientation and room use vary deterministically. Wide entrances have clear vestibules. Upper stories are closed architectural volumes; stairs and upper-floor access are not implemented.
+The town has 100 buildings and 28 repeatable architecture families, including the new cinema, fire station, motel and a tower with a 10 m structural height, plus the unique grocery. Ground floors use three floor plans: central spine, front lounge with rear rooms, and open floor with rear service band. Furniture, wall orientation and room use vary deterministically. Wide entrances have clear vestibules. Upper stories are closed architectural volumes; stairs and upper-floor access are not implemented.
 
 Street population is increased by 15% after the baseline placement pass. Added families are traffic cones, street clocks, newspaper stands, public telephones and bus route boards. Reservations reject collisions with buildings, cars and existing props. Benches face pedestrian areas, bins pair with seating/shelters, lamps follow uniform pavement lines, cars fit lanes or marked bays, and fences form connected boundary runs of at least 14.6 m. The five extra prop families and all repeatable architectural families appear in each tested town.
 
@@ -182,3 +182,9 @@ The local body fades in over the look-down angle and roughly0.25s of motion usin
 ## Surface and lighting upgrade
 
 Materials use metre-scaled world coordinates: staggered brick courses, pavement joints, damp concrete bases and wood grain retain their scale on differently sized meshes. Road patches become reflective puddles as the existing rain wetness accumulates, then dry gradually. A cached, original sky environment supplies soft reflections to metal, glass and wet asphalt, with reduced intensity at night. The shadow frustum follows the player over a140m area for better local detail. Street-light pools and halos are instanced/world-anchored and disabled on low quality; night skies gain sparse stars behind cloud cover. Geometry and gameplay colliders are unchanged.
+
+## 250m city expansion
+
+The playable square is250×250m (62,500m²), with100 city blocks,298 furnished ground-floor rooms and106 evenly spaced street lamps. New architecture: courthouse,38m Art Deco tower, freight depot and observatory with a rooftop dome. New props: recycling station, parcel locker, bus sign, road block, cable reel, utility cabinet, flower box, street kiosk, delivery trolley and solar bollard. All are original procedural models and participate in placement bounds/collisions. Select facade windows emit a restrained warm glow at night without adding point lights.
+
+World dimensions are shared by generator, server pose bounds, navigation, flying-enemy positioning, mission placement and the100m background belt. Navigation rasterizes collider footprints directly to accommodate the larger city without a collider scan for every grid cell.

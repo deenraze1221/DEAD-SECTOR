@@ -1,16 +1,17 @@
+import {SAFE_EDGE,INNER_ROADS} from './world-config.js';
 import * as T from 'three';
 import {missionForWave,growthHealth} from './mission-roll.js';
 export const AIRDROP_INTERVAL=480, AIRCRAFT_FLYOVER=6, DROP_DESCENT=8;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export function missionReward(seed,wave){return 300+((Math.imul(seed^wave,1664525)>>>0)%301);}
-export function freeGround(world,p,r=.5){return Math.abs(p.x)<94&&Math.abs(p.z)<94&&!world.colliders.some(b=>b.minY<1.5&&b.maxY>0&&p.x>b.minX-r&&p.x<b.maxX+r&&p.z>b.minZ-r&&p.z<b.maxZ+r);}
-export function roadPoint(world,seed){for(let i=0;i<150;i++){const p={x:(((seed+i*13)>>>0)%7-3)*24,z:(((seed+i*37)>>>0)%165)-82};if(freeGround(world,p,1.1))return p;}return {x:0,z:0};}
+export function freeGround(world,p,r=.5){return Math.abs(p.x)<SAFE_EDGE&&Math.abs(p.z)<SAFE_EDGE&&!world.colliders.some(b=>b.minY<1.5&&b.maxY>0&&p.x>b.minX-r&&p.x<b.maxX+r&&p.z>b.minZ-r&&p.z<b.maxZ+r);}
+export function roadPoint(world,seed){for(let i=0;i<150;i++){const p={x:INNER_ROADS[((seed+i*13)>>>0)%INNER_ROADS.length],z:(((seed+i*37)>>>0)%(SAFE_EDGE*2-1))-(SAFE_EDGE-1)};if(freeGround(world,p,1.1))return p;}return {x:0,z:0};}
 export function packagePoint(world,seed){const list=world.buildings.filter(b=>b.type!=='grocery');for(let i=0;i<list.length;i++){const b=list[(seed+i)%list.length];for(const z of [b.z+b.d/2-1,b.z+b.d/2-1.8,b.z+b.d/2-2.5])for(const dx of [0,.8,-.8,1.5,-1.5]){const p={x:b.x+dx,z};if(freeGround(world,p,.35))return {...p,building:b.id};}}return null;}
 export function makeTrapModel(){const g=new T.Group(),metal=new T.MeshStandardMaterial({color:'#707d7a',metalness:.65,roughness:.55});const ring=new T.Mesh(new T.TorusGeometry(.36,.035,5,16),metal);ring.rotation.x=Math.PI/2;ring.position.y=.04;g.add(ring);for(let i=0;i<12;i++){const a=i/12*Math.PI*2,t=new T.Mesh(new T.ConeGeometry(.05,.14,3),metal);t.position.set(Math.cos(a)*.31,.10,Math.sin(a)*.31);g.add(t);}const plate=new T.Mesh(new T.CylinderGeometry(.13,.13,.035,12),metal);plate.position.y=.04;g.add(plate);return g;}
 export class Operations{
  constructor(scene,world,seed){this.scene=scene;this.world=world;this.seed=seed;this.time=0;this.wave=0;this.mission=null;this.traps=[];this.drops=[];this.sounds=[];this.sequence=0;this.seenSounds=new Set();this.visuals=new Map();this.plane=this.makePlane();scene.add(this.plane);}
  sound(type,x,z,range){this.sounds.push({id:++this.sequence,type,x,z,range});if(this.sounds.length>24)this.sounds.shift();}
- startMission(wave,id=wave%2?'package':'zone',reward=missionReward(this.seed,wave)){let p=id==='package'?packagePoint(this.world,(this.seed+wave*71)>>>0):null;if(id==='zone'){const n=((this.seed+wave*13)>>>0)%49;p={x:(n%7-3)*24,z:(Math.floor(n/7)-3)*24};}if(['generator','growth'].includes(id))p=roadPoint(this.world,(this.seed+wave*193)>>>0);if(!p)return;this.wave=wave;this.mission={...p,id,key:`mission-${wave}`,wave,reward,...(id==='growth'?{hp:growthHealth(wave),maxHp:growthHealth(wave)}:{}),status:'active',progress:0,beep:0};}
+ startMission(wave,id=wave%2?'package':'zone',reward=missionReward(this.seed,wave)){let p=id==='package'?packagePoint(this.world,(this.seed+wave*71)>>>0):null;if(id==='zone'){const side=INNER_ROADS.length,n=((this.seed+wave*13)>>>0)%(side*side);p={x:INNER_ROADS[n%side],z:INNER_ROADS[Math.floor(n/side)]};}if(['generator','growth'].includes(id))p=roadPoint(this.world,(this.seed+wave*193)>>>0);if(!p)return;this.wave=wave;this.mission={...p,id,key:`mission-${wave}`,wave,reward,...(id==='growth'?{hp:growthHealth(wave),maxHp:growthHealth(wave)}:{}),status:'active',progress:0,beep:0};}
  addTrap(record){if(!this.traps.some(t=>t.id===record.id))this.traps.push({...record});}
  placeTrap(p,id){if(p.y>.35||!freeGround(this.world,p,.4)||this.traps.some(t=>!t.used&&Math.hypot(t.x-p.x,t.z-p.z)<.9))return false;this.addTrap({id,x:p.x,z:p.z,used:false});return true;}
  nearby(p){const d=this.drops.find(d=>d.status==='landed'&&p.y<1&&Math.hypot(d.x-p.x,d.z-p.z)<2);if(d)return {type:'drop',record:d};const m=this.mission;if(m?.id==='package'&&m.status==='active'&&p.y<1&&Math.hypot(m.x-p.x,m.z-p.z)<2)return {type:'package',record:m};return null;}
