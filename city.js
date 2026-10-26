@@ -1,10 +1,20 @@
 import * as T from 'three';
+import {generateSkyline} from './skyline.js';
 // Instanced construction keeps detailed models practical in a 64-building city.
 export function createCity(scene,layout){
  const palettes={concrete:'#8b8e7e',brick:'#8d6652',plaster:'#a6a58c',dark:'#303c35',wood:'#806448',steel:'#627269',rust:'#865539',glass:'#3c5654',rubber:'#202924',fabric:'#77816a',white:'#c4c6b3',leaf:'#526a46',bark:'#5d4d3b',light:'#e1d79f',road:'#343c37',pavement:'#808574',yard:'#727e62',floor:'#9a9380',paint:'#b7b79b'};
  const geometries={box:new T.BoxGeometry(1,1,1),cylinder:new T.CylinderGeometry(1,1,1,10),sphere:new T.IcosahedronGeometry(1,1),torus:new T.TorusGeometry(1,.1,5,12),cone:new T.ConeGeometry(1,1,8),plane:new T.PlaneGeometry(1,1)},materials={},batches=new Map();
  for(const [name,color]of Object.entries(palettes)){const m=name==='light'?new T.MeshBasicMaterial({color}):new T.MeshStandardMaterial({color,roughness:name==='glass'?.45:.92,metalness:name==='steel'?.35:0});
  if(name==='paint'||name==='glass'){m.polygonOffset=true;m.polygonOffsetFactor=-2;m.polygonOffsetUnits=-2;}
+ if(!['light','glass','paint','leaf'].includes(name)){m.onBeforeCompile=shader=>{shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nvarying vec3 surfacePosition;').replace('#include <begin_vertex>',`#include <begin_vertex>
+ vec4 surfaceVertex=vec4(transformed,1.);
+ #ifdef USE_INSTANCING
+ surfaceVertex=instanceMatrix*surfaceVertex;
+ #endif
+ surfacePosition=(modelMatrix*surfaceVertex).xyz;`);shader.fragmentShader=shader.fragmentShader.replace('#include <common>',`#include <common>
+ varying vec3 surfacePosition;
+ float cityGrain(vec2 p){vec2 i=floor(p),f=fract(p);f=f*f*(3.-2.*f);return mix(mix(fract(sin(dot(i,vec2(12.98,78.23)))*43758.54),fract(sin(dot(i+vec2(1,0),vec2(12.98,78.23)))*43758.54),f.x),mix(fract(sin(dot(i+vec2(0,1),vec2(12.98,78.23)))*43758.54),fract(sin(dot(i+vec2(1,1),vec2(12.98,78.23)))*43758.54),f.x),f.y);}`).replace('#include <color_fragment>',`#include <color_fragment>
+ float grime=cityGrain(surfacePosition.xz*.7+surfacePosition.y*.23);diffuseColor.rgb*=mix(.82,1.06,grime);`);};}
  materials[name]=m;}
  materials.road.dispose();materials.road=new T.MeshPhysicalMaterial({color:palettes.road,roughness:.92,clearcoat:.0001,clearcoatRoughness:.08});scene.userData.roadMaterial=materials.road;
  for(const type of new Set(layout.buildings.map(b=>b.type))){const canvas=document.createElement('canvas');canvas.width=256;canvas.height=48;const ctx=canvas.getContext('2d');ctx.fillStyle='#ded9ba';ctx.textAlign='center';ctx.textBaseline='middle';ctx.font='bold 28px monospace';ctx.fillText(type==='grocery'?'SECTOR MART':({residentialHighrise:'NORTH RESIDENCES',corporateTower:'CIVIC OFFICES',hospitalTower:'MEDICAL TOWER',communicationsTower:'RELAY STATION'}[type]||type.toUpperCase()),128,25,242);const texture=new T.CanvasTexture(canvas);texture.colorSpace=T.SRGBColorSpace;texture.magFilter=T.NearestFilter;materials['label-'+type]=new T.MeshBasicMaterial({map:texture,alphaTest:.4,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2});}
@@ -144,6 +154,11 @@ export function createCity(scene,layout){
  }
  for(const m of layout.markings)part('plane','paint',m.x,.002,m.z,m.w,m.d,1,-Math.PI/2);
  for(const bay of layout.parking){for(const side of [-1,1])part('plane','paint',bay.x+side*bay.w/2,.002,bay.z,.055,bay.d,1,-Math.PI/2);part('plane','paint',bay.x,.002,bay.z-bay.d/2,bay.w,.055,1,-Math.PI/2);}
+ // Background shares instanced materials, without interiors or gameplay colliders.
+ const skyline=generateSkyline(layout.seed??1);anchor.identity();model=null;
+ for(const b of skyline){anchor.makeTranslation(b.x,0,b.z);const wall=['concrete','brick','plaster'][b.variant%3];box(wall,b.w,b.h,b.d,0,b.h/2,0);box('dark',b.w+.25,.3,b.d+.25,0,b.h+.15,0);box('steel',2,1.2,2,0,b.h+.9,0);for(let y=2.5;y<b.h-1;y+=3.2){for(let x=-b.w/2+1.6;x<b.w/2-1;x+=3.3)for(const side of [-1,1])box('glass',1.15,1.6,.06,x,y,side*(b.d/2+.04));for(let z=-b.d/2+1.6;z<b.d/2-1;z+=3.3)for(const side of [-1,1])box('glass',.06,1.6,1.15,side*(b.w/2+.04),y,z);}}
+ anchor.identity();for(const [x,z,w,d]of [[0,-150,400,100],[0,150,400,100],[-150,0,100,200],[150,0,100,200]])surface(x,z,w,d,'road');
+ scene.userData.skyline={count:skyline.length,depth:100,extent:200};
  // Instanced materials support geometry reuse without thousands of draw calls.
  for(const [key,records]of batches){const [shape,mat]=key.split('/'),mesh=new T.InstancedMesh(geometries[shape],materials[mat],records.length);records.forEach((record,i)=>{mesh.setMatrixAt(i,record.matrix);const v=record.tint%16,shade=.9+(v%4)*.035;mesh.setColorAt(i,new T.Color(shade,shade-(v%3)*.015,shade-(v%5)*.012));});mesh.instanceMatrix.needsUpdate=true;mesh.castShadow=shape!=='plane'&&mat!=='glass'&&mat!=='light';// Ground receives cast shadows; solid instanced facades avoid self-shadow acne.
  mesh.receiveShadow=shape==='plane'&&mat!=='light';mesh.computeBoundingBox();mesh.computeBoundingSphere();mesh.name='city/'+key;scene.add(mesh);}

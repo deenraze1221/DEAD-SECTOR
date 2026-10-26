@@ -1,5 +1,5 @@
 // Physics is independent of rendering so fixed-step collision rules can be tested.
-export const PLAYER = Object.freeze({ radius: 0.32, height: 1.8, eye: 1.65, walk: 4.5, run: 7.5, gravity: 20, jump: 7 });
+export const PLAYER = Object.freeze({ radius: 0.32, height: 1.8, eye: 1.65, walk: 4.5, run: 7.5, gravity: 20, jump: 7 / Math.SQRT2 });
 export const FIXED_STEP = 1 / 120;
 
 export function overlapsBody(position, box) {
@@ -26,7 +26,7 @@ export class Player {
     if (magnitude > 0) { forward /= magnitude; right /= magnitude; }
     const wantsSprint=Boolean(input.sprint&&magnitude>0&&this.stamina>1e-8&&!this.exhausted),speed=wantsSprint?PLAYER.run:PLAYER.walk;
     const targetX=(right*Math.cos(this.yaw)-forward*Math.sin(this.yaw))*speed,targetZ=(-right*Math.sin(this.yaw)-forward*Math.cos(this.yaw))*speed;
-    const vx=targetX-this.velocityX,vz=targetZ-this.velocityZ,difference=Math.hypot(vx,vz),limit=(magnitude>0?36:55)*dt,factor=difference>0?Math.min(1,limit/difference):1;this.velocityX+=vx*factor;this.velocityZ+=vz*factor;
+    const vx=targetX-this.velocityX,vz=targetZ-this.velocityZ,difference=Math.hypot(vx,vz),limit=(magnitude>0?36:55)/1.15*dt,factor=difference>0?Math.min(1,limit/difference):1;this.velocityX+=vx*factor;this.velocityZ+=vz*factor;
     const dx=this.velocityX*dt,dz=this.velocityZ*dt;
     const oldX = this.position.x, oldZ = this.position.z;
     // Resolve axes separately: the player slides along walls instead of sticking.

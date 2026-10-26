@@ -20,7 +20,7 @@ test('wear applies per actual 100 shots, broken guns cannot fire, repair restore
  const stale=structuredClone(a);a.revision++;a.weapons.Helsing.durability=100;syncCombat(a,stale);assert.equal(a.weapons.Helsing.durability,100);
 });
 test('zombies leave collectable cash, not free ammo or medicine, with monotonic HP rewards and one pickup',()=>{
- assert.deepEqual([125,250,300,600].map(rewardForHP),[10,30,40,100]);assert.equal(rewardForHP(0),10);assert.equal(rewardForHP(10000),100);
+ assert.deepEqual([125,250,300,600].map(rewardForHP),[15,30,40,100]);assert.equal(rewardForHP(0),15);assert.equal(rewardForHP(10000),100);
  const scene=new T.Scene(),loot=new MoneyDrops(scene),enemies=new Enemies(scene,[],audio),a=createInventory();enemies.onDeath=e=>loot.spawn(e);const e=enemies.spawn('zombie',0,0);enemies.die(e);assert.equal(loot.items.length,1);assert.equal(loot.nearby({x:0,y:0,z:0}).value,30);assert.equal(loot.collect('cash-'+e.id,a),true);assert.equal(loot.collect('cash-'+e.id,a),false);assert.equal(a.money,30);assert.deepEqual(generateTown(42).supplies,[]);
 });
 test('five seconds of sprint drain stamina, five seconds of recovery refill it, no stationary drain',()=>{

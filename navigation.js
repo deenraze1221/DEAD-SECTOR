@@ -15,7 +15,8 @@ export function createNavigation(colliders, radius=.4, height=1.8, baseY=0) {
     return null;
   }
   const fields=new Map();
-  return {path(from,to){const a=nearest(from),b=nearest(to);if(!a||!b)return [];const start=index(...a),end=index(...b);let parents=fields.get(end);
+  const clear=(a,b)=>{const length=Math.hypot(b.x-a.x,b.z-a.z),steps=Math.ceil(length*4);for(let i=0;i<=steps;i++){const t=steps?i/steps:0;if(!free(Math.round(a.x+(b.x-a.x)*t),Math.round(a.z+(b.z-a.z)*t)))return false;}return true;};
+  return {clear,path(from,to){const a=nearest(from),b=nearest(to);if(!a||!b)return [];const start=index(...a),end=index(...b);let parents=fields.get(end);
   if(!parents){parents=new Int32Array(size*size).fill(-1);parents[end]=end;const queue=[end];for(let head=0;head<queue.length;head++){const current=queue[head],x=current%size-offset,z=Math.floor(current/size)-offset;for(const [dx,dz]of [[1,0],[-1,0],[0,1],[0,-1]])if(free(x+dx,z+dz)){const n=index(x+dx,z+dz);if(parents[n]===-1){parents[n]=current;queue.push(n);}}}fields.set(end,parents);if(fields.size>16)fields.delete(fields.keys().next().value);}
   if(parents[start]===-1)return [];const path=[];for(let n=start;n!==end;){n=parents[n];path.push({x:n%size-offset,z:Math.floor(n/size)-offset});}return path;}};
 }
