@@ -27,7 +27,7 @@ export function installSurfaceDetail(material,kind){
    ${mode===3?`vec2 joint=min(fract(surfaceUV/.72),1.-fract(surfaceUV/.72));float seam=1.-smoothstep(.008,.028,min(joint.x,joint.y));diffuseColor.rgb*=1.-seam*.32;`:''}
    ${mode===4?`float patches=cityNoise(surfaceUV*.22+vec2(16.,8.));surfacePuddle=smoothstep(.56,.72,patches)*surfaceWetness;float cracks=1.-smoothstep(.004,.022,abs(cityNoise(surfaceUV*1.5)-.48));diffuseColor.rgb*=1.-cracks*.15;diffuseColor.rgb=mix(diffuseColor.rgb,diffuseColor.rgb*.62,surfacePuddle);`:''}
    ${mode===5?`float grain=sin(surfaceUV.x*135.+cityNoise(surfaceUV*vec2(4.,.8))*7.);diffuseColor.rgb*=.92+grain*.08;`:''}
-  `).replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
+  `).replace('#include <normal_fragment_maps>',`#include <normal_fragment_maps>\n normal=normalize(normal+vec3(dFdx(fine),dFdy(fine),0.)*.13);`).replace('#include <roughnessmap_fragment>',`#include <roughnessmap_fragment>
    roughnessFactor=clamp(roughnessFactor+(fine-.5)*.1,.08,1.);
    ${mode===4?'roughnessFactor=mix(max(.58,roughnessFactor),.09,surfacePuddle);':''}
   `);

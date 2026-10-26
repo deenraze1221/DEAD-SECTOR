@@ -246,8 +246,9 @@ try {
     for(const p of peers.values())p.avatar.animate(delta);
     selfLegs.update(player,delta);selfBody.update(player.pitch,delta,started&&!outcome);
     scene.userData.citySky.update(player.position,elapsed,weather.cycle?.night,preferences.quality);session.measurePing(time);metrics.update(time,preferences.metrics,session.pingMs,session.active);
-    renderer.autoClear=true;renderer.render(scene, camera);
+    renderer.setRenderTarget(psx.target);renderer.autoClear=true;renderer.render(scene, camera);
     if(started&&!outcome){renderer.autoClear=false;renderer.clearDepth();renderer.render(rifle.scene,rifle.camera);}
+    psx.present(elapsed,preferences.quality);
   }
   renderer.setAnimationLoop(frame);
 } catch (error) {

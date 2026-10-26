@@ -53,8 +53,8 @@ World pixel rendering remains mandatory at 540 pixels vertically. There is no ve
 
 | Enemy | HP | Speed | Damage | Chance |
 | --- | --- | --- | --- | --- |
-| Zombie | 250 | 2.2 m/s | 25 | 55% |
-| Runner | 125 | 3.6 m/s | 15 | 20% |
+| Zombie | 250 | 2.42 m/s | 25 | 55% |
+| Runner | 125 | 3.78 m/s | 15 | 20% |
 | Flying flesh eye | 300 | 2.3 m/s | projectile 30 | 20% |
 | Brute | 600 | 1.1 m/s | 40 | 5% |
 
@@ -202,3 +202,5 @@ Enemy traversal now validates smoothed segments against actual expanded terrain 
 Mouse look now requests unadjusted relative input where supported, falls back to standard pointer lock, rejects stale queued events and isolated cursor warps, and removes the old16-degree-per-frame truncation that made fast movements depend on FPS. Ordinary deltas apply once with no smoothing tail. Five additional street models and grounded tripod feet are included in the rendered-bounds audit.
 
 First-person body update: the local view keeps a narrowed leg rig (72% width/depth) with torso, vest, backpack and upper gear hidden. Walk/run steps advance from actual physics travel, with separate stride lengths, planted-foot IK, smooth stop/start and a jump tuck. The local view no longer estimates speed from network-packet timing. Remote soldier proportions and rig remain unchanged.
+
+Local body now includes a compact pelvis, belt and lower abdomen joined to straight-legged, hip-driven steps; the upper vest stays hidden to preserve downward visibility. Refrigerated display back panels are inset within their frame and box tape uses separate raised strips, removing the reported coplanar surfaces. A linear HDR target now combines world and viewmodel before one post pass (gentle bloom, restrained sharpening/color grading, vignette and grain), retaining built-in pixelization. Surface normals gain subtle micro relief. Heavy fog density is doubled to0.058; other fog tiers are unchanged.

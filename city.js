@@ -36,7 +36,7 @@ export function createCity(scene,layout){
   }else if(type==='produceStand'){
    box('wood',w,.66,d,0,.33,0);box('dark',w,.05,d,0,.685,0);for(let n=0;n<5;n++)for(const z of [-.2,.1])part('sphere',(n+v)%2?'leaf':'rust',-w*.38+n*w*.19,.82,z,.11,.13,.11);
   }else if(type==='refrigeratedCase'){
-   box('white',w,h,d*.45,0,h/2,-d*.275);box('steel',w,.16,d,0,.08,0);box('steel',w,.16,d,0,h-.08,0);for(const x of [-w/2+.04,w/2-.04])box('steel',.08,h-.32,d,x,h/2,0);for(let n=0;n<4;n++){box('white',w-.16,.045,d*.8,0,.3+n*.38,0);for(let k=0;k<5;k++)box('rust',.15,.23,.15,-w*.35+k*w*.175,.44+n*.38,0);}
+   box('white',w-.18,h-.34,d*.45,0,h/2,-d*.275);box('steel',w,.16,d,0,.08,0);box('steel',w,.16,d,0,h-.08,0);for(const x of [-w/2+.04,w/2-.04])box('steel',.08,h-.32,d,x,h/2,0);for(let n=0;n<4;n++){box('white',w-.16,.045,d*.8,0,.3+n*.38,0);for(let k=0;k<5;k++)box('rust',.15,.23,.15,-w*.35+k*w*.175,.44+n*.38,0);}
   }else if(type==='freezer'){
    box('white',w,h-.08,d,0,(h-.08)/2,0);box('glass',w-.1,.08,d-.1,0,h-.04,0);for(const x of [-w*.23,w*.23])box('steel',.32,.03,.04,x,h-.095,d*.25);
   }else if(type==='shoppingCart'){
@@ -45,7 +45,7 @@ export function createCity(scene,layout){
   }else if(type==='basketStand'){
    box('steel',w,.15,d,0,.075,0);for(let n=0;n<5;n++){box('leaf',w-.06,.10,d-.05,0,.25+n*.15,0);box('dark',w-.15,.02,d-.14,0,.31+n*.15,0);}
   }else if(type==='stockBoxes'){
-   for(const x of [-w*.25,w*.25])for(const z of [-d*.25,d*.25])box('wood',w*.47,h*.55,d*.47,x,h*.275,z);box('wood',w*.65,h*.45,d*.65,0,h*.775,0);box('white',.10,h*.45,d*.66,0,h*.775,0);
+   for(const x of [-w*.25,w*.25])for(const z of [-d*.25,d*.25])box('wood',w*.47,h*.55,d*.47,x,h*.275,z);box('wood',w*.65,h*.45-.012,d*.65,0,h*.775-.006,0);box('white',.10,.006,d*.65,0,h-.006,0);for(const side of [-1,1])box('white',.10,h*.45-.018,.006,0,h*.775-.006,side*(d*.325+.004));
   }else if(['desk','table','workbench'].includes(type)){const top=.76;legs(w,d,top-.06);box('wood',w,.06,d,0,top-.03,0);if(type==='desk'){box('steel',.3,.025,.2,0,top+.0125,-.08);box('steel',.05,.19,.05,0,top+.12,-.12);box('dark',.5,.32,.055,0,top+.36,-.15);box('glass',.44,.26,.01,0,top+.36,-.116);box('dark',.4,.025,.14,0,top+.0125,.2);}if(type==='workbench'){box('steel',w,.28,.05,0,1.1,-d/2+.025);for(let i=0;i<5;i++)box('dark',.045,.2,.045,-w*.35+i*w*.17,1.08,-d/2+.07);}}
   else if(type==='chair'||type==='stool'){legs(w,d,.44);box('wood',w,.06,d,0,.47,0);if(type==='chair'){for(const x of [-w/2+.035,w/2-.035])box('steel',.07,.45,.07,x,.725,-d/2+.035);box('fabric',w-.1,.26,.07,0,.81,-d/2+.035);}}
   else if(type==='bed'||type==='examBed'){legs(w,d,.22);box('steel',w,.12,d,0,.28,0);box('white',w-.04,.18,d-.05,0,.43,0);box('fabric',w-.08,.04,d*.58,0,.54,d*.14);box('white',w*.7,.12,.35,0,.58,-d*.32);if(type==='bed')box('wood',w,.6,.08,0,.65,-d/2+.04);}

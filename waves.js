@@ -1,7 +1,7 @@
 export const ENEMY_TYPES={
  boss:{hp:1800,speed:1.3,damage:55,weight:0,radius:2.1,height:6.6,scale:3.3},
- zombie:{hp:250,speed:2.2,damage:25,weight:55,radius:.5,height:2,scale:1},
- runner:{hp:125,speed:3.6,damage:15,weight:20,radius:.38,height:1.5,scale:.75},
+ zombie:{hp:250,speed:2.42,damage:25,weight:55,radius:.5,height:2,scale:1},
+ runner:{hp:125,speed:3.78,damage:15,weight:20,radius:.38,height:1.5,scale:.75},
  eye:{hp:300,speed:2.3,damage:30,weight:20,radius:.7,height:1.5,scale:1},
  brute:{hp:600,speed:1.1,damage:40,weight:5,radius:2.15,height:6,scale:3},
 };
