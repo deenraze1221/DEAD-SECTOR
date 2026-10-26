@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import weaponModels from './assets/models/weapons.json' with { type: 'json' };
 import {WEAPONS} from './weapon-config.js';
+import {MOTION} from './weapon-motion.js';
 import {recordShot} from './economy.js';
 export {WEAPONS};
 export class Rifle {
@@ -36,6 +37,7 @@ export class Rifle {
       const arm=new THREE.Mesh(new THREE.CylinderGeometry(.035,.052,1,8),sleeve);arm.name=side<0?'support-forearm':'trigger-forearm';this.forearms.push(arm);this.model.add(arm,g);return g;
     });
     this.flash=new THREE.Mesh(new THREE.ConeGeometry(.065,.18,5),new THREE.MeshBasicMaterial({color:'#ffe790'}));
+    this.action=new THREE.Mesh(new THREE.BoxGeometry(.018,.025,.09),new THREE.MeshStandardMaterial({color:'#8d9993',metalness:.6,roughness:.45}));this.model.add(this.action);this.casings=[];this.casingGeometry=new THREE.CylinderGeometry(.007,.007,.03,6);this.casingMaterial=new THREE.MeshStandardMaterial({color:'#b99b55',metalness:.6,roughness:.5});
     this.flash.rotation.x=-Math.PI/2;this.model.add(this.flash);this.reset('Pistol');
   }
   get ammo(){return this.inventory?this.inventory.weapons[this.config.id].ammo:this._ammo;}
@@ -45,7 +47,7 @@ export class Rifle {
   get durability(){return this.inventory?this.inventory.weapons[this.config.id].durability:this._durability;}
   bindInventory(account){const changed=this.config.id!==account.equipped;this.inventory=null;if(changed)this.reset(account.equipped);this.inventory=account;}
   reset(id='Pistol'){
-    this.inventory=null;this._durability=100;this.wearShots=0;
+    for(const c of this.casings||[])this.scene.remove(c.mesh);if(this.casings)this.casings=[];this.inventory=null;this._durability=100;this.wearShots=0;
     const selected=WEAPONS.findIndex(w=>w.id===id);
     const index=selected>=0?selected:Math.min(WEAPONS.length-1,Math.max(0,Math.floor(this.random()*WEAPONS.length)));
     this.config=WEAPONS[index];this.variant=this.variants.find(v=>v.record.id===this.config.id);this.gun=this.variant.body;this.magazine=this.variant.magazine;
@@ -55,21 +57,28 @@ export class Rifle {
   }
   reload(){if(this.reloadTime||this.ammo===this.config.capacity||!this.reserve)return;this.reloadTime=this.config.reload;this.audio.play('reload');}
   step(dt){
+    for(const c of this.casings){c.life-=dt;c.velocity.y-=2.5*dt;c.mesh.position.addScaledVector(c.velocity,dt);c.mesh.rotation.x+=dt*11;c.mesh.rotation.z+=dt*8;}
+    this.casings=this.casings.filter(c=>{if(c.life>0)return true;this.scene.remove(c.mesh);return false;});
     this.cooldown=Math.max(0,this.cooldown-dt);this.flashTime=Math.max(0,this.flashTime-dt);this.flash.visible=this.flashTime>0;this.recoil=Math.max(0,this.recoil-dt*1.8);
     if(this.reloadTime>0){this.reloadTime=Math.max(0,this.reloadTime-dt);if(!this.reloadTime){const n=Math.min(this.config.capacity-this.ammo,this.reserve);this.ammo+=n;this.reserve-=n;this.audio.play('reload');}}
   }
-  fire(){if(this.reloadTime||this.cooldown||this.durability<=0)return false;if(!this.ammo){this.cooldown=.25;this.audio.play('empty');return false;}if(this.inventory)recordShot(this.inventory);else{this.ammo--;this.wearShots++;if(this.wearShots>=100){this._durability=Math.max(0,this._durability-5);this.wearShots=0;}}this.cooldown=this.config.interval;this.recoil=.09;this.flashTime=.045;this.audio.shot?.(this.config.id);return true;}
+  fire(){if(this.reloadTime||this.cooldown||this.durability<=0)return false;if(!this.ammo){this.cooldown=.25;this.audio.play('empty');return false;}if(this.inventory)recordShot(this.inventory);else{this.ammo--;this.wearShots++;if(this.wearShots>=100){this._durability=Math.max(0,this._durability-5);this.wearShots=0;}}this.cooldown=this.config.interval;this.recoil=MOTION[this.config.id].kick;const shell=new THREE.Mesh(this.casingGeometry,this.casingMaterial);shell.position.set(.27,-.17,-.39);this.scene.add(shell);this.casings.push({mesh:shell,life:.7,velocity:new THREE.Vector3(.5,.35,.12)});if(this.casings.length>24)this.scene.remove(this.casings.shift().mesh);this.flashTime=.045;this.audio.shot?.(this.config.id);return true;}
   pose(time,moving){
     const progress=this.reloadTime?1-this.reloadTime/this.config.reload:0,drop=this.reloadTime?Math.sin(progress*Math.PI):0;
-    this.model.position.set(.23,(-.22)-drop*.15,-.48+this.recoil);this.model.rotation.set(this.recoil*.8,0,-drop*.25);
+    this.model.position.set(.23,(-.22)-drop*.15,-.48+this.recoil);const motion=MOTION[this.config.id];this.model.rotation.set(this.recoil*motion.pitch*12,Math.sin(time*17)*this.recoil*motion.yaw*8,-drop*(motion.action==='drum'?.65:.25));
     this.magazine.position.y=-drop*.22;this.magazine.rotation.x=drop*.2;
     const loading=this.reloadTime&&this.config.reloadStyle!=='magazine'?Math.sin(progress*Math.PI*6)*drop:0;
     if(this.reloadTime)this.model.rotation.x+=drop*(this.config.reloadStyle==='breech'?.4:.12);
     const length=this.variant.record.length;
+    const cycle=this.reloadTime?Math.sin(progress*Math.PI*motion.load):0;
+    this.action.position.set(.042,.005,length*.05+(this.flashTime>0?.045:0)+(this.reloadTime&&['bolt','rack'].includes(motion.action)?Math.max(0,cycle)*.09:0));
+    this.action.rotation.z=motion.action==='bolt'&&this.reloadTime?drop*.7:0;
+    if(this.reloadTime&&motion.action==='break')this.model.rotation.x+=drop*.25;
+    if(this.reloadTime&&motion.action==='drum')this.model.rotation.y+=drop*.22;
     const grips=this.variant.record.grips;
     this.hands[1].position.fromArray(grips.trigger);
     this.hands[0].position.fromArray(grips.support);
-    if(this.reloadTime){this.hands[0].position.x-=drop*.04;this.hands[0].position.y-=drop*.09;this.hands[0].position.z+=drop*.10+loading*.025;}
+    if(this.reloadTime){if(['bolt','rack'].includes(motion.action)){this.hands[0].position.z+=drop*length*.20;this.hands[0].position.y+=drop*.08;}this.hands[0].position.z+=cycle*.025;this.hands[0].position.x-=drop*.04;this.hands[0].position.y-=drop*.09;this.hands[0].position.z+=drop*.10+loading*.025;}
     this.hands[0].rotation.set(-.12,0,drop*.12);this.hands[1].rotation.set(.06,0,-.08);
     this.forearms.forEach((arm,i)=>{const side=i===0?-1:1,start=this.hands[i].position.clone().add(new THREE.Vector3(0,-.015,.10)),end=new THREE.Vector3(side<0?-.24:.23,-.38,.40),delta=end.clone().sub(start);arm.position.copy(start).add(end).multiplyScalar(.5);arm.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),delta.clone().normalize());arm.scale.set(1,delta.length(),1);});
     if(moving){this.model.position.y+=Math.sin(time*10)*.007;this.model.position.x+=Math.cos(time*5)*.006;}

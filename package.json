@@ -17,7 +17,9 @@
     "test:revive:browser": "node tests/revive-browser.js",
     "test:geometry:browser": "node tests/geometry-browser.js",
     "test:mutants:browser": "node tests/mutants-browser.js",
-    "test:economy:browser": "node tests/economy-browser.js"
+    "test:economy:browser": "node tests/economy-browser.js",
+    "test:music:browser": "node tests/music-browser.js",
+    "report:economy": "node scripts/economy-report.js"
   },
   "dependencies": {
     "three": "0.180.0",

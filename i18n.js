@@ -1,4 +1,11 @@
 const entries={
+'При ранении лечит сразу; при полном HP — в запас (H/J)':'Heals immediately if injured; stored at full HP (H/J)',
+'60 секунд подготовки · Уничтожь всех · 30 секунд перерыва.':'60-second preparation · Clear all enemies · 30-second break',
+'ПОДГОТОВКА':'PREPARATION',
+'НАЧИНАЕТСЯ':'INCOMING','120 секунд спавна · Уничтожь всех · 30 секунд перерыва.':'120 seconds of spawns · Kill all enemies · 30-second break',
+'Автоподбор':'Auto pickup','ОРУЖИЕ':'WEAPONS','СНАРЯЖЕНИЕ':'GEAR','выстр/мин':'rounds/min','Деньги подобраны':'Cash collected',
+'Запустить генератор':'Start the generator','Удержать перекрёсток':'Hold the crossroads','Уничтожить нарост':'Destroy the growth','Событие выполнено':'Event complete',' · E рядом':' · E nearby','Награда получена':'Reward received','МИНИ-БОСС':'MINI-BOSS','БЫСТРОЕ НАСТУПЛЕНИЕ':'RUNNER RUSH','ОСАДА':'SIEGE','СТАНДАРТ':'STANDARD',
+
 "ПУСТО":"EMPTY",
 "Состояние обновлено":"State updated",
 "ЗДОРОВЬЕ":"HEALTH",

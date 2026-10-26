@@ -7,10 +7,10 @@ export class GoreParticles {
   this.mesh=new T.InstancedMesh(new T.BoxGeometry(1,1,1),new T.MeshStandardMaterial({color:'#b41e2d',roughness:1,flatShading:true}),capacity);
   this.mesh.name='red-death-particles';this.mesh.count=0;this.mesh.frustumCulled=false;this.mesh.instanceMatrix.setUsage(T.DynamicDrawUsage);scene.add(this.mesh);
  }
- burst(enemy){
+ burst(enemy,amount){
   let seed=(Math.imul(enemy.id+1,2654435761)^(enemy.skin+17))>>>0;
   const random=()=>{seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;};
-  const p=enemy.rig.position,scale=enemy.scale,count=enemy.type==='brute'?112:enemy.type==='eye'?64:48;
+  const p=enemy.rig.position,scale=enemy.scale,count=amount??(enemy.type==='brute'?112:enemy.type==='eye'?64:48);
   for(let n=0;n<count;n++){
    const slot=this.cursor++%this.capacity,angle=random()*Math.PI*2,speed=(1.1+random()*2.9)*Math.sqrt(scale),size=(.025+random()*.045)*Math.sqrt(scale);
    const item={x:p.x+(random()-.5)*enemy.radius,y:p.y+(enemy.type==='eye'?(random()-.5)*.8:(.25+random()*.65)*enemy.height),z:p.z+(random()-.5)*enemy.radius,vx:Math.sin(angle)*speed,vy:1.4+random()*3.5,vz:Math.cos(angle)*speed,size,age:0,life:1+random()*.8,rx:random()*3,ry:random()*3,spin:random()*8-4};

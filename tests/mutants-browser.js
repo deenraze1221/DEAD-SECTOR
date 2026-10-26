@@ -15,7 +15,7 @@ try{
   const ground=new T.Mesh(new T.PlaneGeometry(30,30),new T.MeshStandardMaterial({color:'#62685a'}));ground.rotation.x=-Math.PI/2;scene.add(ground);
   const enemies=new Enemies(scene,[],{play(){}});
   for(let i=0;i<5;i++)enemies.spawn('zombie',-5+i*1.6,0,i,i);
-  const brute=enemies.spawn('brute',5,0,5),runner=enemies.spawn('runner',2,0,6),eye=enemies.spawn('eye',-3,3,7);eye.rig.position.y=4;
+  const brute=enemies.spawn('brute',5,0,5),runner=enemies.spawn('runner',2,0,6),eye=enemies.spawn('eye',-3,3,7);eye.rig.position.y=4;enemies.spawn('boss',2,3,8);
   const camera=new T.PerspectiveCamera(48,1440/900,.1,100);camera.position.set(10,6.7,17);camera.lookAt(.5,2.4,0);
   const renderer=new T.WebGLRenderer({antialias:true});renderer.setSize(1440,900);renderer.outputColorSpace=T.SRGBColorSpace;renderer.toneMapping=T.ACESFilmicToneMapping;document.body.append(renderer.domElement);
   for(const e of enemies.items){e.motion=1;e.phase=1.3;poseMutant(e);}renderer.render(scene,camera);

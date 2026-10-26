@@ -15,3 +15,9 @@
 #briefing{display:none!important}
 
 .weapon-slots{position:absolute;left:28px;bottom:140px;display:flex;gap:6px;font:10px monospace}.weapon-slots span{padding:8px 10px;background:#111c19ce;border:1px solid #66764d66;color:#a5b29a}.weapon-slots .active{border-color:var(--acid);color:#deefb7}@media(max-width:800px){.weapon-slots{left:12px;bottom:115px;font-size:8px}.weapon-slots span{padding:6px}}
+
+#event-objective{max-width:330px;font:10px/1.6 monospace;color:#dfc487;margin-top:8px}#event-objective:empty{display:none}
+
+#shop-tabs{display:flex;gap:10px;margin:14px 0}#shop-tabs [aria-selected=true]{background:var(--acid);color:#182413}.weapon-silhouette{width:100%;height:88px;color:#b2c19c}.weapon-card{position:relative}.weapon-card .weapon-stats{opacity:0;transition:opacity .15s}.weapon-card:hover .weapon-stats,.weapon-card:focus-within .weapon-stats{opacity:1}.weapon-card:focus-visible{outline:2px solid var(--acid)}@media(hover:none){.weapon-card .weapon-stats{opacity:1}}
+
+#wave-notice{position:absolute;top:24%;left:50%;transform:translateX(-50%);padding:18px 30px;background:#142119e8;border-top:2px solid var(--acid);border-bottom:1px solid #9faf6980;color:#dfedb6;font:clamp(16px,2vw,28px) monospace;text-align:center;letter-spacing:3px;max-width:90vw}

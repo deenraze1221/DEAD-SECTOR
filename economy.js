@@ -3,7 +3,7 @@ export const AMMO_LIMIT=500;
 export const STORE={x:10.35,z:9.95,w:9.4,d:9.4,terminal:{x:7.25,z:10.9},spawn:{x:10.35,y:0,z:17.1}};
 const prices={Helsing:6000,Tikhar:3500,Shambler:3000,Shotgun:2000,Kalash:4000,VSV:5500,Scorpion:4500,Vector:2500,G36:5000};
 export const SHOP_ITEMS=[...WEAPONS.filter(w=>w.id!=='Pistol').map(w=>({id:w.id,kind:'weapon',name:w.label,price:prices[w.id]})),{id:'ammo',kind:'ammo',name:'30 универсальных патронов',price:50},{id:'smallMedkit',kind:'medkit',name:'Малая аптечка · +25 HP',price:100},{id:'largeMedkit',kind:'medkit',name:'Большая аптечка · +75 HP',price:250},{id:'repair',kind:'repair',name:'Починить · +50 прочности',price:500}];
-export function createInventory(){return {revision:0,money:0,health:100,equipped:'Pistol',reserve:64,weapons:{Pistol:{ammo:8,durability:100,wearShots:0}},smallMedkit:0,largeMedkit:0};}
+export function createInventory(){return {revision:0,money:0,health:100,equipped:'Pistol',reserve:84,weapons:{Pistol:{ammo:8,durability:100,wearShots:0}},smallMedkit:0,largeMedkit:0};}
 export function totalAmmo(a){return a.reserve+Object.values(a.weapons).reduce((n,w)=>n+w.ammo,0);}
 export function rewardForHP(hp){return Math.round(Math.max(5,Math.min(100,5+(hp-125)/5)));}
 export function equipWeapon(a,id){if(!a.weapons[id])return false;a.equipped=id;return true;}
@@ -17,7 +17,7 @@ export function buy(a,id){
  a.money-=item.price;
  if(item.kind==='weapon'){for(const old of Object.keys(a.weapons))if(old!=='Pistol'){a.reserve+=a.weapons[old].ammo;delete a.weapons[old];}a.weapons[id]={ammo:0,durability:100,wearShots:0};a.equipped=id;}
  if(id==='ammo')a.reserve+=30;
- if(id==='smallMedkit'||id==='largeMedkit')a[id]++;
+ if(id==='smallMedkit'||id==='largeMedkit'){a[id]++;if(a.health>0&&a.health<100)useMedkit(a,id);}
  if(id==='repair')a.weapons[a.equipped].durability=Math.min(100,a.weapons[a.equipped].durability+50);
  return {ok:true,reason:'Покупка выполнена'};
 }

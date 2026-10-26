@@ -31,8 +31,8 @@ export const ZOMBIE_SKINS = Object.freeze([
 // Separate shoulders, elbows, hips, knees and ankles; all measurements are local metres.
 export function createMutantVisuals(owner,type,skinIndex){
  const root=new T.Group();root.name='anatomy';const limbs=[],legs=[],arms=[];
- const brute=type==='brute',runner=type==='runner',skin=ZOMBIE_SKINS[skinIndex];
- const palette={skin:brute?'#938270':runner?'#a0967c':skin.skin,cloth:brute?'#625445':runner?'#4b5750':skin.clothes,pants:brute?'#4b4236':skin.pants,accent:skin.accent,boot:'#292d29',wound:'#823c40',bone:'#bfb497',eye:'#e4c46b',black:'#252a23'};
+ const boss=type==='boss',brute=type==='brute',runner=type==='runner',skin=ZOMBIE_SKINS[skinIndex];
+ const palette={skin:boss?'#6e8386':brute?'#938270':runner?'#a0967c':skin.skin,cloth:boss?'#293849':brute?'#625445':runner?'#4b5750':skin.clothes,pants:brute?'#4b4236':skin.pants,accent:skin.accent,boot:'#292d29',wound:'#823c40',bone:'#bfb497',eye:'#e4c46b',black:'#252a23'};
  const materials=Object.fromEntries(Object.entries(palette).map(([key,color])=>[key,owner.material(color,key==='eye')]));
  function part(parent,name,kind,size,material,x,y,z){const p=owner.mesh(parent,kind,size,materials[material],x,y,z);p.name=name;p.castShadow=true;return p;}
  if(type==='eye'){
@@ -71,8 +71,9 @@ export function createMutantVisuals(owner,type,skinIndex){
   part(head,'brow','box',[.10,.027,.04],'skin',side*.083,.09,.166).rotation.z=side*-.17;
   part(head,'ear','sphere',[.045,1],'skin',side*.207,-.008,0).scale.set(.55,1,.7);
  }
+ if(boss){upper('warden-armor','box',[.46,.36,.10],'black',0,1.29,.25);for(const side of [-1,1]){upper('warden-shoulder','box',[.22,.15,.27],'bone',side*.31,1.47,0);part(head,'warden-horn','cone',[.055,.22,5],'bone',side*.14,.19,-.02).rotation.z=side*-.35;}part(head,'warden-mask','box',[.29,.10,.06],'black',0,-.06,.195);part(head,'warden-eye-band','box',[.25,.028,.018],'wound',0,.048,.208);}
  part(head,'temple-wound','sphere',[.05,1],'wound',.148,.105,.085).scale.set(.5,1,.55);
- if(!brute&&!runner){
+ if(!brute&&!runner&&!boss){
   if(skin.id==='worker'){
    part(head,'hardhat','sphere',[.234,1],'accent',0,.148,-.01).scale.set(1,.43,1);
    part(head,'hardhat-brim','box',[.49,.025,.39],'accent',0,.128,.015);
@@ -123,7 +124,7 @@ export function poseMutant(enemy){
  v.torso.rotation.z=Math.sin(phase)*.018*motion;
  v.head.rotation.y=Math.sin(phase*.5)*.035;
  for(const leg of v.legs){
-  const p=phase+(leg.side<0?0:Math.PI),z=Math.cos(p)*.18*motion,lift=Math.max(0,Math.sin(p))*.12*motion;
+  const p=phase+(leg.side<0?0:Math.PI),z=Math.cos(p)*.18*motion*(enemy.hp<enemy.maxHp*.35&&leg.side<0?.6:1),lift=Math.max(0,Math.sin(p))*.12*motion*(enemy.hp<enemy.maxHp*.35&&leg.side<0?.55:1);
   const down=.75-lift,distance=Math.min(.779,Math.hypot(down,z));
   leg.hip.rotation.x=Math.atan2(-z,down)-Math.acos(T.MathUtils.clamp(distance/.78,-1,1));
   leg.knee.rotation.x=2*Math.acos(T.MathUtils.clamp(distance/.78,-1,1));

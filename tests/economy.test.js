@@ -3,14 +3,14 @@ import {createInventory,buy,equipWeapon,recordShot,totalAmmo,rewardForHP,useMedk
 import {Rifle} from '../weapons.js';import {MoneyDrops} from '../loot.js';import {Enemies} from '../enemies.js';import {Player,FIXED_STEP} from '../player.js';import {generateTown} from '../town.js';
 const audio={play(){},shot(){}};
 test('starter pistol only, two weapon slots, exact prices and replacement preserve universal ammunition',()=>{
- const a=createInventory();assert.deepEqual(Object.keys(a.weapons),['Pistol']);assert.equal(a.money,0);assert.equal(totalAmmo(a),72);
+ const a=createInventory();assert.deepEqual(Object.keys(a.weapons),['Pistol']);assert.equal(a.money,0);assert.equal(totalAmmo(a),92);
  const expected={Helsing:6000,Tikhar:3500,Shambler:3000,Shotgun:2000,Kalash:4000,VSV:5500,Scorpion:4500,Vector:2500,G36:5000};
- a.money=100000;for(const [id,price]of Object.entries(expected)){assert.equal(SHOP_ITEMS.find(i=>i.id===id).price,price);const before=a.money;assert.equal(buy(a,id).ok,true);assert.equal(a.money,before-price);assert.deepEqual(Object.keys(a.weapons).sort(),['Pistol',id].sort());assert.equal(a.equipped,id);assert.equal(equipWeapon(a,'Pistol'),true);assert.equal(totalAmmo(a),72);}
- a.weapons.G36.ammo=10;a.reserve-=10;buy(a,'Vector');assert.equal(totalAmmo(a),72);assert.equal(a.weapons.G36,undefined);
+ a.money=100000;for(const [id,price]of Object.entries(expected)){assert.equal(SHOP_ITEMS.find(i=>i.id===id).price,price);const before=a.money;assert.equal(buy(a,id).ok,true);assert.equal(a.money,before-price);assert.deepEqual(Object.keys(a.weapons).sort(),['Pistol',id].sort());assert.equal(a.equipped,id);assert.equal(equipWeapon(a,'Pistol'),true);assert.equal(totalAmmo(a),92);}
+ a.weapons.G36.ammo=10;a.reserve-=10;buy(a,'Vector');assert.equal(totalAmmo(a),92);assert.equal(a.weapons.G36,undefined);
 });
 test('full ammo packs respect 500 total including both magazines; medkits and repairs charge only valid purchases',()=>{
- const a=createInventory();a.money=10000;assert.equal(buy(a,'ammo').ok,true);assert.equal(totalAmmo(a),102);a.reserve=492;let before=a.money;assert.equal(buy(a,'ammo').ok,false);assert.equal(a.money,before);
- a.health=10;assert.equal(buy(a,'smallMedkit').ok,true);assert.equal(buy(a,'largeMedkit').ok,true);assert.equal(useMedkit(a,'smallMedkit'),true);assert.equal(a.health,35);assert.equal(useMedkit(a,'largeMedkit'),true);assert.equal(a.health,100);assert.equal(a.smallMedkit+a.largeMedkit,0);
+ const a=createInventory();a.money=10000;assert.equal(buy(a,'ammo').ok,true);assert.equal(totalAmmo(a),122);a.reserve=492;let before=a.money;assert.equal(buy(a,'ammo').ok,false);assert.equal(a.money,before);
+ a.health=10;assert.equal(buy(a,'smallMedkit').ok,true);assert.equal(a.health,35);assert.equal(a.smallMedkit,0);assert.equal(buy(a,'largeMedkit').ok,true);assert.equal(a.health,100);assert.equal(a.largeMedkit,0);assert.equal(buy(a,'smallMedkit').ok,true);assert.equal(a.smallMedkit,1);assert.equal(useMedkit(a,'smallMedkit'),false);a.health=75;assert.equal(useMedkit(a,'smallMedkit'),true);assert.equal(a.health,100);assert.equal(a.smallMedkit+a.largeMedkit,0);
  before=a.money;assert.equal(buy(a,'repair').ok,false);assert.equal(a.money,before);a.weapons.Pistol.durability=70;assert.equal(buy(a,'repair').ok,true);assert.equal(a.weapons.Pistol.durability,100);assert.equal(a.money,before-500);
 });
 test('wear applies per actual 100 shots, broken guns cannot fire, repair restores firing and pistol stays separate',()=>{

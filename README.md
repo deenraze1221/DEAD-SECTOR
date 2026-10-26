@@ -4,15 +4,15 @@ Browser wave-survival FPS with seeded 200 × 200 m towns, English/Russian UI and
 
 ## Play
 
-Download ZIP, extract it and open `index.html`. Single player needs no installation, server or Internet connection. A new run generates a town and starts beside SECTOR MART with 100 HP, $0, a pistol, 8 loaded rounds and 64 spare rounds. Starter ammunition makes the first cash earnings possible; there are no free ammunition or medkit boxes in the world.
+Download ZIP, extract it and open `index.html`. Single player needs no installation, server or Internet connection. A new run generates a town and starts beside SECTOR MART with 100 HP, $0, a pistol, 8 loaded rounds and 84 spare rounds. Starter ammunition makes the first cash earnings possible; there are no free ammunition or medkit boxes in the world.
 
-WASD move; mouse look; Shift sprint; Space jump; LMB fire; R reload; E collect cash, open the terminal or revive a nearby partner. **1 selects the primary weapon; 2 selects the pistol.** There are only these two weapon slots. Buying a different primary replaces the previous primary, returns its remaining magazine rounds to the universal reserve and equips the new empty gun. The pistol, its magazine and its condition remain. Reload the new weapon with R. H uses a small medkit; J uses a large medkit. Esc pauses single player. Resuming preserves the run; Restart starts over.
+WASD move; mouse look; Shift sprint; Space jump; LMB fire; R reload; E open the terminal or revive a nearby partner. **1 selects the primary weapon; 2 selects the pistol.** There are only these two weapon slots. Buying a different primary replaces the previous primary, returns its remaining magazine rounds to the universal reserve and equips the new empty gun. The pistol, its magazine and its condition remain. Reload the new weapon with R. H uses a small medkit; J uses a large medkit. Esc pauses single player. Resuming preserves the run; Restart starts over.
 
 Sprinting lasts five seconds from full stamina. Stamina recovers in five seconds at walking speed or while stationary; exhaustion requires full recovery before sprinting resumes. The HUD shows health, stamina, cash, the two slots, weapon condition and ammunition. Static control instructions on the right have been removed. The terminal opens a scrollable shop with owned slot buttons, prices and purchase feedback. Close it using its button or Esc.
 
 ## Money, shop and condition
 
-A dead enemy leaves a cash bundle on the ground. E collects it within 1.6 m. Rewards derive from maximum HP, clamped to $5–100: runner 125 HP → $5; zombie 250 HP → $30; eye 300 HP → $40; brute 600 HP → $100. Cash remains until collected, and a bundle can be collected once. In co-op, the collector receives the money in their individual wallet.
+A dead enemy leaves a cash bundle on the ground. Walking within 0.85 m collects it automatically with a cash sound. Rewards derive from maximum HP, clamped to $5–100: runner 125 HP → $5; zombie 250 HP → $30; eye 300 HP → $40; brute 600 HP → $100. Cash remains until collected, and a bundle can be collected once. In co-op, the collector receives the money in their individual wallet.
 
 SECTOR MART is a unique grocery building in the central quarter. Its large terminal opens within 2.1 m. The shop contains ten prop families: stocked shelves, produce stand, refrigerated case, freezer, checkout with cash register, shopping cart, basket stand, display rack, stock boxes and the terminal. Entrances and the route to the terminal have physical player-clearance checks.
 
@@ -32,8 +32,8 @@ SECTOR MART is a unique grocery building in the central quarter. Its large termi
 Damage includes the latest +15 to every weapon. Pistol also retains the preceding +20 increase (10 + 20 + 15 = 45). Fire intervals resolve qualitative rate requests; Shambler/Shotgun damage is total per shot. There is no aiming mode. Each weapon has a distinct synthesized report.
 
 - Universal ammunition: **30 rounds for $50**. The **500-round limit includes reserve and both loaded magazines**. A full pack is refused if it would exceed the limit; no money is deducted.
-- Small medkit: **$100**, restores **25 HP** when used with H.
-- Large medkit: **$250**, restores **75 HP** when used with J. Health caps at 100; using a kit at full health consumes nothing.
+- Small medkit: **$100**, immediately restores **25 HP** when purchased while injured; stored at full health for H.
+- Large medkit: **$250**, immediately restores **75 HP** when purchased while injured; stored at full health for J. Health caps at 100; using a kit at full health consumes nothing.
 - Every weapon has **100 condition**, losing **5 condition after each 100 shots actually fired**. Empty clicks do not cause wear. At zero condition it cannot shoot.
 - Repair: **$500 for +50 condition** on the equipped weapon, capped at 100. Repairing an already intact weapon is refused without charging.
 
@@ -60,7 +60,7 @@ World pixel rendering remains mandatory at 540 pixels vertically. There is no ve
 
 Ordinary zombies have five procedural outfits. Jointed shoulders/elbows/hips/knees/ankles drive opposite strides, planted stance feet and attack motions. Brute arms stay outside the belly. Death immediately hides the model and emits red particles from one bounded pool. There are no falling corpses. Death/outfit/animation state replicates without replaying particles on duplicate packets.
 
-The first wave spawns 30 enemies gradually over 120 seconds from four corner hives. Each later wave adds five. After spawning finishes, **every enemy must die before the 10-second break starts**. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Projectiles are blocked by cover and damage only on body contact. The perimeter is a concrete wall 5.8 m high.
+The first wave spawns 30 enemies gradually over 120 seconds from four corner hives. Each later wave adds five. After spawning finishes, **every enemy must die before the 30-second break starts**. The HUD shows CLEAR REMAINING / ДОБЕЙТЕ ОСТАВШИХСЯ while waiting. Projectiles are blocked by cover and damage only on body contact. The perimeter is a concrete wall 5.8 m high.
 
 ## Network play
 
@@ -99,3 +99,32 @@ CHROMIUM_PATH=/usr/bin/chromium npm run test:city:browser
 Browser checks need a running dev server. Override BASE_URL, CHROMIUM_PATH, ARTIFACT_DIR (screenshots), and WS_URL (external server for network/revive scenarios) as needed. `test:economy:browser` starts an isolated local room server and funds its test account server-side to verify purchases; the playable client has no money-grant debug API. `test:weapons:browser` aliases that market/equipment scenario. `test:network:browser` and `test:revive:browser` use a running room server. Tests cover exact stats, slots, wear/breakage, cash, caps, medkits, repairs, stamina, transactions/reconnect, wave completion, collision routes and model bounds. Software headless rendering is not a measurement of desktop GPU FPS.
 
 `npm run build` writes self-contained `index.html` and `dist/index.html`, including models and styles. Source edits require rebuilding. The committed root file supports double-click offline play.
+
+## Atmosphere and encounter update
+
+The town now uses a cool overcast evening palette and lighter-distance fog, warm grocery lighting, cold street lights and an occasional flickering circuit. Activating the generator stabilizes and strengthens the street circuit for the rest of that run. Instanced boarded windows, facade cracks, litter beside dumpsters and weathered vehicle panels mark the abandoned environment without obstructing tested entrances. This is stylized procedural scenery, not a destructible-building simulation.
+
+Each gun has its own recoil parameters and reload motion profile, with animated action/bolt, spent cases and support-hand operation. The original FBX guns remain single meshes: these are procedural first-person mechanisms rather than imported skeletal animations. Hits emit small red particles and cause a body recoil. Wounded enemies limp and slow to 80% speed below 35% health. Normal/runner melee has a short preparation; brutes wind up for 0.6 s and can miss if the player moves away or takes cover. Flying eyes swell before firing. Brute steps have a separate low-frequency sound.
+
+Wave 1 remains standard. Waves congruent to 2 modulo 3 concentrate on one hive; waves congruent to 0 modulo 3 favor runners (at least70%, depending on unlocked types); every fifth wave overrides these modes and finishes with one mini-boss. It has 1,800 HP, 55 melee damage, speed 1.3 m/s and a separate armored Warden body, 2.2 m height and 0.7 m navigation radius, plus visible red chest marks and a HUD health counter. It must die before the normal clear-and-break transition.
+
+One optional event activates 20 seconds into each assault, rotating through:
+
+- Start the roadside generator near (-3.65, 12), using E within 2.4 m: $150 and stable street lighting.
+- Hold the crossroads at (0, 24) for 25 seconds: $250. A living player must stay within 5 m, with no living enemy inside 10 m; progress decays outside those conditions.
+- Destroy the fleshy growth at (24, 0), 180 HP: $350. Gunfire obeys cover and nearer enemies block shots.
+
+Unfinished events expire at intermission. The HUD shows task, distance, progress/HP and payout; a world marker identifies the location. Co-op uses the host's event state and the room server grants the reward once per event to each connected account. Clearing a wave pays $75 + $25 × wave number; fifth waves pay $500 instead. Single player uses the same payouts. Cash drops remain capped at $100 per enemy; these bonuses are separate.
+
+See [the reproducible resource model](docs/ECONOMY_BALANCE.md), generated by `node scripts/economy-report.js`. It includes ammunition and amortized repair costs at 65% accuracy, but excludes travel and damage taken. Prices and requested weapon damage are unchanged; the report is not a substitute for playtesting.
+
+
+Shop update: two tabs separate weapons from gear (ammo, medkits and repair). Weapons are ordered by price. Each card shows a side silhouette projected from its actual model; hovering or keyboard focus reveals damage, magazine capacity, cyclic rounds/minute and reload time. Touch screens show those details directly. The starter reserve is now84, for92 total rounds. Cash auto-picks up underfoot with a separate sound. Flying-eye projectiles now travel at20 m/s, twice their previous speed; enemy types have separate growl/snarl/chirp sounds.
+
+
+A fresh match has a60-second preparation countdown with no enemy spawns or events. The first assault begins after that countdown; enemies then emerge gradually on its normal120-second schedule. Subsequent intermissions last30 seconds after every enemy is dead. Each assault starts with a five-second on-screen notification and an original synthesized horn. Original procedural ambient music has calm and tense stems: preparation/intermission uses calm chords, active assault/clearing uses the tense stem. Changes crossfade over2.5 seconds; paused single player fades music out. Browser audio starts after the player's Play gesture. No external songs or audio downloads are used.
+
+
+Enemy progression: waves1–5 contain only zombies/runners (weights55:20 normalized over available types). Waves6–10 add eyes (55:20:20 normalized). Wave11 onward enables all four types at55/20/20/5. The separate Warden mini-boss appears every fifth wave starting at wave5; it is not a brute and does not unlock the regular brute early. Fifth-wave completion rewards remain $500 even before bosses unlock. Purchased medkits immediately heal an injured player; full-health purchases go into reserve for H/J.
+
+The fifth enemy family is the armored Warden: distinct mask, shoulder armor and horns, slimmer body and separate navigation clearance. Regular brute unlock remains wave11.

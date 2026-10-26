@@ -20,10 +20,10 @@ try{
  const joined=await waitFor(guest,s=>s.networkActive&&s.room===room.room,'guest join');assert.equal(joined.seed,room.seed);
  await host.bringToFront();await host.locator('#start').click();await waitFor(host,s=>s.started&&s.running,'host pointer lock');
  await guest.bringToFront();await guest.locator('#start').click();await waitFor(guest,s=>s.started&&s.running,'guest pointer lock');
- const replicated=await waitFor(guest,s=>s.remaining>0,'first replicated hive spawn',90000);
- const authoritative=await read(host);assert.ok(authoritative.remaining>0);assert.equal(authoritative.peerVisible,true);assert.equal(replicated.peerVisible,true);
+ const replicated=await waitFor(guest,s=>s.wave.warmup&&s.wave.time>1,'replicated preparation clock',90000);
+ const authoritative=await read(host);assert.equal(authoritative.remaining,0);assert.equal(replicated.remaining,0);assert.equal(authoritative.peerVisible,true);assert.equal(replicated.peerVisible,true);
  assert.equal(authoritative.wave.number,replicated.wave.number);assert.ok(Math.abs(authoritative.wave.time-replicated.wave.time)<1);
  await guest.keyboard.press('Escape');await host.bringToFront();if(!(await host.locator('#network-panel').isVisible()))await host.locator('#online').click();
  await host.locator('#close-room').click();await waitFor(guest,s=>!s.networkActive,'explicit disconnect');assert.deepEqual(errors,[]);
- console.log('PASS two-browser city, synchronized waves, hive/enemy replication, visible partners and disconnect', {hostTime:authoritative.wave.time,guestTime:replicated.wave.time});
+ console.log('PASS two-browser city, synchronized preparation clock, visible partners and disconnect', {hostTime:authoritative.wave.time,guestTime:replicated.wave.time});
 }finally{await browser.close();}

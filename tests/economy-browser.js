@@ -8,23 +8,27 @@ try{
  await p.evaluate(async()=>window.readGame=(await import('/game.js')).getSnapshot);
  const read=()=>p.evaluate(()=>readGame());
  async function wait(predicate,description,timeout=45000){const end=Date.now()+timeout;while(Date.now()<end){const s=await read();if(predicate(s))return s;await p.waitForTimeout(50);}throw Error(description+': '+JSON.stringify(await read())+' errors '+JSON.stringify(errors));}
- let s=await read();assert.equal(s.weapon,'Pistol');assert.equal(s.money,0);assert.equal(s.totalAmmo,72);assert.deepEqual(s.supplies,[]);
+ let s=await read();assert.equal(s.weapon,'Pistol');assert.equal(s.money,0);assert.equal(s.totalAmmo,92);assert.deepEqual(s.supplies,[]);
  await p.locator('#online').click();await p.locator('#server-url').fill('ws://127.0.0.1:'+game.server.address().port);await p.locator('#host-room').click();s=await wait(s=>s.networkActive,'room');const room=game.rooms.get(s.room);
  const pushAccount=()=>{room.host.account.revision++;room.host.socket.send(JSON.stringify({type:'economy',account:room.host.account}));};
  await p.locator('#start').click();await wait(s=>s.running,'play');
  room.cash.set('cash-ui',{id:'cash-ui',x:STORE.spawn.x,z:STORE.spawn.z,value:30,taken:false});room.host.socket.send(JSON.stringify({type:'loot-state',cash:[...room.cash.values()]}));await wait(s=>s.drops.length===1,'cash appears');
- await p.keyboard.press('KeyE');await wait(s=>s.money===30,'cash pickup');assert.equal(room.cash.get('cash-ui').taken,true);
+ await wait(s=>s.money===30,'cash pickup');assert.equal(room.cash.get('cash-ui').taken,true);
  // Isolated room fixture funds purchases; no debug grant exists in the game client.
  room.host.account.money=90000;pushAccount();await wait(s=>s.money===90000,'fixture funds');
  await p.keyboard.down('KeyW');await wait(s=>s.position.z<=12.3,'walk through shop door');await p.keyboard.up('KeyW');
  await p.keyboard.down('KeyA');await wait(s=>s.position.x<=8.35,'walk to terminal');await p.keyboard.up('KeyA');
  await p.keyboard.press('KeyE');await wait(s=>s.shopOpen,'terminal modal');assert.equal(await p.locator('#menu').isVisible(),false);assert.equal(await p.locator('#shop-panel').isVisible(),true);
+ const prices=await p.locator('[data-shop-action=buy]').evaluateAll(buttons=>buttons.map(b=>Number(b.textContent.match(/\$(\d+)/)?.[1])));assert.deepEqual(prices,[...prices].sort((a,b)=>a-b));assert.equal(await p.locator('.weapon-silhouette').count(),9);await p.waitForFunction(()=>!document.pointerLockElement);await p.locator('.weapon-card').first().focus();await p.waitForFunction(()=>Number(getComputedStyle(document.querySelector('.weapon-stats')).opacity)>.95,{},{timeout:15000});
+ if(process.env.ARTIFACT_DIR){await mkdir(process.env.ARTIFACT_DIR,{recursive:true});await p.screenshot({path:process.env.ARTIFACT_DIR+'/market-weapons.png'});}
  for(const item of SHOP_ITEMS.filter(i=>i.kind==='weapon')){
   const before=(await read()).money;await p.locator(`[data-shop-action=buy][data-item=${item.id}]`).click();s=await wait(s=>s.weapon===item.id,'buy '+item.id);
   assert.equal(s.money,before-item.price);assert.deepEqual(Object.keys(s.inventory.weapons).sort(),['Pistol',item.id].sort());console.log('PASS buy/equip and replace primary',item.id);
  }
+ await p.locator('[data-shop-tab=gear]').click();
  for(const id of ['smallMedkit','largeMedkit']){await p.locator(`[data-shop-action=buy][data-item=${id}]`).click();await wait(s=>s.inventory[id]===1,'buy '+id);}
  room.host.account.health=10;room.host.pose.hp=10;room.host.account.weapons.G36.durability=30;room.host.account.reserve=492;pushAccount();await wait(s=>s.hp===10&&s.durability===30&&s.totalAmmo===500,'condition and ammo fixture');
+ await p.locator('[data-shop-action=buy][data-item=smallMedkit]').click();await wait(s=>s.hp===35,'purchase immediately heals');await p.locator('[data-shop-action=buy][data-item=largeMedkit]').click();await wait(s=>s.hp===100,'large purchase heals to cap');room.host.account.health=10;room.host.pose.hp=10;pushAccount();await wait(s=>s.hp===10,'stored kit fixture');
  assert.equal(await p.locator('[data-shop-action=buy][data-item=ammo]').isDisabled(),true);
  await p.locator('[data-shop-action=buy][data-item=repair]').click();await wait(s=>s.durability===80,'repair +50');
  await p.locator('[data-shop-action=buy][data-item=repair]').click();await wait(s=>s.durability===100,'repair capped');assert.equal(await p.locator('[data-shop-action=buy][data-item=repair]').isDisabled(),true);

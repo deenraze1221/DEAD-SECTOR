@@ -1,6 +1,6 @@
 // Shared by the client and room server. Intervals resolve qualitative rate requests.
 export const WEAPONS = Object.freeze([
-  {id:'Pistol',label:'ПИСТОЛЕТ',capacity:8,reserve:64,damage:45,interval:.28,reload:1.15,automatic:false,reloadStyle:'magazine'},
+  {id:'Pistol',label:'ПИСТОЛЕТ',capacity:8,reserve:84,damage:45,interval:.28,reload:1.15,automatic:false,reloadStyle:'magazine'},
   {id:'Helsing',label:'HELSING',capacity:40,reserve:320,damage:30,interval:.075,reload:4,automatic:true,reloadStyle:'action'},
   {id:'Tikhar',label:'TIKHAR',capacity:1,reserve:60,damage:55,interval:.45,reload:3,automatic:false,reloadStyle:'breech'},
   {id:'Shambler',label:'SHAMBLER',capacity:5,reserve:100,damage:50,interval:.5,reload:3,automatic:false,reloadStyle:'shells'},
