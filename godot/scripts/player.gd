@@ -21,7 +21,6 @@ var recoil=0.0
 var config: Dictionary
 var shots=0
 var last_hit=false
-var shot_sound: AudioStreamPlayer
 var flash: OmniLight3D
 
 func _ready() -> void:
@@ -58,21 +57,6 @@ func _ready() -> void:
  lamp.light_energy=3
  lamp.visible=false
  camera.add_child(lamp)
- shot_sound=AudioStreamPlayer.new()
- var wav=AudioStreamWAV.new()
- wav.format=AudioStreamWAV.FORMAT_16_BITS
- wav.mix_rate=22050
- var bytes=PackedByteArray()
- bytes.resize(6615*2)
- var rng=RandomNumberGenerator.new()
- rng.seed=123
- for i in range(6615):
-  var t=float(i)/22050
-  var signal_value=(rng.randf_range(-1,1)*.6+sin(t*TAU*(160-t*240))*.4)*exp(-t*30)*.65
-  bytes.encode_s16(i*2,int(signal_value*32767))
- wav.data=bytes
- shot_sound.stream=wav
- add_child(shot_sound)
 
 func _unhandled_input(event: InputEvent) -> void:
  if not active or health<=0: return
@@ -82,7 +66,9 @@ func _unhandled_input(event: InputEvent) -> void:
   if abs(motion.x)>600 or abs(motion.y)>600: return
   look(motion)
  if event.is_action_pressed("fire"): fire()
- if event.is_action_pressed("reload") and switch_time<=0 and reloading<=0 and ammo<int(config.capacity) and reserve>0: reloading=float(config.reload)
+ if event.is_action_pressed("reload") and switch_time<=0 and reloading<=0 and ammo<int(config.capacity) and reserve>0:
+  reloading=float(config.reload)
+  if get_parent().sound!=null: get_parent().sound.play("reload")
  if event.is_action_pressed("flashlight") and (battle==null or battle.flashlight and battle.battery>0):
   camera.get_node("Flashlight").visible=not camera.get_node("Flashlight").visible
  if battle!=null:
@@ -129,7 +115,9 @@ func _physics_process(delta: float) -> void:
  else: velocity.y=-.1
  move_and_slide()
  var actual=Vector2(get_real_velocity().x,get_real_velocity().z).length()
+ var previous_step=floori(distance_walked/1.7)
  distance_walked+=actual*delta
+ if is_on_floor() and actual>.5 and floori(distance_walked/1.7)!=previous_step and get_parent().sound!=null: get_parent().sound.play("step",null,.6)
  var bob=sin(distance_walked*TAU/1.65)*minf(actual/4.5,1)*.006
  gun.position=base_gun+Vector3(0,bob-(sin((float(config.reload)-reloading)/float(config.reload)*PI)*.16 if reloading>0 else 0),recoil*.07)
  gun.position.y-=sin((1.5-switch_time)/1.5*PI)*.35 if switch_time>0 else 0
@@ -148,14 +136,17 @@ func fire() -> void:
  cooldown=float(config.interval)
  recoil=1
  shots+=1
- shot_sound.play()
+ if get_parent().sound!=null: get_parent().sound.play("shot-"+str(config.id))
+
  flash.light_energy=5
  var from=camera.global_position
  var query=PhysicsRayQueryParameters3D.create(from,from-camera.global_basis.z*100)
  query.exclude=[get_rid()]
  var hit=get_world_3d().direct_space_state.intersect_ray(query)
  last_hit=not hit.is_empty()
- if last_hit and hit.collider.has_method("take_damage"): hit.collider.take_damage(int(config.damage))
+ if last_hit and hit.collider.has_method("take_damage"):
+  hit.collider.take_damage(int(config.damage))
+  if get_parent().sound!=null: get_parent().sound.play("hit")
  elif last_hit and hit.collider.has_meta("target"):
   var target=hit.collider
   target.set_meta("hp",target.get_meta("hp")-int(config.damage))
@@ -211,4 +202,5 @@ func _process(_delta: float) -> void:
 func hurt(amount: int) -> void:
  if health<=0: return
  health=maxi(0,health-amount)
+ if get_parent().sound!=null: get_parent().sound.play("hurt")
  if health==0: get_parent().show_death()

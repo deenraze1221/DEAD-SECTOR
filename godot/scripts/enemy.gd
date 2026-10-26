@@ -71,7 +71,7 @@ func _physics_process(delta: float) -> void:
  voice-=delta
  if voice<=0:
   voice=4+battle.rng.randf()*4
-  if position.distance_to(player.position)<18: battle.tone(70+skin*7,.15)
+  if position.distance_to(player.position)<18: battle.main.sound.play(type+"-living",position)
  var target=player.position
  var distance=Vector2(position.x-target.x,position.z-target.z).length()
  var origin=position+Vector3(0,1.6 if type!="eye" else 0,0)
@@ -101,6 +101,7 @@ func _physics_process(delta: float) -> void:
  if can_attack and clear and cooldown<=0 and windup<=0:
   windup=.25 if type=="vomiter" else .55 if type=="eye" else 1.2 if type=="boss" and stage>=2 else .6 if type=="brute" else .18
   cooldown=windup+1
+  if type=="vomiter": battle.main.sound.play("vomit-prepare",position)
  var pursuit=target
  if distance>180:
   pursuit=Vector3(battle.main.bridge.data.terminal.x,0,battle.main.bridge.data.terminal.z)

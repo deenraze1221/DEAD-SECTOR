@@ -149,7 +149,7 @@ func _physics_process(delta: float) -> void:
    money+=pickup.value
    pickup.mesh.queue_free()
    pickups.erase(pickup)
-   tone(800,.12)
+   main.sound.play("cash")
  for shot in projectiles.duplicate():
   var next=shot.mesh.position+shot.velocity*delta
   var query=PhysicsRayQueryParameters3D.create(shot.mesh.position,next,1|8)
@@ -166,7 +166,7 @@ func _physics_process(delta: float) -> void:
   for enemy in enemies.duplicate():
    if enemy.type!="eye" and enemy.position.distance_to(trap.position)<enemy.stats.radius+.4:
     enemy.take_damage(300)
-    tone(180,.2)
+    main.sound.play("trap",trap.position)
     trap.queue_free()
     placed_traps.erase(trap)
     break
@@ -174,23 +174,8 @@ func _physics_process(delta: float) -> void:
 func announce(text: String) -> void:
  notice=text
  notice_time=5
- tone(420,.3)
+ if main.sound!=null: main.sound.play("wave-clear" if "COMPLETE" in text else "wave")
 
-func tone(hz: float, duration: float) -> void:
- var sound=AudioStreamPlayer3D.new()
- var wave=AudioStreamWAV.new()
- wave.mix_rate=22050
- wave.format=AudioStreamWAV.FORMAT_16_BITS
- var count=int(duration*22050)
- var data=PackedByteArray()
- data.resize(count*2)
- for i in range(count): data.encode_s16(i*2,int(sin(float(i)/22050*TAU*hz)*minf(1,float(count-i)/200)*5000))
- wave.data=data
- sound.stream=wave
- add_child(sound)
- sound.global_position=main.player.global_position
- sound.finished.connect(sound.queue_free)
- sound.play()
 
 func burst(at: Vector3, green=false) -> void:
  var particles=CPUParticles3D.new()
@@ -237,7 +222,7 @@ func killed(enemy) -> void:
  var floor_hit=get_world_3d().direct_space_state.intersect_ray(floor_query)
  if not floor_hit.is_empty(): pickup.position.y=floor_hit.position.y+.2
  pickups.append({"mesh":pickup,"value":roundi(clampf(5+(float(enemy.stats.hp)-125)/5,15,100))})
- tone(95 if enemy.type!="vomiter" else 65,.2)
+ main.sound.play(str(enemy.type)+"-death",enemy.position)
 
 func projectile(enemy, poison: bool) -> void:
  var mesh=MeshInstance3D.new()
@@ -253,7 +238,7 @@ func projectile(enemy, poison: bool) -> void:
  mesh.position=enemy.position+Vector3(0,1.8 if poison else 0,0)
  var aim=main.player.position+Vector3(0,1,0)
  projectiles.append({"mesh":mesh,"velocity":mesh.position.direction_to(aim)*(5 if poison else 20),"life":1.6 if poison else 6.0,"poison":poison})
- tone(120 if poison else 260,.12)
+ main.sound.play("vomit" if poison else "eye-living",enemy.position)
 
 func save_gun() -> void:
  var p=main.player

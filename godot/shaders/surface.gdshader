@@ -1,5 +1,6 @@
 shader_type spatial;
 uniform vec4 tint : source_color = vec4(0.5);
+uniform float wetness=0.;
 uniform int surface_kind = 0;
 varying vec3 world_pos;
 varying vec3 world_normal;
@@ -28,5 +29,5 @@ void fragment(){
  }
  if(surface_kind==5){detail*=.94+.06*sin(p.x*70.+sin(p.y*3.)*2.);}
  ALBEDO=tint.rgb*detail*COLOR.rgb;
- ROUGHNESS=.92;
+ if(surface_kind==4){ALBEDO*=mix(1.,.65,wetness);ROUGHNESS=mix(.92,.2,wetness);}else{ROUGHNESS=.92;}
 }

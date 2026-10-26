@@ -1,14 +1,26 @@
 extends Node3D
+const Generator=preload("res://scripts/city_generator.gd")
+const Climate=preload("res://scripts/climate.gd")
+const Soundscape=preload("res://scripts/soundscape.gd")
+const Body=preload("res://scripts/local_body.gd")
 const Bridge=preload("res://scripts/bridge.gd")
 const Soldier=preload("res://scripts/player.gd")
 const Battle=preload("res://scripts/battle.gd")
 var bridge=Bridge.new()
 var battle
+var climate
+var sound
+var body
+var generation: Dictionary
+var map_seed=0
+var weather_volume=.7
+var show_fps=true
 var screen: Control
 var wave_label: Label
 var notice_label: Label
 var wallet_label: Label
 var vignette: ColorRect
+var gear_label: Label
 var store_panel: PanelContainer
 var store_grid: GridContainer
 var store_message: Label
@@ -34,8 +46,11 @@ var compass_markers: Control
 var compass_timer=0.0
 
 func _ready() -> void:
+ load_user_settings()
  setup_inputs()
  bridge.load_data()
+ var seed_value=map_seed if map_seed!=0 else int(Time.get_unix_time_from_system()*1000)%2147483647
+ generation=Generator.new().apply(bridge.data,seed_value,bridge)
  var world=Node3D.new()
  world.name="City"
  add_child(world)
@@ -52,16 +67,25 @@ func _ready() -> void:
  setup_ui()
  setup_store()
  setup_music()
+ climate=Climate.new()
+ climate.main=self
+ add_child(climate)
+ body=Body.new()
+ player.add_child(body)
+ body.setup(player,bridge)
+ apply_quality()
  set_playing(false)
 
 func setup_inputs() -> void:
  var keys={"forward":KEY_W,"back":KEY_S,"left":KEY_A,"right":KEY_D,"jump":KEY_SPACE,"sprint":KEY_SHIFT,"reload":KEY_R,"flashlight":KEY_F,"pause_game":KEY_ESCAPE,"interact":KEY_E,"primary":KEY_1,"pistol":KEY_2,"trap":KEY_3,"small_medkit":KEY_H,"large_medkit":KEY_J,"battery":KEY_B}
  for action in keys:
-  InputMap.add_action(action)
+  if not InputMap.has_action(action): InputMap.add_action(action)
+  InputMap.action_erase_events(action)
   var event=InputEventKey.new()
   event.physical_keycode=keys[action]
   InputMap.action_add_event(action,event)
- InputMap.add_action("fire")
+ if not InputMap.has_action("fire"): InputMap.add_action("fire")
+ InputMap.action_erase_events("fire")
  var mouse=InputEventMouseButton.new()
  mouse.button_index=MOUSE_BUTTON_LEFT
  InputMap.action_add_event("fire",mouse)
@@ -79,7 +103,6 @@ func equip(id: String) -> void:
   child.queue_free()
  bridge.build_weapon(player.gun,id)
  player.config=bridge.data.weapons[id]
- player.shot_sound.pitch_scale={"Pistol":1.1,"Shotgun":.65,"Vector":1.35,"Shambler":.8,"Tikhar":.9,"Kalash":.95,"Scorpion":1.25,"G36":1.0,"VSV":.85,"Helsing":1.4}.get(id,1.0)
  player.ammo=int(player.config.capacity)
  player.reserve=int(player.config.reserve)
  player.reloading=0
@@ -90,6 +113,7 @@ func equip(id: String) -> void:
 
 func setup_environment() -> void:
  var world_environment=WorldEnvironment.new()
+ world_environment.name="WorldEnvironment"
  var env=Environment.new()
  env.background_mode=Environment.BG_SKY
  var sky=Sky.new()
@@ -137,7 +161,8 @@ func button(text: String, callback: Callable) -> Button:
  node.text=text
  node.custom_minimum_size=Vector2(0,48)
  node.pressed.connect(callback)
- node.pressed.connect(func(): if is_instance_valid(battle): battle.tone(600,.05))
+ node.pressed.connect(func(): if is_instance_valid(sound): sound.play("ui-click"))
+ node.mouse_entered.connect(func(): if is_instance_valid(sound): sound.play("ui-hover",null,.5))
  return node
 
 func setup_ui() -> void:
@@ -159,6 +184,9 @@ func setup_ui() -> void:
  var theme=Theme.new()
  theme.default_font=load("res://assets/terminal.ttf")
  theme.default_font_size=16
+ theme.set_color("font_shadow_color","Label",Color(0,0,0,.8))
+ theme.set_constant("shadow_offset_x","Label",1)
+ theme.set_constant("shadow_offset_y","Label",1)
  theme.set_color("font_color","Label",Color("#d4dfba"))
  theme.set_color("font_color","Button",Color("#d4dfba"))
  theme.set_color("font_disabled_color","Button",Color("#67735e"))
@@ -237,11 +265,13 @@ COMBAT ZONE",18)
  screen.add_child(compass_markers)
  var status=label("F · FLASHLIGHT   B · BATTERY   3 · TRAP   H / J · MEDKITS",15)
  status.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_LEFT)
- status.position=Vector2(24,-40)
+ status.position=Vector2(24,-220)
+ status.add_theme_font_size_override("font_size",12)
+ gear_label=status
  screen.add_child(status)
  menu=PanelContainer.new()
  menu.set_anchors_and_offsets_preset(Control.PRESET_CENTER_LEFT)
- menu.position=Vector2(64,-260)
+ menu.position=Vector2(64,-300)
  menu.custom_minimum_size=Vector2(560,520)
  var style=StyleBoxFlat.new()
  style.bg_color=Color(.035,.065,.05,.96)
@@ -253,8 +283,13 @@ COMBAT ZONE",18)
  var column=VBoxContainer.new()
  column.add_theme_constant_override("separation",14)
  menu.add_child(column)
- column.add_child(label("DEAD SECTOR",38))
- column.add_child(label("FIELD SYSTEMS / BUILD 0.2",16))
+ var title=label("DEAD
+SECTOR®",64)
+ title.add_theme_font_override("font",load("res://assets/title.ttf"))
+ title.add_theme_constant_override("line_spacing",-8)
+ title.add_theme_color_override("font_color",Color("#c6db78"))
+ column.add_child(title)
+ column.add_child(label("FIELD SYSTEMS / BUILD 0.3",16))
  column.add_child(label("Behind the perimeter — silence.\nWASD Move / Shift Sprint / Space Jump\nMouse Look / LMB Fire / R Reload\nF Flashlight / Esc Pause",17))
  column.add_child(button("PLAY / RESUME",func(): set_playing(true)))
  column.add_child(button("NEW MATCH",func(): get_tree().reload_current_scene()))
@@ -291,11 +326,9 @@ func _process(_delta: float) -> void:
  if not is_instance_valid(player) or not is_instance_valid(hud): return
  for control in get_tree().get_nodes_in_group("match_hud"): control.visible=player.active
  if player.health<=0: notice_label.show()
- if is_instance_valid(calm_music):
-  var tense=player.active and battle.phase in ["ASSAULT","CLEARANCE"]
-  calm_music.volume_db=lerpf(calm_music.volume_db,-60 if tense else linear_to_db(maxf(.001,music_volume)),minf(1,_delta*1.5))
-  tense_music.volume_db=lerpf(tense_music.volume_db,linear_to_db(maxf(.001,music_volume)) if tense else -60,minf(1,_delta*1.5))
  stamina_bar.value=player.stamina
+ gear_label.text="1 · %s   2 · PISTOL   3 · TRAPS ×%d   H/J · MEDKITS %d/%d
+F · LIGHT %d%%   B · BATTERIES ×%d" % [battle.primary.to_upper() if battle.primary!="" else "EMPTY",battle.traps,battle.medkits[0],battle.medkits[1],int(battle.battery/120*100),battle.batteries]
  wallet_label.text="HEALTH %d HP   $%d   CONDITION %d%%" % [player.health,battle.money,int(battle.inventory.get(player.config.id,{}).get("durability",100))]
  wave_label.text="WAVE %d · %s
 %ds   ALIVE %d   SPAWNED %d/%d" % [battle.number,battle.phase,int(maxf(0,(60 if battle.phase=="PREPARATION" else 30 if battle.phase=="INTERMISSION" else 120)-battle.time)),battle.enemies.size(),battle.spawned,battle.total()]
@@ -305,7 +338,11 @@ func _process(_delta: float) -> void:
  ammo_label.text="%s
 %d / %d
 %s" % [player.config.id.to_upper(),player.ammo,player.reserve,"RELOADING" if player.reloading>0 else "R · RELOAD"]
- fps_label.text="%d FPS" % Engine.get_frames_per_second()
+ fps_label.text="%d FPS" % Engine.get_frames_per_second() if show_fps else ""
+ if climate!=null: hud.text="SECTOR 00
+COMBAT ZONE
+%02d:%02d · %s
+%s · %s fog" % [int(climate.hour),int(fmod(climate.hour,1)*60),"NIGHT" if climate.night else "DAY",climate.kind.to_upper(),climate.fog.to_upper()]
  var azimuth=fposmod(-rad_to_deg(player.rotation.y),360)
  var direction=["N","NE","E","SE","S","SW","W","NW"][int(round(azimuth/45))%8]
  bearing_label.text="·     %s    %03d°     ·" % [direction,int(azimuth)]
@@ -394,7 +431,8 @@ func render_store() -> void:
  items.sort_custom(func(a,b): return a.price<b.price)
  for item in items:
   if (item.kind=="weapon")!=(store_tab=="weapon"): continue
-  var text="%s · $%d" % [item.id.to_upper(),int(item.price)]
+  var display_name={"ammo":"UNIVERSAL AMMO","smallMedkit":"SMALL MEDKIT","largeMedkit":"LARGE MEDKIT","flashlight":"FLASHLIGHT","battery":"BATTERY","trap":"BEAR TRAP","repair":"REPAIR WEAPON"}.get(item.id,item.id.to_upper())
+  var text="%s · $%d" % [display_name,int(item.price)]
   var locked=false
   if item.kind=="weapon":
    var config: Dictionary=bridge.data.weapons[item.id]
@@ -429,87 +467,112 @@ func open_settings() -> void:
  if is_instance_valid(settings_panel): settings_panel.queue_free()
  settings_panel=PanelContainer.new()
  settings_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
- settings_panel.position=Vector2(-430,-230)
- settings_panel.custom_minimum_size=Vector2(410,460)
+ settings_panel.position=Vector2(-570,-300)
+ settings_panel.custom_minimum_size=Vector2(540,600)
  var backing=StyleBoxFlat.new()
  backing.bg_color=Color(.035,.06,.045,.98)
- backing.set_content_margin_all(18)
- backing.border_color=Color("#75875b")
+ backing.set_content_margin_all(20)
  backing.set_border_width_all(1)
+ backing.border_color=Color("#75875b")
  settings_panel.add_theme_stylebox_override("panel",backing)
  screen.add_child(settings_panel)
  var column=VBoxContainer.new()
+ column.add_theme_constant_override("separation",16)
  settings_panel.add_child(column)
  column.add_child(label("SETTINGS",26))
- column.add_child(label("MASTER VOLUME",16))
- var volume=HSlider.new()
- volume.min_value=0
- volume.max_value=1
- volume.step=.01
- volume.value=master_volume
- volume.value_changed.connect(func(value): master_volume=value;AudioServer.set_bus_volume_db(0,linear_to_db(maxf(.0001,value))))
- column.add_child(volume)
- column.add_child(label("MUSIC VOLUME",16))
- var music=HSlider.new()
- music.min_value=0
- music.max_value=1
- music.step=.01
- music.value=music_volume
- music.value_changed.connect(func(value): music_volume=value)
- column.add_child(music)
- column.add_child(label("MOUSE SENSITIVITY",16))
+ var tabs=TabContainer.new()
+ tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ column.add_child(tabs)
+ var panels={}
+ for title in ["Audio","Controls","Graphics","World"]:
+  var page=VBoxContainer.new()
+  page.name=title
+  page.add_theme_constant_override("separation",18)
+  tabs.add_child(page)
+  panels[title]=page
+ for setting in [["MASTER VOLUME","master_volume"],["MUSIC VOLUME","music_volume"],["WEATHER VOLUME","weather_volume"]]:
+  panels.Audio.add_child(label(setting[0],16))
+  var slider=HSlider.new()
+  slider.min_value=0
+  slider.max_value=1
+  slider.step=.01
+  slider.value=get(setting[1])
+  slider.value_changed.connect(func(value): set(setting[1],value);save_user_settings())
+  panels.Audio.add_child(slider)
+ panels.Controls.add_child(label("MOUSE SENSITIVITY",16))
  var mouse=HSlider.new()
  mouse.min_value=.2
  mouse.max_value=3
  mouse.step=.05
  mouse.value=sensitivity
- mouse.value_changed.connect(func(value): sensitivity=value)
- column.add_child(mouse)
- column.add_child(label("GRAPHICS QUALITY",16))
+ mouse.value_changed.connect(func(value): sensitivity=value;save_user_settings())
+ panels.Controls.add_child(mouse)
+ panels.Controls.add_child(label("WASD · MOVE
+SHIFT · SPRINT
+SPACE · JUMP
+1 / 2 · PRIMARY / PISTOL
+3 / LMB · TRAP
+R · RELOAD
+H / J · MEDKITS
+E · STORE
+F / B · FLASHLIGHT / BATTERY
+ESC · PAUSE",16))
+ panels.Graphics.add_child(label("GRAPHICS QUALITY",16))
  var quality=OptionButton.new()
  for text in ["LOW","MEDIUM","HIGH"]: quality.add_item(text)
  quality.select(graphics_quality)
- quality.item_selected.connect(func(index):
-  graphics_quality=index
-  get_node("Sun").shadow_enabled=index>0
-  get_node("Sun").directional_shadow_max_distance=[60,90,120][index]
-  player.camera.far=[350,600,650][index])
- column.add_child(quality)
- column.add_child(label("WASD · MOVE
-SHIFT · SPRINT
-SPACE · JUMP
-1 / 2 · WEAPONS
-3 / LMB · TRAP
-H / J · MEDKITS
-E · STORE
-F / B · LIGHT / BATTERY",16))
+ quality.item_selected.connect(func(index): graphics_quality=index;apply_quality();save_user_settings())
+ panels.Graphics.add_child(quality)
+ var metrics=CheckButton.new()
+ metrics.text="SHOW FPS"
+ metrics.button_pressed=show_fps
+ metrics.toggled.connect(func(value): show_fps=value;save_user_settings())
+ panels.Graphics.add_child(metrics)
+ panels.Graphics.add_child(label("PSX COLOR / PIXEL EFFECT: ALWAYS ON",14))
+ panels.Graphics.add_child(button("FULLSCREEN / WINDOW",toggle_fullscreen))
+ panels.World.add_child(label("CITY SEED (0 = RANDOM EACH MATCH)",15))
+ var seed_input=LineEdit.new()
+ seed_input.text=str(map_seed)
+ seed_input.text_changed.connect(func(value):
+  if value.is_valid_int(): map_seed=int(value);save_user_settings())
+ panels.World.add_child(seed_input)
+ panels.World.add_child(label("CURRENT SEED: %d
+%d BLOCKS REASSEMBLED
+
+Seed changes apply to NEW MATCH.
+Roads and central store stay fixed.
+Buildings and interiors move together.
+
+Interface language: English" % [generation.seed,generation.moved_blocks],15))
  column.add_child(button("CLOSE",func(): settings_panel.hide()))
 
+func load_user_settings() -> void:
+ var config=ConfigFile.new()
+ if config.load("user://settings.cfg")!=OK: return
+ for key in ["master_volume","music_volume","weather_volume"]:
+  set(key,clampf(float(config.get_value("settings",key,get(key))),0,1))
+ sensitivity=clampf(float(config.get_value("settings","sensitivity",1.0)),.2,3)
+ graphics_quality=clampi(int(config.get_value("settings","graphics_quality",1)),0,2)
+ map_seed=int(config.get_value("settings","map_seed",0))
+ show_fps=bool(config.get_value("settings","show_fps",true))
+ AudioServer.set_bus_volume_db(0,linear_to_db(maxf(.0001,master_volume)))
+
+func save_user_settings() -> void:
+ var config=ConfigFile.new()
+ for key in ["master_volume","music_volume","weather_volume","sensitivity","graphics_quality","map_seed","show_fps"]:
+  config.set_value("settings",key,get(key))
+ config.save("user://settings.cfg")
+ AudioServer.set_bus_volume_db(0,linear_to_db(maxf(.0001,master_volume)))
+
+func apply_quality() -> void:
+ get_node("Sun").shadow_enabled=graphics_quality>0
+ get_node("Sun").directional_shadow_max_distance=[60,90,120][graphics_quality]
+ player.camera.far=[350,600,650][graphics_quality]
+
 func setup_music() -> void:
- for tense in [false,true]:
-  var stream=AudioStreamWAV.new()
-  stream.mix_rate=22050
-  stream.format=AudioStreamWAV.FORMAT_16_BITS
-  stream.loop_mode=AudioStreamWAV.LOOP_FORWARD
-  var samples=22050*8
-  stream.loop_end=samples
-  var bytes=PackedByteArray()
-  bytes.resize(samples*2)
-  for i in range(samples):
-   var t=float(i)/22050
-   var note=[55.0,65.406,49.0,58.27][int(t/2)%4]
-   var value=(sin(t*TAU*note)+sin(t*TAU*note*1.5)*.3)*.04
-   if tense: value+=(sin(t*TAU*110)*.05+sin(t*TAU*220)*.02)*exp(-fmod(t,.25)*22)
-   var fade=minf(1,minf(t*8,(8-t)*8))
-   bytes.encode_s16(i*2,int(value*fade*32767))
-  stream.data=bytes
-  var audio=AudioStreamPlayer.new()
-  audio.stream=stream
-  audio.volume_db=-60
-  add_child(audio)
-  audio.play()
-  if tense: tense_music=audio
-  else: calm_music=audio
+ sound=Soundscape.new()
+ sound.main=self
+ add_child(sound)
 
 func update_markers(azimuth: float) -> void:
  for marker in compass_markers.get_children(): compass_markers.remove_child(marker);marker.queue_free()
