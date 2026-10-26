@@ -4,6 +4,7 @@ import {t} from './i18n.js';
 import {PerformanceMetrics} from './metrics.js';
 import {applyEnvironmentLight} from './environment-light.js';
 import {CitySky} from './city-sky.js';
+import {FirstPersonBody} from './first-person-body.js';
 import {BodyVisibility,canSelectTrap} from './body-visibility.js';
 import { Player, PLAYER, FIXED_STEP } from './player.js';
 import { createMap } from './map.js';
@@ -34,7 +35,7 @@ const movementKeys = new Set(['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ShiftLeft', 'Shif
 const announcedMissionCompletions=new Set();
 let lastMissionKey='',lastMissionCompleteKey='',missionNoticeUntil=0,missionNoticeRecord=null;
 let queuedEquip=null;
-let selfAvatar,selfBody,flashlight,operations,trapSelected=false,trapPreview;let lastCompletedWave=0,waveNoticeMessage='';
+let selfAvatar,selfBody,selfLegs,flashlight,operations,trapSelected=false,trapPreview;let lastCompletedWave=0,waveNoticeMessage='';
 let renderer, scene, camera, player,lastMenuFrame=-Infinity;
 let needsCapture=false,lobbyOpen=false,matchReady=false,lobbyPhase='lobby',countdownAt=0,members=[],localTimer;const peers=new Map();
 let weather,events,cashCooldown=0,lastAnnouncedWave=0,waveNoticeUntil=0;
@@ -84,7 +85,7 @@ function rebuild(seedValue){
   if(shopOpen){shopOpen=false;shop.hide();}
   if(scene){scene.traverse(o=>{if(o.isInstancedMesh)o.dispose();o.geometry?.dispose();for(const m of (Array.isArray(o.material)?o.material:[o.material]))if(m){m.map?.dispose();m.dispose();}});}
   scene=new THREE.Scene();world=createMap(scene,seedValue);applyEnvironmentLight(scene,renderer);seed=world.seed;colliders=world.colliders;
-  selfAvatar=new PeerAvatar();selfAvatar.head.visible=false;selfAvatar.upper.visible=false;selfAvatar.root.visible=false;selfBody=new BodyVisibility(selfAvatar.root);scene.add(selfAvatar.root);flashlight=new Flashlight(scene);operations=new Operations(scene,world,seed);trapSelected=false;queuedEquip=null;lastMissionKey='';lastMissionCompleteKey='';announcedMissionCompletions.clear();missionNoticeUntil=0;missionNoticeRecord=null;player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.base={...world.spawn};scene.userData.citySky=new CitySky(scene);enemies.listener=player.position;enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);lastAnnouncedWave=0;lastCompletedWave=0;waveNoticeMessage='';waveNoticeUntil=0;events=new EncounterEvents(scene,seed);weather=new WeatherEffects(scene,seed,world.buildings);
+  selfAvatar=new PeerAvatar();selfAvatar.head.visible=false;selfAvatar.upper.visible=false;selfAvatar.root.visible=false;selfLegs=new FirstPersonBody(selfAvatar);selfBody=new BodyVisibility(selfAvatar.root);scene.add(selfAvatar.root);flashlight=new Flashlight(scene);operations=new Operations(scene,world,seed);trapSelected=false;queuedEquip=null;lastMissionKey='';lastMissionCompleteKey='';announcedMissionCompletions.clear();missionNoticeUntil=0;missionNoticeRecord=null;player=new Player(world.spawn);loot=new MoneyDrops(scene);enemies=new Enemies(scene,colliders,audio);enemies.base={...world.spawn};scene.userData.citySky=new CitySky(scene);enemies.listener=player.position;enemies.onDeath=e=>{if(!session.active||session.host)loot.spawn(e);};waves=new Waves(seed);lastAnnouncedWave=0;lastCompletedWave=0;waveNoticeMessage='';waveNoticeUntil=0;events=new EncounterEvents(scene,seed);weather=new WeatherEffects(scene,seed,world.buildings);
   peer=new THREE.Group();const material=new THREE.MeshStandardMaterial({color:'#7d9676'});const body=new THREE.Mesh(new THREE.CapsuleGeometry(.28,.8,3,6),material);body.position.y=1;peer.add(body);const head=new THREE.Mesh(new THREE.IcosahedronGeometry(.23,1),material);head.position.y=1.75;peer.add(head);peer.visible=false;scene.add(peer);peerPose=null;peers.clear();if(renderer)applyPreferences(preferences);
 }
 function resetCombat(){needsCapture=false;clearTimeout(localTimer);matchReady=false;lobbyOpen=false;$('lobby').hidden=true;session.close();rebuild(crypto.getRandomValues(new Uint32Array(1))[0]);account=createInventory();rifle.bindInventory(account);hp=100;outcome='';hitTime=0;hurtTime=0;elapsed=0;footstep=0;downed=false;updateCamera();}
@@ -243,7 +244,7 @@ try {
     if(lobbyOpen&&countdownAt)$('lobby-countdown').textContent=`${t('СТАРТ ЧЕРЕЗ')} ${Math.max(0,Math.ceil((countdownAt-Date.now())/1000))}`;
     if(session.active&&matchReady){netTime+=delta;if(netTime>.1){netTime=0;session.send({type:'pose',...player.position,yaw:player.yaw,pitch:player.pitch,flashlightOn:flashlight.on,interacting:running&&keys.has('KeyE'),hp,ammo:rifle.ammo,reserve:rifle.reserve,weapon:rifle.config.id,visualWeapon:rifle.displayUtility?'trap':rifle.displayVariant?.record.id||rifle.config.id,weaponDrop:rifle.switchDrop||0,inventory:account});if(session.host)session.send({type:'state',wave:waves.snapshot(),event:events.snapshot(),operations:operations.snapshot(),cash:loot.snapshot(),enemies:enemies.snapshot(),projectiles:enemies.projectiles.map(p=>p.mesh.position.toArray())});}}
     for(const p of peers.values())p.avatar.animate(delta);
-    selfAvatar.update({...player.position,yaw:player.yaw,pitch:0,hp,weapon:rifle.config.id});selfAvatar.animate(delta);selfAvatar.root.position.set(player.position.x+Math.sin(player.yaw)*.12,player.position.y,player.position.z+Math.cos(player.yaw)*.12);selfAvatar.root.rotation.y=player.yaw;selfBody.update(player.pitch,delta,started&&!outcome);
+    selfLegs.update(player,delta);selfBody.update(player.pitch,delta,started&&!outcome);
     scene.userData.citySky.update(player.position,elapsed,weather.cycle?.night,preferences.quality);session.measurePing(time);metrics.update(time,preferences.metrics,session.pingMs,session.active);
     renderer.autoClear=true;renderer.render(scene, camera);
     if(started&&!outcome){renderer.autoClear=false;renderer.clearDepth();renderer.render(rifle.scene,rifle.camera);}
