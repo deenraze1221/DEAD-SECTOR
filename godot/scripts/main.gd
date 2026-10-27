@@ -1,6 +1,15 @@
 extends Node3D
 const ReferenceUI=preload("res://scripts/reference_ui.gd")
 var reference_ui
+const Interiors=preload("res://scripts/interior_layout.gd")
+const Objectives=preload("res://scripts/objectives.gd")
+var objectives
+var net
+var coop
+var network_ui
+var atmosphere
+var combat_fx
+var interior_report: Dictionary
 const Generator=preload("res://scripts/city_generator.gd")
 const Climate=preload("res://scripts/climate.gd")
 const Soundscape=preload("res://scripts/soundscape.gd")
@@ -48,11 +57,16 @@ var compass_markers: Control
 var compass_timer=0.0
 
 func _ready() -> void:
+ net=get_node("/root/CoopNetwork")
  load_user_settings()
  setup_inputs()
  bridge.load_data()
- var seed_value=map_seed if map_seed!=0 else int(Time.get_unix_time_from_system()*1000)%2147483647
+ for type in ["zombie","runner","vomiter","brute","boss"]: bridge.data.enemy_types[type].speed*=1.05
+ var seed_value=net.seed_value if net.match_active else map_seed if map_seed!=0 else int(Time.get_unix_time_from_system()*1000)%2147483647
+ var interiors=Interiors.new()
+ interiors.capture(bridge.data,bridge)
  generation=Generator.new().apply(bridge.data,seed_value,bridge)
+ interior_report=interiors.rebuild(bridge.data,seed_value)
  var world=Node3D.new()
  world.name="City"
  add_child(world)
@@ -75,8 +89,34 @@ func _ready() -> void:
  body=Body.new()
  player.add_child(body)
  body.setup(player,bridge)
+ atmosphere=preload("res://scripts/atmosphere.gd").new()
+ atmosphere.main=self
+ add_child(atmosphere)
+ objectives=Objectives.new()
+ objectives.main=self
+ add_child(objectives)
+ combat_fx=preload("res://scripts/combat_fx.gd").new()
+ combat_fx.main=self
+ add_child(combat_fx)
  apply_quality()
- set_playing(false)
+ coop=preload("res://scripts/coop.gd").new()
+ coop.main=self
+ add_child(coop)
+ network_ui=preload("res://scripts/network_ui.gd").new()
+ network_ui.build(self)
+ if net.match_active:
+  var slot=maxi(0,net.members.find_custom(func(m): return str(m.id)==net.peer_id))
+  player.position+=Vector3(slot*1.1,0,0)
+  set_playing(true)
+ else: set_playing(false)
+
+func world_running() -> bool:
+ if net.match_active and net.active: return coop!=null and not coop.paused_for_disconnect
+ return player.active
+
+func new_match() -> void:
+ net.close()
+ get_tree().reload_current_scene()
 
 func setup_inputs() -> void:
  var keys={"forward":KEY_W,"back":KEY_S,"left":KEY_A,"right":KEY_D,"jump":KEY_SPACE,"sprint":KEY_SHIFT,"reload":KEY_R,"flashlight":KEY_F,"pause_game":KEY_ESCAPE,"interact":KEY_E,"primary":KEY_1,"pistol":KEY_2,"trap":KEY_3,"small_medkit":KEY_H,"large_medkit":KEY_J,"battery":KEY_B}
@@ -193,7 +233,8 @@ func set_playing(value: bool) -> void:
 
 func _unhandled_input(event: InputEvent) -> void:
  if event.is_action_pressed("pause_game"):
-  if store_panel.visible: close_store()
+  if network_ui!=null and network_ui.panel.visible: network_ui.panel.hide();menu.show()
+  elif store_panel.visible: close_store()
   else: set_playing(not player.active)
  if event.is_action_pressed("interact") and player.active and near_store(): open_store()
 
@@ -210,7 +251,7 @@ F · LIGHT %d%%   B · BATTERIES ×%d" % [battle.primary.to_upper() if battle.pr
  wallet_label.text="HEALTH %d HP   $%d   CONDITION %d%%" % [player.health,battle.money,int(battle.inventory.get(player.config.id,{}).get("durability",100))]
  wave_label.text="WAVE %d · %s
 %ds   ALIVE %d   SPAWNED %d/%d" % [battle.number,battle.phase,int(maxf(0,(60 if battle.phase=="PREPARATION" else 30 if battle.phase=="INTERMISSION" else 120)-battle.time)),battle.enemies.size(),battle.spawned,battle.total()]
- notice_label.text=battle.notice if battle.notice_time>0 else "E · ACCESS STORE" if player.active and near_store() else ""
+ notice_label.text=battle.notice if battle.notice_time>0 else ""
  vignette.color=Color(0,0,0,0)
  screen.get_meta("post_material").set_shader_parameter("low_health",player.health>0 and player.health<25)
  ammo_label.text="%s
@@ -235,7 +276,7 @@ func near_store() -> bool:
 
 func show_death() -> void:
  set_playing(false)
- battle.notice="YOU DIED · SELECT NEW MATCH"
+ battle.notice="YOU ARE DOWN · A SQUAD MEMBER CAN REVIVE YOU" if net.active else "YOU DIED · SELECT NEW MATCH"
  battle.notice_time=99999
 
 func setup_store() -> void:
@@ -380,17 +421,8 @@ func setup_music() -> void:
  sound.main=self
  add_child(sound)
 
-func update_markers(azimuth: float) -> void:
- for marker in compass_markers.get_children(): compass_markers.remove_child(marker);marker.queue_free()
- var store_position=Vector3(bridge.data.terminal.x,0,bridge.data.terminal.z)
- var targets=[{"position":store_position,"store":true}]
- for enemy in battle.enemies:
-  if battle.phase=="CLEARANCE" or enemy.position.distance_to(player.position)<25: targets.append({"position":enemy.position,"store":false})
- for target in targets:
-  var offset=target.position-player.position
-  var angle=wrapf(rad_to_deg(atan2(offset.x,-offset.z))-azimuth,-180,180)
-  if absf(angle)>75: continue
-  var marker=label("MART %dm" % int(offset.length()) if target.store else "■",12)
-  marker.position=Vector2(250+angle*3,0)
-  marker.add_theme_color_override("font_color",Color("#e0c37b") if target.store else Color("#d65e4b"))
-  compass_markers.add_child(marker)
+func update_markers(_azimuth: float) -> void:
+ if reference_ui!=null and is_instance_valid(reference_ui.compass_widget): reference_ui.compass_widget.queue_redraw()
+
+func _exit_tree() -> void:
+ if network_ui!=null and is_instance_valid(net) and net.changed.is_connected(network_ui.refresh): net.changed.disconnect(network_ui.refresh)

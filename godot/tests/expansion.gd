@@ -14,10 +14,17 @@ func contacts(boxes: Array) -> Dictionary:
     var key=Vector2i(x,z)
     for j in buckets.get(key,[]):
      var b=boxes[j]
-     if minf(a.maxX,b.maxX)-maxf(a.minX,b.minX)>.01 and minf(a.maxZ,b.maxZ)-maxf(a.minZ,b.minZ)>.01 and minf(a.maxY,b.maxY)-maxf(a.minY,b.minY)>.01: pairs[str(j)+":"+str(i)]=true
+     if str(a.get("owner"))==str(b.get("owner")): continue
+     if minf(a.maxX,b.maxX)-maxf(a.minX,b.minX)>.01 and minf(a.maxZ,b.maxZ)-maxf(a.minZ,b.minZ)>.01 and minf(a.maxY,b.maxY)-maxf(a.minY,b.minY)>.01: pairs[contact_signature(a,b)]=true
     if not buckets.has(key): buckets[key]=[]
     buckets[key].append(i)
  return pairs
+func signature(box: Dictionary) -> String:
+ return str([box.kind,snappedf(fposmod(box.minX,24),.001),snappedf(fposmod(box.minZ,24),.001),snappedf(box.maxX-box.minX,.001),snappedf(box.maxZ-box.minZ,.001),snappedf(box.minY,.001),snappedf(box.maxY,.001)])
+func contact_signature(a: Dictionary,b: Dictionary) -> String:
+ var values=[signature(a),signature(b)]
+ values.sort()
+ return str(values)
 func run() -> void:
  var Bridge=load("res://scripts/bridge.gd")
  var Generator=load("res://scripts/city_generator.gd")
@@ -26,6 +33,9 @@ func run() -> void:
  var source=JSON.parse_string(FileAccess.get_file_as_string("res://assets/city.json"))
  var original_contacts=contacts(source.colliders)
  var plans=[]
+ var interior_hashes=[]
+ var interior_factory=load("res://scripts/interior_layout.gd").new()
+ interior_factory.capture(source,bridge)
  for seed_value in [123,123,456]:
   var data=source.duplicate(true)
   var result=Generator.new().apply(data,seed_value,bridge)
@@ -38,6 +48,14 @@ func run() -> void:
    if not original_contacts.has(key): extra+=1
   check(extra==0,"No new overlapping solid collider pairs; found "+str(extra))
   plans.append(result.plan)
+  interior_factory.rebuild(data,seed_value)
+  interior_hashes.append(hash(data.fresh_batches))
+  var fresh_pairs=contacts(data.colliders)
+  var extra_rooms=0
+  for key in fresh_pairs:
+   if not original_contacts.has(key): extra_rooms+=1
+  check(extra_rooms==0,"Fresh rooms have no inter-object overlaps seed"+str(seed_value)+": "+str(extra_rooms))
+ check(interior_hashes[0]==interior_hashes[1] and interior_hashes[0]!=interior_hashes[2],"Fresh furniture and rooms repeat by seed and vary across seeds")
  check(plans[0]==plans[1] and plans[0]!=plans[2],"Seeds repeat and differ")
  var Climate=load("res://scripts/climate.gd")
  var counts={}
@@ -48,6 +66,11 @@ func run() -> void:
  var scene=load("res://main.tscn").instantiate()
  root.add_child(scene)
  await process_frame
+ var fresh_contacts=contacts(scene.bridge.data.colliders)
+ var fresh_extra=0
+ for key in fresh_contacts:
+  if not original_contacts.has(key): fresh_extra+=1
+ check(fresh_extra==0,"Fresh interiors must not overlap other objects: "+str(fresh_extra))
  check(scene.body.legs.size()==2,"Local soldier has two animated legs")
  check(scene.sound.library.calm.size()==5 and scene.sound.library.tense.size()==5,"All10 original scores")
  for id in scene.bridge.data.weapons: check(scene.sound.stream("shot-"+id)!=null,"Original sound "+id)

@@ -21,6 +21,9 @@ var recoil=0.0
 var config: Dictionary
 var shots=0
 var last_hit=false
+var hit_time=0.0
+var hurt_time=0.0
+var actions
 var flash: OmniLight3D
 
 func _ready() -> void:
@@ -40,6 +43,9 @@ func _ready() -> void:
  camera.far=600
  camera.position.y=1.65
  add_child(camera)
+ actions=preload("res://scripts/weapon_actions.gd").new()
+ add_child(actions)
+ actions.setup(self)
  setup_weapon_view()
  gun=Node3D.new()
  gun.position=base_gun
@@ -82,12 +88,14 @@ func _unhandled_input(event: InputEvent) -> void:
    battle.battery=120
 
 func _physics_process(delta: float) -> void:
- if not active or health<=0: return
+ if not active or health<=0 or not get_parent().world_running(): return
  if switch_time>0:
   var before=switch_time
   switch_time=maxf(0,switch_time-delta)
   if before>.75 and switch_time<=.75 and battle!=null: battle.equip_owned(pending_weapon)
  mouse_guard=maxf(0,mouse_guard-delta)
+ hit_time=maxf(0,hit_time-delta)
+ hurt_time=maxf(0,hurt_time-delta)
  cooldown=maxf(0,cooldown-delta)
  if config.automatic and Input.is_action_pressed("fire"): fire()
  flash.light_energy=maxf(0,flash.light_energy-delta*80)
@@ -124,7 +132,7 @@ func _physics_process(delta: float) -> void:
  gun.rotation.x=recoil*.15
 
 func fire() -> void:
- if not active or health<=0 or switch_time>0: return
+ if not active or health<=0 or switch_time>0 or not get_parent().world_running(): return
  if battle!=null and battle.trap_selected: battle.place_trap();return
  if cooldown>0 or reloading>0 or ammo<=0: return
  if battle!=null:
@@ -139,18 +147,34 @@ func fire() -> void:
  if get_parent().sound!=null: get_parent().sound.play("shot-"+str(config.id))
 
  flash.light_energy=5
+ actions.fired()
+ if not get_parent().net.active or get_parent().net.hosting:
+  for enemy in battle.enemies: enemy.hear(global_position)
  var from=camera.global_position
  var query=PhysicsRayQueryParameters3D.create(from,from-camera.global_basis.z*100)
+ query.collision_mask=1|4
  query.exclude=[get_rid()]
  var hit=get_world_3d().direct_space_state.intersect_ray(query)
  last_hit=not hit.is_empty()
+ var main=get_parent()
+ main.combat_fx.tracer(from-camera.global_basis.z*.5,hit.position if last_hit else from-camera.global_basis.z*100)
+ if main.net.active and not main.net.hosting:
+  main.net.send({"type":"shot","direction":main.coop.v(-camera.global_basis.z),"weapon":config.id})
+  if last_hit and hit.collider.has_method("take_damage"): hit_time=.16
+  return
+ elif main.net.active:
+  main.net.send({"type":"effect","sound":"shot-"+str(config.id),"p":main.coop.v(global_position),"shooter":main.net.peer_id,"end":main.coop.v(hit.position if last_hit else from-camera.global_basis.z*100)})
  if last_hit and hit.collider.has_method("take_damage"):
-  hit.collider.take_damage(int(config.damage))
+  if hit.collider.has_meta("mutant"): hit.collider.take_damage(int(config.damage),hit.position,-camera.global_basis.z)
+  else: hit.collider.take_damage(int(config.damage))
+  hit_time=.16
   if get_parent().sound!=null: get_parent().sound.play("hit")
  elif last_hit and hit.collider.has_meta("target"):
   var target=hit.collider
   target.set_meta("hp",target.get_meta("hp")-int(config.damage))
   if target.get_meta("hp")<=0: target.queue_free()
+
+ if last_hit and not hit.collider.has_method("take_damage"): battle.burst(hit.position,false,5,hit.normal,true,true)
 
 func look(relative: Vector2) -> void:
  var sensitivity=get_parent().sensitivity
@@ -201,6 +225,7 @@ func _process(_delta: float) -> void:
 
 func hurt(amount: int) -> void:
  if health<=0: return
+ hurt_time=.35
  health=maxi(0,health-amount)
  if get_parent().sound!=null: get_parent().sound.play("hurt")
  if health==0: get_parent().show_death()

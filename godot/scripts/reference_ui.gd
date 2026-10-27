@@ -5,6 +5,10 @@ var mono: SystemFont
 var heading: SystemFont
 var sans: SystemFont
 var hud_root: Control
+var hit_marker: Label
+var mission_status: Label
+var sector_subtitle: Label
+var weather_line: Label
 var health: Label
 var condition: Label
 var reserve: Label
@@ -12,6 +16,10 @@ var weapon: Label
 var total_ammo: Label
 var slots: Label
 var heading_ticks: Label
+var compass_widget: Control
+var notice_box: PanelContainer
+var prompt_box: PanelContainer
+var interaction_label: Label
 var health_bar: ProgressBar
 var store_balance: Label
 var owned_row: HBoxContainer
@@ -149,14 +157,33 @@ func build_hud() -> void:
  hud_root.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
  hud_root.mouse_filter=Control.MOUSE_FILTER_IGNORE
  hud_root.add_to_group("match_hud")
+ var hud_theme=main.screen.theme.duplicate()
+ var hud_font=load("res://assets/hud-user.ttf")
+ hud_font.fallbacks=[mono]
+ hud_theme.default_font=hud_font
+ hud_root.theme=hud_theme
  main.screen.add_child(hud_root)
  var cross=text("▪",10)
  cross.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
  cross.position=Vector2(-3,-7)
  hud_root.add_child(cross)
- main.hud=text("",11)
+ hit_marker=text("×",24,Color("#f0d0a1"))
+ hit_marker.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
+ hit_marker.position=Vector2(-8,-16)
+ hud_root.add_child(hit_marker)
+ mission_status=text("",10,Color("#dec995"))
+ mission_status.position=Vector2(24,175)
+ mission_status.custom_minimum_size.x=270
+ hud_root.add_child(mission_status)
+ main.hud=text("",14)
  main.hud.position=Vector2(24,90)
  hud_root.add_child(main.hud)
+ sector_subtitle=text("COMBAT ZONE",9,Color("#b2c0b9"))
+ sector_subtitle.position=Vector2(24,116)
+ hud_root.add_child(sector_subtitle)
+ weather_line=text("",8,Color("#a9bebd"))
+ weather_line.position=Vector2(24,140)
+ hud_root.add_child(weather_line)
  var vitals=panel(hud_root,Vector2(400,76),Vector2(24,-94),Control.PRESET_BOTTOM_LEFT)
  var row=HBoxContainer.new()
  row.add_theme_constant_override("separation",16)
@@ -220,28 +247,32 @@ func build_hud() -> void:
  main.fps_label.custom_minimum_size.x=100
  main.fps_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_RIGHT
  hud_root.add_child(main.fps_label)
- heading_ticks=text("",9,Color("#aabdb5"))
- heading_ticks.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
- heading_ticks.position=Vector2(-220,7)
- heading_ticks.custom_minimum_size.x=440
- heading_ticks.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
- hud_root.add_child(heading_ticks)
  main.bearing_label=text("",11)
- main.bearing_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
- main.bearing_label.position=Vector2(-100,26)
- main.bearing_label.custom_minimum_size.x=200
- main.bearing_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+ main.bearing_label.hide()
  hud_root.add_child(main.bearing_label)
  main.compass_markers=Control.new()
- main.compass_markers.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
- main.compass_markers.position=Vector2(-250,46)
+ main.compass_markers.hide()
  hud_root.add_child(main.compass_markers)
- main.notice_label=text("",15)
- main.notice_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER)
- main.notice_label.position=Vector2(-400,-150)
- main.notice_label.custom_minimum_size.x=800
+ compass_widget=preload("res://scripts/compass_ui.gd").new()
+ compass_widget.main=main
+ compass_widget.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ hud_root.add_child(compass_widget)
+ notice_box=PanelContainer.new()
+ var notice_style=box(Color(.04,.07,.09,.88),14,Color("#9aaa79"))
+ notice_style.border_width_top=2
+ notice_box.add_theme_stylebox_override("panel",notice_style)
+ notice_box.mouse_filter=Control.MOUSE_FILTER_IGNORE
+ hud_root.add_child(notice_box)
+ main.notice_label=text("",15,Color("#e0eac1"))
  main.notice_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
- hud_root.add_child(main.notice_label)
+ main.notice_label.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
+ notice_box.add_child(main.notice_label)
+ prompt_box=PanelContainer.new()
+ prompt_box.add_theme_stylebox_override("panel",box(Color(.04,.07,.09,.85),10,Color("#667b63")))
+ hud_root.add_child(prompt_box)
+ interaction_label=text("",11)
+ interaction_label.horizontal_alignment=HORIZONTAL_ALIGNMENT_CENTER
+ prompt_box.add_child(interaction_label)
  main.vignette=ColorRect.new()
  main.vignette.mouse_filter=Control.MOUSE_FILTER_IGNORE
  main.vignette.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -272,11 +303,13 @@ func build_menu() -> void:
  column.add_theme_constant_override("separation",10)
  main.menu.add_child(column)
  column.add_child(text("▪ CONNECTION ESTABLISHED / SECTOR 00",8))
+ var brand_font=load("res://assets/title-user.ttf")
+ brand_font.fallbacks=[heading]
  var logo=VBoxContainer.new()
  logo.add_theme_constant_override("separation",-18)
  for line in ["DEAD","SECTOR"]:
   var title=text(line,72,Color("#e8eeeb") if line=="DEAD" else Color("#cddaa1"))
-  title.add_theme_font_override("font",heading)
+  title.add_theme_font_override("font",brand_font)
   logo.add_child(title)
  column.add_child(logo)
  var subtitle=text("Beyond the perimeter — silence.\nCheck your gear. Look around. Keep moving.",12,Color("#bcc6c4"))
@@ -287,15 +320,16 @@ func build_menu() -> void:
  actions.size_flags_horizontal=Control.SIZE_SHRINK_BEGIN
  actions.add_theme_constant_override("separation",6)
  column.add_child(actions)
- play_button=action("PLAY                        ↗",func(): main.set_playing(true),true)
+ play_button=action("PLAY                        ↗",func():
+  if started: main.set_playing(true)
+  else: main.network_ui.open()
+ ,true)
  play_button.add_theme_font_override("font",heading)
  actions.add_child(play_button)
- var join=action("JOIN BY CODE",func(): pass)
- join.disabled=true
- join.tooltip_text="Network play is not available in the Godot port yet."
+ var join=action("JOIN BY CODE",func(): main.network_ui.open(true))
  actions.add_child(join)
  actions.add_child(action("SETTINGS                    +",main.open_settings))
- restart_button=action("NEW MATCH",func(): main.get_tree().reload_current_scene(),false,26)
+ restart_button=action("NEW MATCH",func(): main.new_match(),false,26)
  restart_button.hide()
  actions.add_child(restart_button)
  for choice in actions.get_children(): choice.add_theme_font_override("font",heading)
@@ -420,8 +454,19 @@ func render_store() -> void:
  layout()
 
 func layout() -> void:
+ if main.network_ui!=null: main.network_ui.layout()
  var size=main.screen.size
  if size.x<=0: return
+ if is_instance_valid(compass_widget):
+  compass_widget.position=Vector2((size.x-minf(400,size.x*.55))*.5,0)
+  compass_widget.size=Vector2(minf(400,size.x*.55),68)
+ if is_instance_valid(notice_box):
+  var width=minf(600,size.x*.8)
+  notice_box.custom_minimum_size=Vector2(width,56)
+  notice_box.size.x=width
+  notice_box.position=Vector2((size.x-width)*.5,size.y*.24)
+ if is_instance_valid(prompt_box):
+  prompt_box.position=Vector2((size.x-prompt_box.size.x)*.5,size.y-155)
  if is_instance_valid(main.store_panel):
   var target=Vector2(minf(800,size.x-40),minf(580,size.y-32))
   main.store_panel.custom_minimum_size=target
@@ -435,6 +480,34 @@ func layout() -> void:
 func refresh(delta: float) -> void:
  var p=main.player
  var b=main.battle
+ hit_marker.visible=p.hit_time>0
+ notice_box.visible=b.notice_time>0 and main.notice_label.text!=""
+ notice_box.modulate.a=clampf(b.notice_time/.35,0,1)
+ var prompt=main.objectives.interaction if main.objectives!=null else ""
+ if prompt=="" and main.near_store(): prompt="E · ACCESS SUPPLY TERMINAL"
+ interaction_label.text=prompt
+ prompt_box.visible=prompt!=""
+ prompt_box.position=Vector2((main.screen.size.x-prompt_box.size.x)*.5,main.screen.size.y-155)
+ main.screen.get_meta("post_material").set_shader_parameter("hurt",p.hurt_time/.35)
+ mission_status.text=""
+ if main.objectives!=null and not main.objectives.mission.is_empty() and main.objectives.mission.status=="active":
+  var m=main.objectives.mission
+  mission_status.text="MISSION · "+str(m.kind).to_upper()+" · $"+str(m.reward)
+  if m.kind=="growth": mission_status.text+="\nGROWTH HP "+str(m.hp)
+
+ main.hud.text="▪ SECTOR 00"
+ if main.climate!=null:
+  var climate=main.climate
+  weather_line.text="%02d:%02d · %s · %s · %s fog" % [int(climate.hour),int(fmod(climate.hour,1)*60),"Night" if climate.night else "Day",climate.kind.capitalize(),climate.fog.capitalize()]
+ var countdown=maxf(0,(60 if b.phase=="PREPARATION" else 30 if b.phase=="INTERMISSION" else 120)-b.time)
+ main.wave_label.text=("%s · %ds" % [("WAVE %d · ASSAULT" % b.number) if b.phase=="ASSAULT" else b.phase,int(countdown)])+"
+
+ALIVE: %d · SPAWNED: %d/%d" % [b.enemies.size(),b.spawned,b.total()]
+ if b.phase=="CLEARANCE": main.wave_label.text="CLEAR ALL SURVIVORS
+
+ALIVE: %d" % b.enemies.size()
+ if main.objectives!=null: main.wave_label.text+="
+Next airdrop: %ds" % (480-int(fmod(main.objectives.elapsed,480)))
  health.text="%d HP" % p.health
  health_bar.value=p.health
  main.stamina_bar.get_meta("number").text="%d%%" % int(p.stamina*20)
@@ -446,12 +519,7 @@ func refresh(delta: float) -> void:
  total_ammo.text="RELOADING" if p.reloading>0 else "%d/500 · AMMO" % carried_ammo()
  slots.text="1 · %s    2 · PISTOL" % (b.primary.to_upper() if b.primary!="" else "EMPTY")
  main.gear_label.text="F · Flashlight %d%%  ·  B ×%d  ·  3 Traps ×%d  ·  H/J %d/%d" % [int(b.battery/120*100),b.batteries,b.traps,b.medkits[0],b.medkits[1]]
- var degrees=fposmod(-rad_to_deg(p.rotation.y),360)
- heading_ticks.text=""
- for n in range(-3,4):
-  var bearing=int(fposmod(round(degrees/15)*15+n*15,360))
-  heading_ticks.text+=({0:"N",90:"E",180:"S",270:"W"}.get(bearing,"%03d" % bearing))+"     "
- menu_shade.visible=main.menu.visible or is_instance_valid(main.settings_panel) and main.settings_panel.visible
+ menu_shade.visible=(main.network_ui!=null and main.network_ui.panel.visible) or main.menu.visible or is_instance_valid(main.settings_panel) and main.settings_panel.visible
  store_shade.visible=is_instance_valid(main.store_panel) and main.store_panel.visible
  for node in main.get_tree().get_nodes_in_group("menu_chrome"): node.visible=main.menu.visible
  play_button.text="RESUME                      ↗" if started else "PLAY                        ↗"

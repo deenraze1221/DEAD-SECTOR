@@ -20,6 +20,10 @@ func load_data() -> void:
   else:
    var standard=StandardMaterial3D.new()
    standard.albedo_color=Color(record.color)
+   if record.get("transparent",false):
+    standard.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+    standard.albedo_color.a=record.get("opacity",1.0)
+   if record.get("side",0)==2: standard.cull_mode=BaseMaterial3D.CULL_DISABLED
    standard.roughness=record.roughness
    standard.metallic=record.metalness
    standard.vertex_color_use_as_albedo=true
@@ -102,8 +106,11 @@ func build_world(parent: Node3D) -> void:
  body.add_child(ground)
 
 func build_weapon(parent: Node3D, id: String) -> void:
+ var part_index=0
  for part in data.weapons[id].parts:
   var instance=MeshInstance3D.new()
+  instance.name="WeaponBody" if part_index==0 else "WeaponMagazine"
+  part_index+=1
   instance.mesh=make_mesh(part)
   if id=="Pistol":
    instance.mesh=instance.mesh.duplicate()
@@ -136,6 +143,7 @@ func build_hands(parent: Node3D, grips: Dictionary) -> void:
   cylinder.top_radius=.035
   cylinder.bottom_radius=.049
   cylinder.height=wrist.distance_to(elbow)
+  arm.name="SupportForearm" if side<0 else "TriggerForearm"
   arm.mesh=cylinder
   arm.material_override=sleeve
   parent.add_child(arm)

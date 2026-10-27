@@ -29,6 +29,7 @@ var poison_time=0.0
 var poison_tick=0.0
 var rng=RandomNumberGenerator.new()
 var store_open=false
+var smoke_texture: ImageTexture
 
 func _ready() -> void:
  rng.randomize()
@@ -40,21 +41,21 @@ func _ready() -> void:
 
 func make_grid(radius: float, height: float, bottom: float) -> AStarGrid2D:
  var nav=AStarGrid2D.new()
- nav.region=Rect2i(0,0,312,312)
- nav.cell_size=Vector2(.8,.8)
- nav.offset=Vector2(-124.4,-124.4)
+ nav.region=Rect2i(0,0,498,498)
+ nav.cell_size=Vector2(.5,.5)
+ nav.offset=Vector2(-124.25,-124.25)
  nav.diagonal_mode=AStarGrid2D.DIAGONAL_MODE_ONLY_IF_NO_OBSTACLES
  nav.update()
  for box in main.bridge.data.colliders:
   if box.minY>=height or box.maxY<=bottom: continue
   var a=cell(Vector3(box.minX-radius,0,box.minZ-radius))
   var b=cell(Vector3(box.maxX+radius,0,box.maxZ+radius))
-  for x in range(maxi(0,a.x),mini(311,b.x)+1):
-   for y in range(maxi(0,a.y),mini(311,b.y)+1): nav.set_point_solid(Vector2i(x,y))
+  for x in range(maxi(0,a.x),mini(497,b.x)+1):
+   for y in range(maxi(0,a.y),mini(497,b.y)+1): nav.set_point_solid(Vector2i(x,y))
  return nav
 
 func cell(p: Vector3) -> Vector2i:
- return Vector2i(roundi((p.x+124.4)/.8),roundi((p.z+124.4)/.8))
+ return Vector2i(roundi((p.x+124.25)/.5),roundi((p.z+124.25)/.5))
 
 func free_cell(p: Vector3, nav: AStarGrid2D=null) -> Vector2i:
  if nav==null: nav=grid
@@ -107,9 +108,19 @@ func spawn_enemy(type: String) -> void:
  enemies.append(node)
 
 func _physics_process(delta: float) -> void:
- if not main.player.active: return
+ if not main.world_running(): return
  notice_time=maxf(0,notice_time-delta)
- if main.player.health<=0: return
+ if main.player.health<=0 and not main.net.active: return
+ if poison_time>0:
+  poison_time=maxf(0,poison_time-delta)
+  poison_tick+=delta
+  if poison_tick>=1:
+   poison_tick-=1
+   main.player.hurt(5)
+ if main.player.camera.get_node("Flashlight").visible:
+  battery=maxf(0,battery-delta)
+  if battery==0: main.player.camera.get_node("Flashlight").visible=false
+ if not main.net.authority(): return
  time+=delta
  if phase=="PREPARATION" and time>=60:
   phase="ASSAULT"
@@ -123,7 +134,7 @@ func _physics_process(delta: float) -> void:
   if time>=120: phase="CLEARANCE"
  if phase=="CLEARANCE" and enemies.is_empty():
   completed=number
-  if number%5==0: money+=500
+  if number%5==0: main.coop.grant(500)
   phase="INTERMISSION"
   time=0
   announce("WAVE %d COMPLETE · 30 SECOND BREAK" % number)
@@ -134,19 +145,11 @@ func _physics_process(delta: float) -> void:
   spawned=0
   vomiters=0
   announce("WAVE %d · ASSAULT" % number)
- if poison_time>0:
-  poison_time=maxf(0,poison_time-delta)
-  poison_tick+=delta
-  if poison_tick>=1:
-   poison_tick-=1
-   main.player.hurt(5)
- if main.player.camera.get_node("Flashlight").visible:
-  battery=maxf(0,battery-delta)
-  if battery==0: main.player.camera.get_node("Flashlight").visible=false
  for pickup in pickups.duplicate():
   pickup.mesh.rotation.y+=delta
-  if pickup.mesh.position.distance_to(main.player.position+Vector3(0,.2,0))<1.2:
-   money+=pickup.value
+  var collector=main.coop.nearest(pickup.mesh.position) if main.coop!=null else main.player
+  if collector.health>0 and pickup.mesh.position.distance_to(collector.position+Vector3(0,.2,0))<1.2:
+   main.coop.grant(pickup.value)
    pickup.mesh.queue_free()
    pickups.erase(pickup)
    main.sound.play("cash")
@@ -160,6 +163,16 @@ func _physics_process(delta: float) -> void:
     main.player.hurt(10 if shot.poison else 30)
     if shot.poison: poison_time=5;poison_tick=0
    shot.life=0
+  if main.net.active and main.net.hosting:
+   var end=hit.position if not hit.is_empty() else next
+   for actor in main.coop.peers.values():
+    if actor.health<=0: continue
+    var closest=Geometry3D.get_closest_point_to_segment(actor.position+Vector3.UP,shot.mesh.position,end)
+    if closest.distance_to(actor.position+Vector3.UP)<.55:
+     actor.health=maxi(0,actor.health-(10 if shot.poison else 30))
+     main.net.send({"type":"damage","target":actor.id,"amount":10 if shot.poison else 30,"poison":shot.poison})
+     shot.life=0
+     break
   shot.mesh.position=next
   if shot.life<=0: shot.mesh.queue_free();projectiles.erase(shot)
  for trap in placed_traps.duplicate():
@@ -171,33 +184,60 @@ func _physics_process(delta: float) -> void:
     placed_traps.erase(trap)
     break
 
-func announce(text: String) -> void:
+func announce(text: String,sound_name="auto") -> void:
  notice=text
  notice_time=5
- if main.sound!=null: main.sound.play("wave-clear" if "COMPLETE" in text else "wave")
+ if main.sound!=null and sound_name!="": main.sound.play(("wave-clear" if "COMPLETE" in text else "wave") if sound_name=="auto" else sound_name)
 
 
-func burst(at: Vector3, green=false) -> void:
+func burst(at: Vector3, green=false,amount=22, direction=Vector3.ZERO, hit=false, dust=false) -> void:
  var particles=CPUParticles3D.new()
- particles.amount=22
- particles.lifetime=2.5 if green else .65
+ particles.amount=amount
+ particles.lifetime=.35 if hit else 2.5 if green else .65
  particles.one_shot=true
  particles.explosiveness=1
- particles.direction=Vector3.UP
- particles.spread=180
+ particles.direction=direction.normalized() if direction.length()>.01 else Vector3.UP
+ particles.spread=65 if hit else 180
  particles.initial_velocity_min=.5
- particles.initial_velocity_max=2 if green else 4
+ particles.initial_velocity_max=1.4 if hit else .8 if green else 4
  particles.gravity=Vector3(0,.2 if green else -5,0)
  particles.scale_amount_min=.06
  particles.scale_amount_max=.25 if green else .12
  var material=StandardMaterial3D.new()
- material.albedo_color=Color("#667f30") if green else Color("#98352d")
+ material.albedo_color=Color.WHITE
+ material.vertex_color_use_as_albedo=true
+ material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+ var ramp=Gradient.new()
+ var tint=Color("#83887c") if dust else Color("#739543") if green else Color("#b63d31")
+ ramp.colors=PackedColorArray([tint,tint,Color(tint.r,tint.g,tint.b,0)])
+ ramp.offsets=PackedFloat32Array([0,.55,1])
+ particles.color_ramp=ramp
  var mesh=SphereMesh.new()
  mesh.radius=.5
  mesh.height=1
+ mesh.radial_segments=8
+ mesh.rings=4
  material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
- mesh.material=material
- particles.mesh=mesh
+ if green:
+  if smoke_texture==null:
+   var image=Image.create(32,32,false,Image.FORMAT_RGBA8)
+   for y in range(32):
+    for x in range(32): image.set_pixel(x,y,Color(1,1,1,pow(maxf(0,1-Vector2(x-15.5,y-15.5).length()/15.5),2)))
+   smoke_texture=ImageTexture.create_from_image(image)
+  var cloud=QuadMesh.new()
+  cloud.size=Vector2(1.2,1.2)
+  material.albedo_texture=smoke_texture
+  material.billboard_mode=BaseMaterial3D.BILLBOARD_ENABLED
+  cloud.material=material
+  particles.mesh=cloud
+  particles.scale_amount_min=.5
+  particles.scale_amount_max=1.2
+ else:
+  mesh.material=material
+  particles.mesh=mesh
+ particles.local_coords=false
+ if main.net.active and main.net.hosting:
+  main.net.send({"type":"effect","p":main.coop.v(at),"burst":true,"green":green,"amount":amount,"direction":main.coop.v(direction),"hit":hit,"dust":dust})
  add_child(particles)
  particles.position=at
  particles.finished.connect(particles.queue_free)
@@ -205,7 +245,17 @@ func burst(at: Vector3, green=false) -> void:
 
 func killed(enemy) -> void:
  enemies.erase(enemy)
- burst(enemy.position+Vector3(0,1.2,0),enemy.type=="vomiter")
+ burst(enemy.position+Vector3(0,1.2,0),enemy.type=="vomiter",14 if enemy.type=="vomiter" else 40)
+ var pickup=cash_mesh(enemy.position+Vector3(0,.2,0))
+ pickup.position.y=.2
+ var floor_query=PhysicsRayQueryParameters3D.create(enemy.position+Vector3(0,1,0),enemy.position-Vector3(0,12,0),1)
+ var floor_hit=get_world_3d().direct_space_state.intersect_ray(floor_query)
+ if not floor_hit.is_empty(): pickup.position.y=floor_hit.position.y+.2
+ pickups.append({"mesh":pickup,"value":roundi(clampf(5+(float(enemy.stats.hp)-125)/5,15,100))})
+ main.sound.play(str(enemy.type)+"-death",enemy.position)
+ if main.net.active and main.net.hosting: main.net.send({"type":"effect","sound":str(enemy.type)+"-death","p":main.coop.v(enemy.position)})
+
+func cash_mesh(at: Vector3) -> MeshInstance3D:
  var pickup=MeshInstance3D.new()
  var box=BoxMesh.new()
  box.size=Vector3(.22,.12,.15)
@@ -216,13 +266,8 @@ func killed(enemy) -> void:
  material.emission=Color("#45522c")
  pickup.material_override=material
  add_child(pickup)
- pickup.position=enemy.position+Vector3(0,.2,0)
- pickup.position.y=.2
- var floor_query=PhysicsRayQueryParameters3D.create(enemy.position+Vector3(0,1,0),enemy.position-Vector3(0,12,0),1)
- var floor_hit=get_world_3d().direct_space_state.intersect_ray(floor_query)
- if not floor_hit.is_empty(): pickup.position.y=floor_hit.position.y+.2
- pickups.append({"mesh":pickup,"value":roundi(clampf(5+(float(enemy.stats.hp)-125)/5,15,100))})
- main.sound.play(str(enemy.type)+"-death",enemy.position)
+ pickup.position=at
+ return pickup
 
 func projectile(enemy, poison: bool) -> void:
  var mesh=MeshInstance3D.new()
@@ -236,9 +281,11 @@ func projectile(enemy, poison: bool) -> void:
  mesh.material_override=material
  add_child(mesh)
  mesh.position=enemy.position+Vector3(0,1.8 if poison else 0,0)
- var aim=main.player.position+Vector3(0,1,0)
+ main.combat_fx.trail(mesh,poison)
+ var aim=(main.coop.nearest(enemy.position).position if main.coop!=null else main.player.position)+Vector3(0,1,0)
  projectiles.append({"mesh":mesh,"velocity":mesh.position.direction_to(aim)*(5 if poison else 20),"life":1.6 if poison else 6.0,"poison":poison})
  main.sound.play("vomit" if poison else "eye-living",enemy.position)
+ if main.net.active and main.net.hosting: main.net.send({"type":"effect","sound":"vomit" if poison else "eye-living","p":main.coop.v(enemy.position)})
 
 func save_gun() -> void:
  var p=main.player
@@ -305,15 +352,14 @@ func use_medkit(index: int) -> void:
 
 func place_trap() -> void:
  if traps<=0: trap_selected=false;return
- var mesh=MeshInstance3D.new()
- var box=BoxMesh.new()
- box.size=Vector3(.65,.08,.65)
- mesh.mesh=box
- var material=StandardMaterial3D.new()
- material.albedo_color=Color("#747b69")
- mesh.material_override=material
- add_child(mesh)
- mesh.position=main.player.position+Vector3(0,.06,0)
- placed_traps.append(mesh)
+ if main.net.active and not main.net.hosting:
+  main.net.send({"type":"trap"})
+ else: add_trap(main.player.position)
  traps-=1
  trap_selected=false
+
+func add_trap(at: Vector3) -> void:
+ var mesh=main.bridge.creature_node(main.bridge.data.mission_models.trap)
+ add_child(mesh)
+ mesh.position=at+Vector3(0,.06,0)
+ placed_traps.append(mesh)

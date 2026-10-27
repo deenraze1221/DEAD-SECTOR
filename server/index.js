@@ -1,3 +1,4 @@
+import {createNativeRelay} from './native.js';
 import {MAP_HALF} from '../world-config.js';
 import {createServer} from 'node:http';import {readFile} from 'node:fs/promises';import {resolve,extname} from 'node:path';import {randomBytes,randomInt} from 'node:crypto';import {WebSocketServer,WebSocket} from 'ws';
 import {WEAPON_BY_ID} from '../weapon-config.js';
@@ -5,7 +6,11 @@ import {createInventory,syncCombat,buy,equipWeapon,useMedkit,useSupply,consumeTr
 import {ENEMY_TYPES} from '../waves.js';
 const GRACE=120000,ROLES=['host','guest','guest2','guest3'];
 export function createGameServer(){const root=resolve('dist');const server=createServer(async(req,res)=>{try{const pathname=new URL(req.url,'http://local').pathname,file=resolve(root,'.'+decodeURIComponent(pathname==='/'?'/index.html':pathname));if(!file.startsWith(root+'/'))return res.writeHead(403).end();const bytes=await readFile(file);res.setHeader('Content-Type',({'.html':'text/html','.js':'text/javascript','.css':'text/css'})[extname(file)]||'application/octet-stream');res.end(bytes);}catch{res.writeHead(404).end('Build the game with npm run build.');}});
-const wss=new WebSocketServer({server,maxPayload:524288}),rooms=new Map(),send=(s,m)=>{if(s?.readyState===WebSocket.OPEN)s.send(JSON.stringify(m));};
+const native=createNativeRelay();
+const wss=new WebSocketServer({noServer:true,maxPayload:524288});
+server.on('upgrade',(req,socket,head)=>{const hub=new URL(req.url,'http://local').pathname==='/godot'?native.wss:wss;hub.handleUpgrade(req,socket,head,ws=>hub.emit('connection',ws,req));});
+wss.on('close',()=>native.wss.close());
+const rooms=new Map(),send=(s,m)=>{if(s?.readyState===WebSocket.OPEN)s.send(JSON.stringify(m));};
 const other=(r,role)=>ROLES.filter(key=>key!==role).map(key=>r[key]).find(Boolean);
 const broadcast=(r,m,except)=>{for(const role of ROLES)if(role!==except)send(r[role]?.socket,m);};
 const members=r=>ROLES.map((role,slot)=>({id:role,slot,connected:!!r[role]?.socket,reserved:!!r[role],ready:!!r[role]?.ready}));

@@ -20,6 +20,12 @@ func run() -> void:
   for i in range(3): await process_frame
   var bounds=Rect2(Vector2.ZERO,size)
   check(bounds.encloses(main.menu.get_global_rect()),"Menu in bounds "+str(size))
+  main.network_ui.open()
+  for i in range(3): await process_frame
+  main.network_ui.layout()
+  check(bounds.encloses(main.network_ui.panel.get_global_rect()),"LAN/server lobby in bounds "+str(size))
+  main.network_ui.panel.hide()
+  main.menu.show()
   main.open_settings()
   for i in range(3): await process_frame
   check(bounds.encloses(main.settings_panel.get_global_rect()),"Settings in bounds "+str(size))

@@ -1,6 +1,6 @@
 ## Two versions: HTML and Godot
 
-The existing HTML game remains in the repository root. A separate **Godot 4.6 Standard** single-player port is in [godot/](godot/README.md): import [godot/project.godot](godot/project.godot) and press F5. It includes the native block generation, weather/day-night, soldier body, original audio/music, ten weapons, six enemy types, waves and shop/economy. Multiplayer has not been ported yet. The HTML and Godot versions currently cannot share a multiplayer match.
+The existing HTML game remains in the repository root. The separate **Godot 4.6 Standard** native version is in [godot/](godot/README.md): import [godot/project.godot](godot/project.godot) and press F5. It includes native architecture selection/fresh interiors, weather/day-night, soldier body, original audio/music, weapons, six enemy types, waves, shop/economy, missions and airdrops. Native four-player co-op now supports direct LAN ENet and WebSocket rooms on the same Node.js deployment as HTML. See [connection instructions](godot/NETWORK_RU.md). HTML and Godot use separate rooms and cannot share a match.
 
 # DEAD SECTOR
 

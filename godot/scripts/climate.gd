@@ -63,7 +63,7 @@ func roll(number: int) -> void:
  storm_timer=rng.randf_range(8,16)
 
 func _process(delta: float) -> void:
- if not main.player.active:
+ if not main.world_running():
   flash.light_energy=0
   return
  if wave!=main.battle.number: roll(main.battle.number)
