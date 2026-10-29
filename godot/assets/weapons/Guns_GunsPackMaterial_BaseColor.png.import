@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://c5afj824006w1"
-path="res://.godot/imported/Kalash.svg-16f187ac55ef08253e0265a3bc8b7210.ctex"
+uid="uid://dsctyy6e5xm8i"
+path="res://.godot/imported/Guns_GunsPackMaterial_BaseColor.png-d16b536e0b35ddd3c80fc4641ef81558.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/Kalash.svg"
-dest_files=["res://.godot/imported/Kalash.svg-16f187ac55ef08253e0265a3bc8b7210.ctex"]
+source_file="res://assets/weapons/Guns_GunsPackMaterial_BaseColor.png"
+dest_files=["res://.godot/imported/Guns_GunsPackMaterial_BaseColor.png-d16b536e0b35ddd3c80fc4641ef81558.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

@@ -81,6 +81,8 @@ func run() -> void:
  check(enemy.impulse.length()>0,"Collision-constrained hit impulse")
  enemy.take_damage(1000)
  check(enemy.dead,"Death is immediate")
- check(main.reference_ui.hud_root.theme.default_font.resource_path.ends_with("hud-user.ttf"),"Uploaded HUD font used")
+ var hud_font=main.reference_ui.hud_root.theme.default_font
+ check(hud_font is SystemFont and not str(hud_font.resource_path).ends_with("hud-user.ttf"),"HUD uses the HTML monospace stack, not the pixel font")
+ check(hud_font.fallbacks.size()>0 and str(hud_font.fallbacks[0].resource_path).ends_with("terminal.ttf"),"Bundled monospace fallback present")
  if errors.is_empty(): print("PASS NEXT PORT: new rooms/furniture, speeds, missions,15s generator, growth, plane/drop and zombie hit reactions")
  quit(0 if errors.is_empty() else 1)

@@ -73,7 +73,7 @@ func run() -> void:
  check(fresh_extra==0,"Fresh interiors must not overlap other objects: "+str(fresh_extra))
  check(scene.body.legs.size()==2,"Local soldier has two animated legs")
  check(scene.sound.library.calm.size()==5 and scene.sound.library.tense.size()==5,"All10 original scores")
- for id in scene.bridge.data.weapons: check(scene.sound.stream("shot-"+id)!=null,"Original sound "+id)
+ for id in scene.bridge.data.weapons: check(scene.sound.stream("shot-"+scene.bridge.data.weapons[id].sound)!=null,"Original sound "+id)
  var saved=scene.master_volume
  scene.master_volume=.42
  scene.save_user_settings()

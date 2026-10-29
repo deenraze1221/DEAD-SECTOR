@@ -9,6 +9,11 @@ void vertex(){
  world_normal=normalize(MODEL_NORMAL_MATRIX*NORMAL);
 }
 float hash(vec2 p){return fract(sin(dot(p,vec2(12.9898,78.233)))*43758.5453);}
+float vnoise(vec2 p){
+ vec2 i=floor(p),f=fract(p);
+ f=f*f*(3.0-2.0*f);
+ return mix(mix(hash(i),hash(i+vec2(1.,0.)),f.x),mix(hash(i+vec2(0.,1.)),hash(i+vec2(1.,1.)),f.x),f.y);
+}
 void fragment(){
  vec2 p=abs(world_normal.y)>0.7?world_pos.xz:vec2(abs(world_normal.x)>0.7?world_pos.z:world_pos.x,world_pos.y);
  float detail=.97+hash(floor(p*12.0))*.06;
@@ -28,6 +33,18 @@ void fragment(){
   detail*=mix(.96,.72,max(line.x,line.y));
  }
  if(surface_kind==5){detail*=.94+.06*sin(p.x*70.+sin(p.y*3.)*2.);}
- ALBEDO=tint.rgb*detail*COLOR.rgb;
- if(surface_kind==4){ALBEDO*=mix(1.,.65,wetness);ROUGHNESS=mix(.92,.2,wetness);}else{ROUGHNESS=.92;}
+ vec3 base=tint.rgb*detail*COLOR.rgb;
+ // Grime: dirt gathers near the ground, rain streaks run down walls, blotches break up flat colour.
+ float vertical=1.0-smoothstep(.45,.9,abs(world_normal.y));
+ float ground_dirt=(1.0-smoothstep(.0,3.2,world_pos.y))*vertical;
+ float streak=vnoise(vec2((abs(world_normal.x)>.7?world_pos.z:world_pos.x)*2.3,world_pos.y*.22));
+ float blotch=vnoise(p*.17)*.6+vnoise(p*.9)*.4;
+ float stain=vnoise(p*.45+7.3);
+ float dirt=ground_dirt*(.18+.24*blotch)+vertical*smoothstep(.55,.9,streak)*.16+smoothstep(.62,.88,stain)*.14;
+ base*=1.0-clamp(dirt,0.,.5);
+ base*=.9+.1*blotch;
+ float luma=dot(base,vec3(.299,.587,.114));
+ base=mix(vec3(luma),base,.82);
+ ALBEDO=base;
+ if(surface_kind==4){ALBEDO*=mix(1.,.55,wetness);ROUGHNESS=mix(.92,.2,wetness);}else{ROUGHNESS=.92;}
 }

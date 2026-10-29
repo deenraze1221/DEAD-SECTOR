@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://cnm783uc4qk75"
-path="res://.godot/imported/Shambler.svg-dbc464736bfb7bedcb51c6025dd6d033.ctex"
+uid="uid://bmbw2krit1svt"
+path="res://.godot/imported/Well-255.png-3517a36470a6092e0c8a8024719f81ca.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/Shambler.svg"
-dest_files=["res://.godot/imported/Shambler.svg-dbc464736bfb7bedcb51c6025dd6d033.ctex"]
+source_file="res://assets/icons/Well-255.png"
+dest_files=["res://.godot/imported/Well-255.png-3517a36470a6092e0c8a8024719f81ca.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

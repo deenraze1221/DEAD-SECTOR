@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://06dhxxo6dcyc"
-path="res://.godot/imported/G36.svg-2af3fd919d61f606b791829f30eef13c.ctex"
+uid="uid://bax42k77j5v3v"
+path="res://.godot/imported/Shotgun.png-40497f0a169de86cfaa644d9bd8113be.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/G36.svg"
-dest_files=["res://.godot/imported/G36.svg-2af3fd919d61f606b791829f30eef13c.ctex"]
+source_file="res://assets/icons/Shotgun.png"
+dest_files=["res://.godot/imported/Shotgun.png-40497f0a169de86cfaa644d9bd8113be.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

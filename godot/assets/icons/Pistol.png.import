@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b58gpgol18r6g"
-path="res://.godot/imported/Shotgun.svg-2e6ffcb881756c8d280796d095f6e0ce.ctex"
+uid="uid://b56ahnf0opuvk"
+path="res://.godot/imported/Pistol.png-99ba3d1cbf12e56dd043615fa8a1d83c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/Shotgun.svg"
-dest_files=["res://.godot/imported/Shotgun.svg-2e6ffcb881756c8d280796d095f6e0ce.ctex"]
+source_file="res://assets/icons/Pistol.png"
+dest_files=["res://.godot/imported/Pistol.png-99ba3d1cbf12e56dd043615fa8a1d83c.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

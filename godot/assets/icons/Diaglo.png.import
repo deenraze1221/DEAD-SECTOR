@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://yiggxcnjh0hs"
-path="res://.godot/imported/Tikhar.svg-dc53b8fca3ca8d5b8172ab2aa471e356.ctex"
+uid="uid://dlm4npr113vrl"
+path="res://.godot/imported/Diaglo.png-6fb773fc725aeaeca64e727e7a18a251.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/icons/Tikhar.svg"
-dest_files=["res://.godot/imported/Tikhar.svg-dc53b8fca3ca8d5b8172ab2aa471e356.ctex"]
+source_file="res://assets/icons/Diaglo.png"
+dest_files=["res://.godot/imported/Diaglo.png-6fb773fc725aeaeca64e727e7a18a251.ctex"]
 
 [params]
 
@@ -38,6 +38,3 @@ process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
 detect_3d/compress_to=1
-svg/scale=1.0
-editor/scale_with_editor_scale=false
-editor/convert_colors_with_editor_theme=false

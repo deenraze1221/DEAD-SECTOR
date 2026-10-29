@@ -1,14 +1,24 @@
 extends RefCounted
 # Three.js and Godot both use a right-handed Y-up world. Godot triangles are clockwise.
 var materials: Array = []
+var powered: Dictionary = {}
 var mesh_cache: Dictionary = {}
 var data: Dictionary
 
 func matrix(values: Array) -> Transform3D:
  return Transform3D(Basis(Vector3(values[0],values[1],values[2]),Vector3(values[4],values[5],values[6]),Vector3(values[8],values[9],values[10])),Vector3(values[12],values[13],values[14]))
 
+const Catalog=preload("res://scripts/weapon_catalog.gd")
+var gun_material: ORMMaterial3D
+var gun_scene: Node3D
+
 func load_data() -> void:
  data=JSON.parse_string(FileAccess.get_file_as_string("res://assets/city.json"))
+ data.weapons=Catalog.weapons()
+ var kept=[]
+ for item in data.shop_items:
+  if item.kind!="weapon": kept.append(item)
+ data.shop_items=Catalog.shop_items()+kept
  for record in data.materials:
   var material: Material
   if record.surface>0:
@@ -39,9 +49,17 @@ func load_data() -> void:
     standard.emission_energy_multiplier=record.energy
    material=standard
   materials.append(material)
+  if record.get("unlit",false) and not record.get("transparent",false) and record.surface<=0:
+   var lit=ShaderMaterial.new()
+   lit.shader=load("res://shaders/powered.gdshader")
+   lit.set_shader_parameter("tint",Color(record.color))
+   if record.texture>=0:
+    lit.set_shader_parameter("use_texture",true)
+    lit.set_shader_parameter("label_texture",load("res://assets/label-%d.png" % int(record.texture)))
+   powered[materials.size()-1]=lit
 
-func make_mesh(record: Dictionary) -> ArrayMesh:
- var key=JSON.stringify([record.geometry,record.materials])
+func make_mesh(record: Dictionary, world=false) -> ArrayMesh:
+ var key=JSON.stringify([record.geometry,record.materials,world])
  if mesh_cache.has(key): return mesh_cache[key]
  var raw: Dictionary=data.geometries[int(record.geometry)]
  var mesh=ArrayMesh.new()
@@ -68,7 +86,8 @@ func make_mesh(record: Dictionary) -> ArrayMesh:
    indices.append_array(PackedInt32Array([original[i],original[i+2],original[i+1]]))
   arrays[Mesh.ARRAY_INDEX]=indices
   mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES,arrays)
-  mesh.surface_set_material(mesh.get_surface_count()-1,materials[int(record.materials[int(group.materialIndex)])])
+  var material_index=int(record.materials[int(group.materialIndex)])
+  mesh.surface_set_material(mesh.get_surface_count()-1,powered[material_index] if world and powered.has(material_index) else materials[material_index])
  mesh_cache[key]=mesh
  return mesh
 
@@ -77,7 +96,7 @@ func build_world(parent: Node3D) -> void:
   var instance=MultiMeshInstance3D.new()
   var multi=MultiMesh.new()
   multi.transform_format=MultiMesh.TRANSFORM_3D
-  multi.mesh=make_mesh(batch)
+  multi.mesh=make_mesh(batch,true)
   multi.use_colors=true
   multi.instance_count=batch.transforms.size()
   for i in range(multi.instance_count):
@@ -105,26 +124,32 @@ func build_world(parent: Node3D) -> void:
  ground.position.y=-.1
  body.add_child(ground)
 
-func build_weapon(parent: Node3D, id: String) -> void:
- var part_index=0
- for part in data.weapons[id].parts:
-  var instance=MeshInstance3D.new()
-  instance.name="WeaponBody" if part_index==0 else "WeaponMagazine"
-  part_index+=1
-  instance.mesh=make_mesh(part)
-  if id=="Pistol":
-   instance.mesh=instance.mesh.duplicate()
-   for surface in range(instance.mesh.get_surface_count()):
-    var source: StandardMaterial3D=instance.mesh.surface_get_material(surface)
-    var finish=source.duplicate()
-    finish.albedo_color=[Color("#495654"),Color("#77816e"),Color("#bd9254")][mini(surface,2)]
-    finish.roughness=.72
-    instance.mesh.surface_set_material(surface,finish)
-  instance.transform=matrix(part.transform)
-  instance.layers=2
-  instance.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-  parent.add_child(instance)
+func weapon_material() -> ORMMaterial3D:
+ if gun_material==null:
+  var m=ORMMaterial3D.new()
+  m.albedo_texture=load("res://assets/weapons/Guns_GunsPackMaterial_BaseColor.png")
+  m.normal_enabled=true
+  m.normal_texture=load("res://assets/weapons/Guns_GunsPackMaterial_Normal.png")
+  m.orm_texture=load("res://assets/weapons/Guns_GunsPackMaterial_OcclusionRoughnessMetallic.png")
+  gun_material=m
+ return gun_material
 
+func weapon_mesh(id: String) -> Array:
+ if gun_scene==null: gun_scene=load("res://assets/weapons/Guns.fbx").instantiate()
+ var node: MeshInstance3D=gun_scene.get_node(id)
+ return [node.mesh,node.transform]
+
+func build_weapon(parent: Node3D, id: String) -> void:
+ var instance=MeshInstance3D.new()
+ instance.name="WeaponBody"
+ var source=weapon_mesh(id)
+ instance.mesh=source[0]
+ instance.material_override=weapon_material()
+ var s=float(data.weapons[id].viewScale)
+ instance.transform=Transform3D(Basis(Vector3.UP,PI)*Basis.from_scale(Vector3.ONE*s),Vector3.ZERO)*source[1]
+ instance.layers=2
+ instance.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+ parent.add_child(instance)
  build_hands(parent,data.weapons[id].grips)
 
 func build_hands(parent: Node3D, grips: Dictionary) -> void:

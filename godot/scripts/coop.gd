@@ -176,6 +176,7 @@ func host_shot(m: Dictionary) -> void:
  var actor=peers[str(m.id)]
  if actor.health<=0 or not main.bridge.data.weapons.has(str(m.weapon)): return
  var interval=float(main.bridge.data.weapons[m.weapon].interval)
+ if int(main.bridge.data.weapons[m.weapon].shots)>1: interval=float(main.bridge.data.weapons[m.weapon].gap)
  var now=Time.get_ticks_msec()/1000.0
  if now-float(actor.get_meta("last_shot",-100.0))<interval*.85: return
  actor.set_meta("last_shot",now)
@@ -189,8 +190,8 @@ func host_shot(m: Dictionary) -> void:
   if hit.collider.has_meta("mutant"): hit.collider.take_damage(damage,hit.position,direction)
   else: hit.collider.take_damage(damage)
  main.combat_fx.tracer(origin,hit.position if not hit.is_empty() else origin+direction*100)
- main.sound.play("shot-"+str(m.weapon),origin)
- main.net.send({"type":"effect","sound":"shot-"+str(m.weapon),"p":v(origin),"end":v(hit.position if not hit.is_empty() else origin+direction*100),"shooter":m.id})
+ main.sound.play("shot-"+str(main.bridge.data.weapons[m.weapon].sound),origin)
+ main.net.send({"type":"effect","sound":"shot-"+str(main.bridge.data.weapons[m.weapon].sound),"p":v(origin),"end":v(hit.position if not hit.is_empty() else origin+direction*100),"shooter":m.id})
  for enemy in main.battle.enemies: enemy.hear(origin)
 
 func apply_snapshot(m: Dictionary) -> void:

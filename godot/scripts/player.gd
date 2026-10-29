@@ -2,6 +2,10 @@ extends CharacterBody3D
 var camera: Camera3D
 var weapon_camera: Camera3D
 var weapon_viewport: SubViewport
+var weapon_env: Environment
+var weapon_key: OmniLight3D
+var weapon_fill: DirectionalLight3D
+var weapon_sky: ProceduralSkyMaterial
 var mouse_guard=0.0
 var gun: Node3D
 var stamina=5.0
@@ -25,6 +29,10 @@ var hit_time=0.0
 var hurt_time=0.0
 var actions
 var flash: OmniLight3D
+var muzzle: MeshInstance3D
+var muzzle_time=0.0
+var muzzle_offsets: Dictionary={}
+var flicker=0.0
 
 func _ready() -> void:
  collision_layer=8
@@ -58,11 +66,60 @@ func _ready() -> void:
  camera.add_child(flash)
  var lamp=SpotLight3D.new()
  lamp.name="Flashlight"
- lamp.spot_range=30
- lamp.spot_angle=24
- lamp.light_energy=3
+ lamp.spot_range=34
+ lamp.spot_angle=31
+ lamp.spot_attenuation=.75
+ lamp.light_energy=4.2
+ lamp.light_color=Color("#e9f0ff")
+ lamp.position=Vector3(.17,-.09,-.1)
+ lamp.shadow_enabled=true
+ lamp.shadow_bias=.06
  lamp.visible=false
  camera.add_child(lamp)
+ muzzle=MeshInstance3D.new()
+ var star=QuadMesh.new()
+ star.size=Vector2(.34,.34)
+ var star_material=StandardMaterial3D.new()
+ star_material.shading_mode=BaseMaterial3D.SHADING_MODE_UNSHADED
+ star_material.blend_mode=BaseMaterial3D.BLEND_MODE_ADD
+ star_material.transparency=BaseMaterial3D.TRANSPARENCY_ALPHA
+ star_material.albedo_texture=muzzle_texture()
+ star_material.albedo_color=Color(1,.78,.42,1)
+ star_material.depth_draw_mode=BaseMaterial3D.DEPTH_DRAW_DISABLED
+ star_material.no_depth_test=true
+ star_material.render_priority=5
+ star.material=star_material
+ muzzle.mesh=star
+ muzzle.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+ muzzle.layers=2
+ muzzle.visible=false
+ camera.add_child(muzzle)
+
+# Barrel tip in gun space: front of the weapon mesh bounds, measured once per weapon.
+func muzzle_offset() -> Vector3:
+ var id=str(config.id)
+ if muzzle_offsets.has(id): return muzzle_offsets[id]
+ var bounds=AABB()
+ var first=true
+ for node in gun.find_children("WeaponBody","MeshInstance3D",true,false):
+  var local_box=(gun.global_transform.affine_inverse()*node.global_transform)*node.get_aabb()
+  bounds=local_box if first else bounds.merge(local_box)
+  first=false
+ var offset=Vector3(0,.03,-.45)
+ if not first: offset=Vector3(0,float(config.get("muzzleY",.02)),float(config.tip)-.01)
+ muzzle_offsets[id]=offset
+ return offset
+
+func muzzle_texture() -> ImageTexture:
+ var image=Image.create(48,48,false,Image.FORMAT_RGBA8)
+ for y in range(48):
+  for x in range(48):
+   var d=Vector2(x-23.5,y-23.5)
+   var angle=atan2(d.y,d.x)
+   var spikes=.55+.45*absf(cos(angle*2.5))
+   var radius=d.length()/23.5/spikes
+   image.set_pixel(x,y,Color(1,1,1,pow(maxf(0,1-radius),1.6)))
+ return ImageTexture.create_from_image(image)
 
 func _unhandled_input(event: InputEvent) -> void:
  if not active or health<=0: return
@@ -100,6 +157,21 @@ func _physics_process(delta: float) -> void:
  if config.automatic and Input.is_action_pressed("fire"): fire()
  flash.light_energy=maxf(0,flash.light_energy-delta*80)
  recoil=move_toward(recoil,0,delta*4)
+ # View kick and damage shake shift only the projection, so aim and hit scan stay exact.
+ camera.v_offset=recoil*.016
+ camera.h_offset=randf_range(-1,1)*(recoil*.004+hurt_time*.05)
+ muzzle_time=maxf(0,muzzle_time-delta)
+ muzzle.visible=muzzle_time>0
+ if muzzle.visible:
+  muzzle.position=gun.transform*muzzle_offset()
+  muzzle.rotation.z=randf()*TAU
+  muzzle.scale=Vector3.ONE*randf_range(.7,1.1)*(.6 if str(config.id) in ["Pistol","Diaglo"] else .9)
+ var lamp_node=camera.get_node("Flashlight")
+ if lamp_node.visible:
+  flicker=maxf(0,flicker-delta)
+  var weak=battle!=null and battle.battery<12
+  if weak and flicker<=0 and randf()<.08: flicker=randf_range(.04,.18)
+  lamp_node.light_energy=(.35 if flicker>0 else lerpf(1.2,4.2,clampf(battle.battery/12.0,0,1)) if weak else 4.2)
  if reloading>0:
   reloading=maxf(0,reloading-delta)
   if reloading==0:
@@ -125,9 +197,9 @@ func _physics_process(delta: float) -> void:
  var actual=Vector2(get_real_velocity().x,get_real_velocity().z).length()
  var previous_step=floori(distance_walked/1.7)
  distance_walked+=actual*delta
- if is_on_floor() and actual>.5 and floori(distance_walked/1.7)!=previous_step and get_parent().sound!=null: get_parent().sound.play("step",null,.6)
+ if is_on_floor() and actual>.5 and floori(distance_walked/1.7)!=previous_step and get_parent().sound!=null: get_parent().sound.play("step",null,(.6*(1.2 if get_parent().climate!=null and get_parent().climate.wetness>.5 else 1.0)),randf_range(.88,1.08)*(.93 if get_parent().climate!=null and get_parent().climate.wetness>.5 else 1.0))
  var bob=sin(distance_walked*TAU/1.65)*minf(actual/4.5,1)*.006
- gun.position=base_gun+Vector3(0,bob-(sin((float(config.reload)-reloading)/float(config.reload)*PI)*.16 if reloading>0 else 0),recoil*.07)
+ gun.position=base_gun+Vector3(0,bob-(sin((float(config.reload)-reloading)/float(config.reload)*PI)*.045 if reloading>0 else 0),recoil*.07)
  gun.position.y-=sin((1.5-switch_time)/1.5*PI)*.35 if switch_time>0 else 0
  gun.rotation.x=recoil*.15
 
@@ -140,13 +212,22 @@ func fire() -> void:
   if state.get("durability",100)<=0: return
   state.shots=state.get("shots",0)+1
   if state.shots>=100: state.durability=maxf(0,state.durability-5);state.shots=0
- ammo-=1
  cooldown=float(config.interval)
+ var id=config.id
+ for i in range(int(config.shots)):
+  if i>0:
+   await get_tree().create_timer(float(config.gap)).timeout
+   if not is_instance_valid(self) or config.id!=id or ammo<=0 or reloading>0 or health<=0 or switch_time>0: return
+  shoot_round()
+
+func shoot_round() -> void:
+ ammo-=1
  recoil=1
  shots+=1
- if get_parent().sound!=null: get_parent().sound.play("shot-"+str(config.id))
+ if get_parent().sound!=null: get_parent().sound.play("shot-"+str(config.sound))
 
  flash.light_energy=5
+ muzzle_time=.045
  actions.fired()
  if not get_parent().net.active or get_parent().net.hosting:
   for enemy in battle.enemies: enemy.hear(global_position)
@@ -163,7 +244,7 @@ func fire() -> void:
   if last_hit and hit.collider.has_method("take_damage"): hit_time=.16
   return
  elif main.net.active:
-  main.net.send({"type":"effect","sound":"shot-"+str(config.id),"p":main.coop.v(global_position),"shooter":main.net.peer_id,"end":main.coop.v(hit.position if last_hit else from-camera.global_basis.z*100)})
+  main.net.send({"type":"effect","sound":"shot-"+str(config.sound),"p":main.coop.v(global_position),"shooter":main.net.peer_id,"end":main.coop.v(hit.position if last_hit else from-camera.global_basis.z*100)})
  if last_hit and hit.collider.has_method("take_damage"):
   if hit.collider.has_meta("mutant"): hit.collider.take_damage(int(config.damage),hit.position,-camera.global_basis.z)
   else: hit.collider.take_damage(int(config.damage))
@@ -204,24 +285,66 @@ func setup_weapon_view() -> void:
  environment.background_mode=Environment.BG_CLEAR_COLOR
  environment.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
  environment.ambient_light_color=Color("#9da8ad")
- environment.ambient_light_energy=.65
+ environment.ambient_light_energy=.9
+ # Painted metal is dark (vertex colours around 0.2) and metallic, so without a sky to reflect it renders black.
+ weapon_sky=ProceduralSkyMaterial.new()
+ weapon_sky.sky_top_color=Color("#7d8f9a")
+ weapon_sky.sky_horizon_color=Color("#c2ccd0")
+ weapon_sky.ground_horizon_color=Color("#8b9591")
+ weapon_sky.ground_bottom_color=Color("#3b4440")
+ var weapon_sky_resource=Sky.new()
+ weapon_sky_resource.sky_material=weapon_sky
+ environment.sky=weapon_sky_resource
+ environment.reflected_light_source=Environment.REFLECTION_SOURCE_SKY
+ weapon_env=environment
  weapon_camera.environment=environment
  weapon_viewport.add_child(weapon_camera)
+ # Soft top-left key light gives the gun volume; it has no shadow so it never flickers.
  var key_light=OmniLight3D.new()
  key_light.light_cull_mask=2
  key_light.omni_range=4
- key_light.light_energy=1.2
+ key_light.light_energy=.7
  key_light.position=Vector3(-.2,.45,.1)
  weapon_camera.add_child(key_light)
+ weapon_key=key_light
+ # The directional light follows the real sun and casts shadows, so the gun and hands shade each other.
  var fill=DirectionalLight3D.new()
  fill.light_cull_mask=2
- fill.light_energy=.5
+ fill.light_energy=.9
  fill.rotation_degrees=Vector3(-35,-25,0)
+ fill.shadow_enabled=true
+ fill.shadow_bias=.015
+ fill.shadow_normal_bias=.8
+ fill.shadow_blur=1.6
+ fill.directional_shadow_mode=DirectionalLight3D.SHADOW_ORTHOGONAL
+ fill.directional_shadow_max_distance=3.0
  weapon_viewport.add_child(fill)
+ weapon_fill=fill
+
+# The viewmodel is lit by its own lights, so they must follow the world: dark at night, grey in storms.
+func update_weapon_light() -> void:
+ var main=get_parent()
+ if weapon_env==null or main==null or not main.has_node("WorldEnvironment") or not main.has_node("Sun"): return
+ var world_env=main.get_node("WorldEnvironment").environment
+ var sun=main.get_node("Sun")
+ var ratio=clampf(world_env.ambient_light_energy/.46,0.0,1.0)
+ weapon_env.ambient_light_energy=lerpf(.28,1.7,ratio)
+ weapon_env.ambient_light_color=world_env.ambient_light_color.lerp(Color("#9da8ad"),.35)
+ weapon_env.reflected_light_source=Environment.REFLECTION_SOURCE_SKY
+ var shade=lerpf(.2,1.3,ratio)
+ weapon_sky.sky_top_color=Color("#7d8f9a")*shade
+ weapon_sky.sky_horizon_color=Color("#c2ccd0")*shade
+ weapon_sky.ground_horizon_color=Color("#8b9591")*shade
+ weapon_sky.ground_bottom_color=Color("#3b4440")*shade
+ weapon_key.light_energy=lerpf(.35,1.9,ratio)
+ weapon_fill.light_color=sun.light_color.lerp(Color.WHITE,.25)
+ weapon_fill.light_energy=lerpf(.4,2.8,clampf(sun.light_energy/.75,0.0,1.0))
+ weapon_fill.basis=sun.global_transform.basis
 
 func _process(_delta: float) -> void:
  if is_instance_valid(weapon_camera):
   weapon_camera.global_transform=camera.global_transform
+  update_weapon_light()
 
 func hurt(amount: int) -> void:
  if health<=0: return

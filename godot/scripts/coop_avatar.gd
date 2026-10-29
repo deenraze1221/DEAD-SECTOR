@@ -43,7 +43,7 @@ func setup(game,identity: String) -> void:
  label=Label3D.new()
  label.text="SQUAD "+id.to_upper()
  label.position.y=2.15
- label.font=load("res://assets/hud-user.ttf")
+ label.font=load("res://assets/terminal.ttf")
  label.font_size=24
  label.pixel_size=.003
  label.billboard=BaseMaterial3D.BILLBOARD_ENABLED

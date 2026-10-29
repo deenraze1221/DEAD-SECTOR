@@ -19,6 +19,7 @@ var trap_selected=false
 var enemies: Array=[]
 var pickups: Array=[]
 var projectiles: Array=[]
+const VOMIT_GRAVITY=5.0
 var placed_traps: Array=[]
 var grid=AStarGrid2D.new()
 var large_grid: AStarGrid2D
@@ -30,14 +31,46 @@ var poison_tick=0.0
 var rng=RandomNumberGenerator.new()
 var store_open=false
 var smoke_texture: ImageTexture
+# Kill Zone: a 300 x 300 m box whose top face is 5 m under the map. Any enemy that falls into it dies at once.
+const KILL_ZONE_SIZE=300.0
+const KILL_ZONE_TOP=-5.0
+const KILL_ZONE_DEPTH=20.0
+var kill_zone: Area3D
+var void_kills=0
 
 func _ready() -> void:
  rng.randomize()
+ build_kill_zone()
  grid=make_grid(.48,1.5,.25)
  large_grid=make_grid(2.1,6.6,.25)
  air_grid=make_grid(.7,5.2,3.5)
  inventory.Pistol={"ammo":8,"durability":100.0,"shots":0}
  announce("PREPARE · FIRST WAVE IN 60 SECONDS")
+
+func build_kill_zone() -> void:
+ kill_zone=Area3D.new()
+ kill_zone.name="KillZone"
+ kill_zone.collision_layer=0
+ kill_zone.collision_mask=4
+ kill_zone.monitoring=true
+ var shape=CollisionShape3D.new()
+ var box=BoxShape3D.new()
+ box.size=Vector3(KILL_ZONE_SIZE,KILL_ZONE_DEPTH,KILL_ZONE_SIZE)
+ shape.shape=box
+ kill_zone.add_child(shape)
+ kill_zone.position=Vector3(0,KILL_ZONE_TOP-KILL_ZONE_DEPTH*.5,0)
+ add_child(kill_zone)
+ kill_zone.body_entered.connect(void_kill)
+
+# Removes an enemy that left the map. No cash, blood or sound: it died where nobody can see it.
+func void_kill(body: Node) -> void:
+ if not enemies.has(body) or body.dead: return
+ if main.net.active and not main.net.hosting: return
+ enemies.erase(body)
+ body.dead=true
+ body.set_physics_process(false)
+ body.queue_free()
+ void_kills+=1
 
 func make_grid(radius: float, height: float, bottom: float) -> AStarGrid2D:
  var nav=AStarGrid2D.new()
@@ -77,12 +110,32 @@ func route(from: Vector3, to: Vector3, type="zombie") -> PackedVector2Array:
 
 func total() -> int: return 15+(number-1)*5
 
+# Wave variants match the HTML game: every 5th boss, 4th blackout, 3rd rush, others 2 mod 3 siege.
+func variant() -> String:
+ if number%5==0: return "boss"
+ if number%4==0: return "blackout"
+ if number%3==0: return "rush"
+ if number%3==2: return "siege"
+ return "standard"
+
+func variant_label() -> String:
+ return {"boss":"WARDEN","blackout":"BLACKOUT","rush":"RUSH","siege":"SIEGE"}.get(variant(),"")
+
+# District (0..3) that loses power during a blackout assault; -1 otherwise. Quadrants follow the HTML grid.
+func blackout_district() -> int:
+ if variant()!="blackout" or phase not in ["ASSAULT","CLEARANCE"]: return -1
+ return (floori(number/4.0)-floori(number/20.0)-1)%4
+
+static func district_of(x: float, z: float) -> int:
+ return (0 if z<0 else 1) if x<0 else (2 if z<0 else 3)
+
 func choose_type() -> String:
  if number>=6 and vomiters<floori(total()*.15) and rng.randf()<.15:
   vomiters+=1
   return "vomiter"
+ if variant()=="rush" and rng.randf()<.5: return "runner"
  var weights={"zombie":55,"runner":20}
- if number>=6: weights.eye=20
+ if number>10: weights.eye=20
  if number>=21: weights.brute=5
  var sum=0
  for weight in weights.values(): sum+=weight
@@ -93,7 +146,7 @@ func choose_type() -> String:
  return "zombie"
 
 func spawn_enemy(type: String) -> void:
- var hive=main.bridge.data.hives[rng.randi_range(0,3)]
+ var hive=main.bridge.data.hives[number%4 if variant()=="siege" else rng.randi_range(0,3)]
  var nav=large_grid if type in ["boss","brute"] else air_grid if type=="eye" else grid
  var c=free_cell(Vector3(hive.x,0,hive.z),nav)
  var node=Enemy.new()
@@ -109,6 +162,9 @@ func spawn_enemy(type: String) -> void:
 
 func _physics_process(delta: float) -> void:
  if not main.world_running(): return
+ # Safety net for enemies that fall past the edge of the zone, so a wave can never wait for a lost enemy.
+ for enemy in enemies.duplicate():
+  if is_instance_valid(enemy) and enemy.position.y<KILL_ZONE_TOP: void_kill(enemy)
  notice_time=maxf(0,notice_time-delta)
  if main.player.health<=0 and not main.net.active: return
  if poison_time>0:
@@ -125,7 +181,7 @@ func _physics_process(delta: float) -> void:
  if phase=="PREPARATION" and time>=60:
   phase="ASSAULT"
   time=0
-  announce("WAVE %d · ASSAULT" % number)
+  announce("WAVE %d · ASSAULT%s" % [number,(" · "+variant_label()) if variant_label()!="" else ""])
  elif phase=="ASSAULT":
   var due=mini(total(),floori(time*total()/120))
   while spawned<due:
@@ -144,7 +200,7 @@ func _physics_process(delta: float) -> void:
   time=0
   spawned=0
   vomiters=0
-  announce("WAVE %d · ASSAULT" % number)
+  announce("WAVE %d · ASSAULT%s" % [number,(" · "+variant_label()) if variant_label()!="" else ""])
  for pickup in pickups.duplicate():
   pickup.mesh.rotation.y+=delta
   var collector=main.coop.nearest(pickup.mesh.position) if main.coop!=null else main.player
@@ -154,6 +210,9 @@ func _physics_process(delta: float) -> void:
    pickups.erase(pickup)
    main.sound.play("cash")
  for shot in projectiles.duplicate():
+  if shot.poison:
+   shot.velocity.y-=VOMIT_GRAVITY*delta
+   if shot.velocity.length()>.1: shot.mesh.look_at(shot.mesh.position+shot.velocity,Vector3.UP)
   var next=shot.mesh.position+shot.velocity*delta
   var query=PhysicsRayQueryParameters3D.create(shot.mesh.position,next,1|8)
   var hit=get_world_3d().direct_space_state.intersect_ray(query)
@@ -174,7 +233,9 @@ func _physics_process(delta: float) -> void:
      shot.life=0
      break
   shot.mesh.position=next
-  if shot.life<=0: shot.mesh.queue_free();projectiles.erase(shot)
+  if shot.life<=0:
+   if shot.poison: burst(shot.mesh.position,true,10,Vector3.ZERO,false,false)
+   shot.mesh.queue_free();projectiles.erase(shot)
  for trap in placed_traps.duplicate():
   for enemy in enemies.duplicate():
    if enemy.type!="eye" and enemy.position.distance_to(trap.position)<enemy.stats.radius+.4:
@@ -283,7 +344,15 @@ func projectile(enemy, poison: bool) -> void:
  mesh.position=enemy.position+Vector3(0,1.8 if poison else 0,0)
  main.combat_fx.trail(mesh,poison)
  var aim=(main.coop.nearest(enemy.position).position if main.coop!=null else main.player.position)+Vector3(0,1,0)
- projectiles.append({"mesh":mesh,"velocity":mesh.position.direction_to(aim)*(5 if poison else 20),"life":1.6 if poison else 6.0,"poison":poison})
+ # Vomit is thrown 3x faster than before (15 m/s) and arcs slightly under gravity; the aim is lifted so the arc lands on the target.
+ var speed=15.0 if poison else 20.0
+ var velocity=mesh.position.direction_to(aim)*speed
+ if poison:
+  velocity.y+=.5*VOMIT_GRAVITY*(mesh.position.distance_to(aim)/speed)
+  sphere.radial_segments=8
+  sphere.rings=4
+  mesh.scale=Vector3(1,1,2.4)
+ projectiles.append({"mesh":mesh,"velocity":velocity,"life":.85 if poison else 6.0,"poison":poison})
  main.sound.play("vomit" if poison else "eye-living",enemy.position)
  if main.net.active and main.net.hosting: main.net.send({"type":"effect","sound":"vomit" if poison else "eye-living","p":main.coop.v(enemy.position)})
 
