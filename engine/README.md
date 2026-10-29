@@ -5,9 +5,10 @@ Windows); Dead Sector is its first game, migrated in stages from the Godot
 version. The HTML and Godot versions are not modified. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for what is engine and what is game.
 
-**Stage 2b (current):** the existing city with the Godot version's look plus
+**Stage 3 (current):** the existing city with the Godot version's look,
 cascaded sun shadows, local-light shadows, contact shadows and optional SSAO,
-and a free-fly camera. No gameplay yet.
+a free-fly camera, and seeded city generation (`--seed N`: new plot layout and
+interiors; without it the exported city is shown unchanged). No gameplay yet.
 
 ## Build and run (Windows)
 
@@ -35,6 +36,7 @@ Options (`dead-sector --help`):
 | `--size 1920x1080` | Window / capture size |
 | `--no-vsync` | Uncapped FPS (use this to measure performance) |
 | `--camera x,y,z,yaw,pitch` | Start pose (metres, degrees; yaw 0 looks along −Z) |
+| `--seed <n>` | Generate the city layout and interiors from a seed (default: the exported seed-42 city, unchanged) |
 | `--quality low\|medium\|high` | Graphics quality (default medium, as in Godot) |
 | `--weather overcast\|rain\|storm\|clear` | Weather (default: the seeded wave 1 roll) |
 | `--fog-level light\|medium\|heavy` | Fog level (default: the seeded wave 1 roll) |
@@ -63,7 +65,7 @@ Vulkan → DX12 order.
 |---|---|
 | `crates/sector-assets` | Engine: scene builder and buffers, materials, images, colour helpers |
 | `crates/sector-render` | Engine: renderer, lighting, shadows, SSAO, post chain, profiling, offscreen capture |
-| `crates/dead-sector` | Game: city data, climate, lamps, look, surface hook; `dead-sector` executable |
+| `crates/dead-sector` | Game: city data, seeded city/interior generation, climate, lamps, look, surface hook; `dead-sector` executable |
 
 Presets (`--quality`):
 

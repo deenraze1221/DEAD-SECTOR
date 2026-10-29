@@ -1,4 +1,4 @@
-//! Dead Sector — Rust engine, stage 2: the exported city with Godot's look.
+//! Dead Sector — Rust engine, stage 3: the exported city with Godot's look, or a seeded one.
 //!
 //! Window mode: free-fly camera over the static city.
 //! `--screenshot <png>` / `--bench <frames>`: offscreen, no window.
@@ -8,6 +8,7 @@ mod window;
 
 use anyhow::{Context, Result};
 use dead_sector::city::City;
+use dead_sector::citygen;
 use dead_sector::climate::{Environment, Weather};
 use dead_sector::content::{self, CITY_FILE, locate_assets};
 use dead_sector::frame::{CityLights, FrameData};
@@ -38,7 +39,19 @@ impl LoadedCity {
 fn load(options: &Options) -> Result<LoadedCity> {
     let assets = locate_assets(options.assets.as_deref())?;
     let started = Instant::now();
-    let city = City::load(&assets.join(CITY_FILE))?;
+    let mut city = City::load(&assets.join(CITY_FILE))?;
+    if let Some(seed) = options.seed {
+        let report = citygen::generate(&mut city, seed);
+        log::info!(
+            "seed {seed}: {} plots moved, {} pinned, {} rooms, {} furniture items in {:.0} ms",
+            report.layout.moved_plots(),
+            report.layout.pinned.iter().filter(|p| **p).count(),
+            report.interiors.rooms.len(),
+            report.interiors.furniture,
+            report.millis
+        );
+        city.validate()?;
+    }
     let parsed = started.elapsed();
     let scene = content::build_scene(&city);
     log::info!(

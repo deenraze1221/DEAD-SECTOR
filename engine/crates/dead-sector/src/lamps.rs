@@ -100,6 +100,7 @@ mod tests {
     #[test]
     fn shelter_uses_plot_building_with_margin() {
         let building = Building {
+            id: 0,
             kind: "shop".into(),
             x: 0.0,
             z: 0.0,

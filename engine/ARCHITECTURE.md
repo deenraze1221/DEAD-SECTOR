@@ -6,9 +6,9 @@ game. Everything lives in `engine/` for now; the original Godot project
 
 ```
 engine/crates/
-  sector-assets   (engine)  scene data, images, colour helpers
+  sector-assets   (engine)  scene data, images, colour helpers, seeded RNG
   sector-render   (engine)  renderer: lighting, shadows, AO, post chain
-  dead-sector     (game)    city.json, climate, lamps, look, surface hook, executable
+  dead-sector     (game)    city.json, city/interior generation, climate, lamps, look, surface hook, executable
 ```
 
 `dead-sector` depends on both engine crates. The engine crates never depend
@@ -21,6 +21,7 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | Scene data | `sector-assets::scene` | `SceneBuilder`: add meshes, materials, instances and instanced draws; any game converts its formats into this |
 | Materials | `sector-assets::MaterialParams` | Albedo, emission, roughness, metallic, unlit, alpha test, texture, pass (opaque / double-sided / transparent) and a game **shading id** |
 | Images | `sector-assets::load_image` | Any PNG; the game decides paths |
+| Random numbers | `sector-assets::rng::Rng` | PCG32: same seed, same sequence on every platform (integer ranges, floats, shuffles); for anything every co-op client must build identically |
 | GPU setup | `sector-render::gpu` | Vulkan first, DX12 fallback on Windows, `WGPU_BACKEND` override |
 | Camera | `sector-render::view::Camera` | Position, yaw/pitch, FOV, near/far, reversed-Z projection |
 | Lighting | `sector-render::Lighting`, `PointLight` | Sun, ambient, exponential fog, sky gradient; up to 16 point lights per frame with Godot's omni falloff |
@@ -40,7 +41,9 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 
 | Module | Content |
 |---|---|
-| `city.rs` | `godot/assets/city.json` format and validation |
+| `city.rs` | `godot/assets/city.json` format and validation, including owners, roles, collider kinds and asset bounds |
+| `citygen.rs` | Seeded plot layout (`city_generator.gd`) |
+| `interiors.rs` | Seeded floor plans and furniture (`interior_layout.gd`) |
 | `content.rs` | city → `SceneBuilder` conversion with `bridge.gd`'s material rules; label textures; asset folder lookup |
 | `climate.rs` | Weather roll, day/night, wetness, fog levels (`climate.gd`), quality presets |
 | `lamps.rs` | Store light, nearest street lamps, blackout districts, lens-rain shelter |
@@ -67,6 +70,45 @@ With shadows, contact shadows and SSAO off, the frame is identical to the
 Stage 2 renderer. Screenshots match the Stage 2 baseline within one 8-bit
 level.
 
+## Seeded city (Stage 3)
+
+`--seed N` runs `citygen::generate` on the loaded city before the scene is
+built; without it nothing is generated and the exported seed-42 city renders
+pixel-identically to Stage 2b. Generation is pure CPU work on the city data
+(about 40–110 ms), so the renderer is unchanged.
+
+1. **Prefab capture.** Each exported `interior-*` item becomes a prefab: its
+   visible parts and colliders relative to the item's anchor (position, yaw).
+   Up to five prefabs per furniture type.
+2. **Layout.** The 10 × 10 plots keep their positions. The corners and the
+   four store-block plots are fixed (plus any plot a shared object reaches
+   into; none in the current export). Every other plot gets a building from
+   its own district: each type at least once, extras chosen with replacement.
+   All of a source plot's instances, colliders and assets are copied into the
+   target plot, shifted by the plot-centre difference; owner ids are renamed
+   per plot, so copies stay distinct.
+3. **Interiors.** Exported furniture and partitions are removed except in the
+   store. Each other building gets one of three floor plans (side rooms off a
+   corridor, or a front/back split with an optional washroom), plaster
+   partitions with colliders, and furniture from a per-building-type program.
+   An item goes against a room wall only if its padded footprint misses every
+   placed item and every reserved doorway/corridor box; desks, tables,
+   workbenches and counters get a chair in front when it fits.
+
+The layout and interior RNG streams are seeded with `seed` and
+`seed ^ 0x524f4f4d`, as in Godot. The algorithms follow the Godot scripts, but
+the random sequence is PCG32, not Godot's, so a seed gives a different city
+than the Godot build does. The weather roll also uses the chosen seed.
+
+Tests (`tests/citygen.rs`, real city data, four seeds): same seed → identical
+output; different seeds → different layouts; a pinned seed-7 layout; fixed
+plots and the store unchanged; every district keeps all its building types;
+the result validates and builds; no two furniture items or an item and a
+partition overlap; doorways and corridors stay clear of furniture and walls;
+furniture stays inside its rooms; each furniture collider lies within its
+drawn geometry and each partition collider equals its drawn box. The Windows
+build renders the same seeded city pixel-identically under Wine.
+
 ## Planned engine systems (not built yet)
 
 These have no user in the code yet, so they will be added when a Dead Sector
@@ -82,6 +124,14 @@ stage needs them, not before:
   server authority, interpolation and prediction: player controller stage.
 - **Audio** (sound effects, music, 3D sound, volume buses): audio stage.
 - **Mesh and animation import (glTF)**: weapons stage.
+
+## Limitations (Stage 3)
+
+- Seeded cities differ from the Godot build's for the same seed (different
+  RNG). Co-op clients must all run this engine's generator.
+- Godot's plan-0 corridor box started 1 cm inside the back-room walls; here
+  it starts at the wall face.
+- `source_bounds` is remapped with the assets; nothing renders from it yet.
 
 ## Limitations (Stage 2b)
 

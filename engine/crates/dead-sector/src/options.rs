@@ -6,7 +6,7 @@ use sector_render::{ContactShadows, RenderSettings, ShadowFilter, Ssao, SunShado
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Sector Engine, stage 2b)
+DEAD SECTOR (Sector Engine, stage 3)
 
 USAGE: dead-sector [options]
 
@@ -15,6 +15,8 @@ USAGE: dead-sector [options]
   --camera <x,y,z,yaw,pitch>
                           Start camera: position in metres, angles in degrees
   --no-vsync              Present without vsync (uncapped FPS)
+  --seed <n>              Generate a new city layout and interiors from this seed
+                          (default: the exported seed-42 city, unchanged)
   --quality <q>           Graphics quality: low, medium (default), high
   --weather <w>           overcast, rain, storm or clear (default: seeded wave 1 roll)
   --fog-level <f>         light, medium or heavy (default: seeded wave 1 roll)
@@ -48,6 +50,7 @@ pub struct Options {
     pub vsync: bool,
     pub fog: bool,
     pub quality: Quality,
+    pub seed: Option<u64>,
     pub weather: Option<WeatherKind>,
     pub fog_level: Option<FogLevel>,
     pub night: bool,
@@ -75,6 +78,7 @@ impl Default for Options {
             vsync: true,
             fog: true,
             quality: Quality::Medium,
+            seed: None,
             weather: None,
             fog_level: None,
             night: false,
@@ -123,6 +127,7 @@ impl Options {
                     options.fog_level =
                         Some(FogLevel::parse(&text).with_context(|| format!("unknown fog level {text:?}"))?);
                 }
+                "--seed" => options.seed = Some(value()?.parse().context("--seed expects a whole number >= 0")?),
                 "--night" => options.night = true,
                 "--blackout" => {
                     let quadrant: u8 = value()?.parse().context("--blackout expects 0..3")?;
@@ -273,6 +278,8 @@ mod tests {
             "--no-fog",
             "--quality",
             "high",
+            "--seed",
+            "1234",
             "--weather",
             "storm",
             "--fog-level",
@@ -295,6 +302,7 @@ mod tests {
         assert!(!options.vsync);
         assert!(!options.fog);
         assert_eq!(options.quality, Quality::High);
+        assert_eq!(options.seed, Some(1234));
         assert_eq!(options.weather, Some(WeatherKind::Storm));
         assert_eq!(options.fog_level, Some(FogLevel::Heavy));
         assert!(options.night);
@@ -319,6 +327,8 @@ mod tests {
         assert!(parse(&["--bench", "0"]).is_err());
         assert!(parse(&["--assets"]).is_err());
         assert!(parse(&["--bogus"]).is_err());
+        assert!(parse(&["--seed", "-1"]).is_err());
+        assert!(parse(&["--seed", "abc"]).is_err());
         assert!(parse(&["--weather", "snow"]).is_err());
         assert!(parse(&["--quality", "ultra"]).is_err());
         assert!(parse(&["--blackout", "4"]).is_err());

@@ -5,9 +5,10 @@
 use anyhow::{Context, Result, bail};
 use sector_assets::color::parse_hex_color;
 use serde::{Deserialize, Deserializer};
+use std::collections::BTreeMap;
 use std::path::Path;
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct City {
     pub version: u32,
     pub seed: u64,
@@ -20,12 +21,17 @@ pub struct City {
     pub buildings: Vec<Building>,
     /// Every placed asset (buildings, props, furniture) with its type name.
     pub source_assets: Vec<SourceAsset>,
+    /// World bounds of each source asset, keyed by its id.
+    #[serde(default)]
+    pub source_bounds: BTreeMap<String, Bounds>,
     /// The SECTOR MART store terminal.
     pub terminal: Terminal,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Building {
+    #[serde(default)]
+    pub id: i64,
     #[serde(rename = "type")]
     pub kind: String,
     /// Footprint centre and size.
@@ -40,14 +46,51 @@ pub struct Building {
     pub district: String,
 }
 
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct SourceAsset {
+    pub id: Owner,
     #[serde(rename = "type")]
     pub kind: String,
     pub x: f32,
     #[serde(default)]
     pub y: f32,
     pub z: f32,
+    #[serde(default)]
+    pub yaw: f32,
+    #[serde(default)]
+    pub w: f32,
+    #[serde(default)]
+    pub h: f32,
+    #[serde(default)]
+    pub d: f32,
+    /// The building an interior item belongs to.
+    #[serde(default)]
+    pub building: Option<i64>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Deserialize)]
+pub struct Bounds {
+    pub min: [f32; 3],
+    pub max: [f32; 3],
+}
+
+/// Id of the asset an instance or collider belongs to: a building number or a
+/// string such as `interior-3-1` or `asset-12`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Deserialize)]
+#[serde(untagged)]
+pub enum Owner {
+    Int(i64),
+    Str(String),
+}
+
+impl Owner {
+    /// The id as Godot's `str()` writes it, which is also the `source_bounds` key.
+    pub fn key(&self) -> String {
+        match self {
+            Owner::Int(n) => n.to_string(),
+            Owner::Str(s) => s.clone(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -65,7 +108,7 @@ pub struct Spawn {
 }
 
 /// three.js `BufferGeometry`: flat attribute arrays, optional index.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Geometry {
     pub position: Vec<f32>,
     #[serde(default)]
@@ -108,7 +151,7 @@ pub enum Side {
 }
 
 /// three.js `MeshStandardMaterial` / `MeshBasicMaterial` parameters.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct Material {
     pub opacity: f32,
     pub transparent: bool,
@@ -131,7 +174,7 @@ pub struct Material {
     pub surface: u32,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Batch {
     pub name: String,
     pub geometry: usize,
@@ -141,9 +184,15 @@ pub struct Batch {
     /// Optional linear RGB colour per instance.
     #[serde(default)]
     pub colors: Vec<f32>,
+    /// Owning asset per instance (may be shorter than `transforms`).
+    #[serde(default)]
+    pub owners: Vec<Option<Owner>>,
+    /// `model`, `partition` or `fresh` per instance (may be shorter than `transforms`).
+    #[serde(default)]
+    pub roles: Vec<String>,
 }
 
-#[derive(Debug, Clone, Copy, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Deserialize)]
 pub struct Collider {
     #[serde(rename = "minX")]
     pub min_x: f32,
@@ -157,6 +206,11 @@ pub struct Collider {
     pub min_z: f32,
     #[serde(rename = "maxZ")]
     pub max_z: f32,
+    /// `structure`, `wall`, `prop`, `furniture`, `partition`, …
+    #[serde(default)]
+    pub kind: String,
+    #[serde(default)]
+    pub owner: Option<Owner>,
 }
 
 impl City {
