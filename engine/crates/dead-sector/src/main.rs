@@ -1,4 +1,4 @@
-//! Dead Sector — Rust engine, stage 3: the exported city with Godot's look, or a seeded one.
+//! Dead Sector — Rust engine, stage 4: walk the exported (or seeded) city with Godot's look.
 //!
 //! Window mode: free-fly camera over the static city.
 //! `--screenshot <png>` / `--bench <frames>`: offscreen, no window.

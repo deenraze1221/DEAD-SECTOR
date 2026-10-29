@@ -5,10 +5,11 @@ Windows); Dead Sector is its first game, migrated in stages from the Godot
 version. The HTML and Godot versions are not modified. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for what is engine and what is game.
 
-**Stage 3 (current):** the existing city with the Godot version's look,
+**Stage 4 (current):** the existing city with the Godot version's look,
 cascaded sun shadows, local-light shadows, contact shadows and optional SSAO,
-a free-fly camera, and seeded city generation (`--seed N`: new plot layout and
-interiors; without it the exported city is shown unchanged). No gameplay yet.
+seeded city generation (`--seed N`; without it the exported city is shown
+unchanged), and a first-person player that walks, sprints and jumps with
+collision against buildings, walls, furniture and the ground. No combat yet.
 
 ## Build and run (Windows)
 
@@ -26,8 +27,10 @@ the repository checkout it finds `godot\assets` by itself; otherwise pass
 assets next to the `.exe`.
 
 Controls: click the window to capture the mouse, Esc releases it. WASD move,
-mouse look, Space/Ctrl up/down, Shift fast, F11 fullscreen. The title bar shows
-FPS, frame time, draw calls, triangles, GPU and camera position.
+mouse look, Shift sprint, Space jump, F11 fullscreen. V toggles a free-fly
+debug camera (Space/Ctrl up/down, Shift fast); `--camera` starts in it. The
+title bar shows FPS, frame time, draw calls, triangles, GPU, walk/fly and
+camera position.
 
 Options (`dead-sector --help`):
 
@@ -65,7 +68,8 @@ Vulkan → DX12 order.
 |---|---|
 | `crates/sector-assets` | Engine: scene builder and buffers, materials, images, colour helpers |
 | `crates/sector-render` | Engine: renderer, lighting, shadows, SSAO, post chain, profiling, offscreen capture |
-| `crates/dead-sector` | Game: city data, seeded city/interior generation, climate, lamps, look, surface hook; `dead-sector` executable |
+| `crates/sector-physics` | Engine: static box collision world and kinematic character mover |
+| `crates/dead-sector` | Game: city data, seeded city/interior generation, player, climate, lamps, look, surface hook; `dead-sector` executable |
 
 Presets (`--quality`):
 

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/sector-assets", "crates/sector-render", "crates/dead-sector"]
+members = ["crates/sector-assets", "crates/sector-render", "crates/sector-physics", "crates/dead-sector"]
 
 [workspace.package]
 version = "0.1.0"

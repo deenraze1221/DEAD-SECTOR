@@ -428,6 +428,7 @@ dependencies = [
  "log",
  "naga",
  "sector-assets",
+ "sector-physics",
  "sector-render",
  "serde",
  "serde_json",
@@ -1815,6 +1816,13 @@ dependencies = [
  "anyhow",
  "bytemuck",
  "image",
+]
+
+[[package]]
+name = "sector-physics"
+version = "0.1.0"
+dependencies = [
+ "glam",
 ]
 
 [[package]]

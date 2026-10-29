@@ -8,7 +8,8 @@ game. Everything lives in `engine/` for now; the original Godot project
 engine/crates/
   sector-assets   (engine)  scene data, images, colour helpers, seeded RNG
   sector-render   (engine)  renderer: lighting, shadows, AO, post chain
-  dead-sector     (game)    city.json, city/interior generation, climate, lamps, look, surface hook, executable
+  sector-physics  (engine)  static box world, grid broadphase, kinematic box mover
+  dead-sector     (game)    city.json, city/interior generation, player, climate, lamps, look, surface hook, executable
 ```
 
 `dead-sector` depends on both engine crates. The engine crates never depend
@@ -36,6 +37,7 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | Quality | `RenderSettings` | Plain values (render lines, shadows, local budget, contact, SSAO, atmosphere, post detail); games map their presets onto it |
 | Profiling | `Renderer::bench` | Wall time per frame and per-pass GPU time (timestamp queries when supported) |
 | Offscreen | `Renderer::capture` | Screenshots and image-based tests without a window |
+| Collision | `sector-physics::World` | Static AABBs in a 4 m XZ grid (huge boxes checked always); `overlaps`, and `move_box`: vertical then X then Z swept moves with sliding, a skin gap, step-up onto low ledges, grounded/ceiling/blocked flags. Deterministic `f32` maths, no tunnelling at any speed |
 
 ## What stays in Dead Sector
 
@@ -44,6 +46,7 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | `city.rs` | `godot/assets/city.json` format and validation, including owners, roles, collider kinds and asset bounds |
 | `citygen.rs` | Seeded plot layout (`city_generator.gd`) |
 | `interiors.rs` | Seeded floor plans and furniture (`interior_layout.gd`) |
+| `player.rs` | First-person player with `player.gd`'s tuning on a fixed 60 Hz step; the city's collision world |
 | `content.rs` | city → `SceneBuilder` conversion with `bridge.gd`'s material rules; label textures; asset folder lookup |
 | `climate.rs` | Weather roll, day/night, wetness, fog levels (`climate.gd`), quality presets |
 | `lamps.rs` | Store light, nearest street lamps, blackout districts, lens-rain shelter |
@@ -109,21 +112,61 @@ furniture stays inside its rooms; each furniture collider lies within its
 drawn geometry and each partition collider equals its drawn box. The Windows
 build renders the same seeded city pixel-identically under Wine.
 
+## Player and physics (Stage 4)
+
+`player::collision_world` turns the city's colliders (walls, partitions,
+furniture, props, structures; the current or seeded city) plus Godot's ground
+box (450 × 450 m, top at y = 0) into a `sector-physics::World`: about 7,300
+boxes, built in ~1 ms.
+
+The player is a 0.64 × 1.8 × 0.64 m box (Godot's capsule: radius 0.32, height
+1.8), eyes at 1.65 m. Each 1/60 s step follows `player.gd`: walk 4.5 m/s,
+sprint 7.5 m/s for 5 s of stamina (recharging, with an exhausted lock-out),
+acceleration 31.3 / 47.8 m/s² (moving / stopping), gravity 20 m/s², jump
+4.95 m/s (about 0.61 m), pitch limits −60° / +88°, 0.002 rad per mouse pixel.
+It can step onto ledges up to 0.3 m (Godot's capsule rides over curbs). Below
+y = −20 it is put back at the spawn. The window runs whole steps for the
+elapsed time (at most 8 per frame) and interpolates the eye between the last
+two steps, so movement is identical at any frame rate.
+
+Controls: click to capture the mouse, Esc releases it; WASD, mouse look,
+Shift sprint, Space jump; V toggles the free-fly debug camera. `--camera`
+starts in fly mode; `--screenshot` and `--bench` are unchanged.
+
+Tests: physics unit tests (landing, sliding, no tunnelling, step heights,
+ceilings, escaping overlaps, grid vs brute force); player unit tests (speeds,
+yaw-relative strafing, sprint and stamina, jump height, walls, respawn, pitch
+clamp, interpolation); real-city tests (`tests/player_city.rs`): spawn is
+clear; one minute of random play from the street and inside buildings in the
+exported and seed-7 cities never overlaps a collider or goes below ground;
+walking at every building is stopped; furniture blocks; identical inputs give
+bit-identical positions. A step costs about 1 µs.
+
 ## Planned engine systems (not built yet)
 
 These have no user in the code yet, so they will be added when a Dead Sector
 stage needs them, not before:
 
-- **Input** (action map, key/mouse/controller bindings, sensitivity) and
-  **config files**: player controller stage.
+- **Input** (action map, rebindable keys, controller, sensitivity setting)
+  and **config files**: when a settings menu exists. Stage 4 reads winit keys
+  directly in `window.rs`.
 - **World/entities**: transforms plus handle-based storage, no full ECS unless
-  it becomes justified; **collision/physics** (AABB world, ray casts, capsule
-  sweeps): player controller stage. Zombie AI and movement rules stay in the
-  game.
-- **Fixed-step simulation** separated from rendering and input, ready for
-  server authority, interpolation and prediction: player controller stage.
+  it becomes justified: zombies stage. **Ray casts** against `World`:
+  weapons stage. Zombie AI and movement rules stay in the game.
+- **Network-ready simulation**: the player already steps at a fixed 60 Hz
+  from an `Input` value, so the same steps can run on a server and be
+  predicted on clients in the co-op stage.
 - **Audio** (sound effects, music, 3D sound, volume buses): audio stage.
 - **Mesh and animation import (glTF)**: weapons stage.
+
+## Limitations (Stage 4)
+
+- The player is a box, not a capsule: it does not round corners and stands
+  on ledge edges up to its full half-width.
+- No slopes: the city is all boxes. Ledges above 0.3 m need a jump.
+- Under Wine on a virtual X display only the first key press reaches the
+  window (the Stage 3 build behaves the same); this could not be checked on
+  real Windows here.
 
 ## Limitations (Stage 3)
 

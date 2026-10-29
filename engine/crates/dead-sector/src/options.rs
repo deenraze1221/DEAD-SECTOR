@@ -6,7 +6,7 @@ use sector_render::{ContactShadows, RenderSettings, ShadowFilter, Ssao, SunShado
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Sector Engine, stage 3)
+DEAD SECTOR (Sector Engine, stage 4)
 
 USAGE: dead-sector [options]
 
@@ -39,8 +39,10 @@ Shadow and occlusion overrides (on top of --quality):
   --bench <frames>        Render frames offscreen and report the average time
   -h, --help              Show this help
 
-Window controls: click to capture the mouse, Esc to release it,
-WASD move, Space/Ctrl up/down, Shift fast, F11 fullscreen.";
+Window controls: click to capture the mouse, Esc to release it, F11 fullscreen.
+  Walk: WASD move, mouse look, Shift sprint, Space jump.
+  V toggles a free-fly debug camera (WASD, Space/Ctrl up/down, Shift fast);
+  --camera starts in fly mode.";
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Options {
