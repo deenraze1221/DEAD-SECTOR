@@ -117,6 +117,10 @@ fn run_offscreen(options: &Options, loaded: &LoadedCity) -> Result<()> {
         for (label, pass_ms) in &result.gpu_passes {
             println!("  {label:<16} {pass_ms:7.3} ms");
         }
+        if !result.cascade_casters.is_empty() {
+            let counts: Vec<String> = result.cascade_casters.iter().map(u32::to_string).collect();
+            println!("  sun cascade casters: {} of {} instances", counts.join(" / "), renderer.stats().instances);
+        }
     }
     if let Some(path) = &options.screenshot {
         let pixels = renderer.capture(size, &inputs)?;

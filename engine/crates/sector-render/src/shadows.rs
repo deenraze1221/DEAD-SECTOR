@@ -14,6 +14,9 @@ pub const MAX_CASCADES: usize = 4;
 pub const MAX_SHADOWED_LIGHTS: usize = 4;
 /// How far behind a cascade (towards the sun) casters are still captured.
 const CASTER_REACH: f32 = 300.0;
+/// Caster culling margin around a cascade's slice, in shadow texels: normal
+/// offset (≤ 2.5) plus the soft filter radius (2.5) with headroom.
+const CULL_MARGIN_TEXELS: f32 = 8.0;
 /// Near plane of point-light shadow faces; keeps a lamp's own housing from
 /// shadowing everything.
 pub const LOCAL_NEAR: f32 = 0.3;
@@ -36,6 +39,14 @@ pub struct Cascade {
     pub far: f32,
     /// World size of one shadow-map texel.
     pub texel: f32,
+    /// World → light space (shared by all cascades).
+    pub light_view: Mat4,
+    /// Caster culling box in light space: x and y ranges, and near/far
+    /// distances along the light direction. It covers the cascade's frustum
+    /// slice (the only receivers that sample it) plus a filter margin, and
+    /// everything between the slice and the sun.
+    pub min: Vec3,
+    pub max: Vec3,
 }
 
 /// Camera basis vectors (forward, right, up).
@@ -89,7 +100,20 @@ pub fn fit_cascades(camera: &Camera, aspect: f32, to_sun: Vec3, settings: &SunSh
                 -snapped.z - radius - CASTER_REACH,
                 -snapped.z + radius,
             );
-            Cascade { view_proj: projection * view, far, texel }
+            // Receivers in this cascade lie inside the slice; shadow rays run along
+            // the light, so casters outside the slice's light-space footprint never
+            // reach them. The margin covers normal offset and the widest filter.
+            let margin = texel * CULL_MARGIN_TEXELS;
+            let (mut slice_min, mut slice_max) = (Vec3::splat(f32::MAX), Vec3::splat(f32::MIN));
+            for corner in &corners {
+                let p = view.transform_point3(*corner);
+                let p = Vec3::new(p.x, p.y, -p.z);
+                slice_min = slice_min.min(p);
+                slice_max = slice_max.max(p);
+            }
+            let min = Vec3::new(slice_min.x - margin, slice_min.y - margin, -snapped.z - radius - CASTER_REACH);
+            let max = Vec3::new(slice_max.x + margin, slice_max.y + margin, slice_max.z + margin);
+            Cascade { view_proj: projection * view, far, texel, light_view: view, min, max }
         })
         .collect()
 }
@@ -149,6 +173,17 @@ struct Bounds {
 /// World-space bounds for every instance of every draw, used to cull shadow casters.
 pub struct InstanceBounds {
     per_draw: Vec<Vec<Bounds>>,
+    /// First instance of each draw in the scene's instance buffer.
+    first_instance: Vec<u32>,
+}
+
+/// The instances that can cast into one cascade, grouped by draw.
+#[derive(Debug, Default, Clone, PartialEq)]
+pub struct CascadeCasters {
+    /// Absolute instance indices, consecutive per draw.
+    pub indices: Vec<u32>,
+    /// (draw index, first entry in `indices`, count)
+    pub runs: Vec<(usize, u32, u32)>,
 }
 
 impl InstanceBounds {
@@ -188,7 +223,37 @@ impl InstanceBounds {
                     .collect()
             })
             .collect();
-        InstanceBounds { per_draw }
+        InstanceBounds { per_draw, first_instance: scene.draws.iter().map(|d| d.first_instance).collect() }
+    }
+
+    /// Casters for each cascade: instances whose bounding sphere overlaps the
+    /// cascade's light-space box (its footprint, plus everything between the
+    /// box and the sun). Conservative, so the shadow maps are unchanged.
+    /// `include` filters draws (e.g. skips transparent ones).
+    pub fn cascade_casters(&self, cascades: &[Cascade], include: impl Fn(usize) -> bool) -> Vec<CascadeCasters> {
+        let mut out = vec![CascadeCasters::default(); cascades.len()];
+        let Some(view) = cascades.first().map(|c| c.light_view) else { return out };
+        for (draw, bounds) in self.per_draw.iter().enumerate().filter(|(d, _)| include(*d)) {
+            let starts: Vec<u32> = out.iter().map(|c| c.indices.len() as u32).collect();
+            for (offset, b) in bounds.iter().enumerate() {
+                let local = view.transform_point3(b.sphere.truncate());
+                // Distance along the light direction is −z in light view space.
+                let point = Vec3::new(local.x, local.y, -local.z);
+                let r = b.sphere.w;
+                for (cascade, casters) in cascades.iter().zip(out.iter_mut()) {
+                    if (point + r).cmpge(cascade.min).all() && (point - r).cmple(cascade.max).all() {
+                        casters.indices.push(self.first_instance[draw] + offset as u32);
+                    }
+                }
+            }
+            for (casters, start) in out.iter_mut().zip(starts) {
+                let count = casters.indices.len() as u32 - start;
+                if count > 0 {
+                    casters.runs.push((draw, start, count));
+                }
+            }
+        }
+        out
     }
 
     /// For each draw, the instance offsets (relative to the draw) that can
@@ -265,6 +330,34 @@ mod tests {
             let texel_ndc = 2.0 / sun().resolution as f32;
             assert!(shift.x < 1e-4 || (shift.x / texel_ndc - (shift.x / texel_ndc).round()).abs() < 1e-2);
         }
+    }
+
+    #[test]
+    fn cascade_culling_keeps_footprint_and_sunward_casters_only() {
+        let mut builder = SceneBuilder::new();
+        let material = builder.add_material(MaterialParams::default());
+        let v = |x, z| Vertex { position: [x, 0.0, z], normal: [0.0, 1.0, 0.0], uv: [0.0; 2], color: [1.0; 3] };
+        let mesh = builder.add_mesh(&[v(-0.5, -0.5), v(0.5, -0.5), v(0.0, 0.5)], None);
+        let at = |p: Vec3| Instance { model: Mat4::from_translation(p).to_cols_array(), color: [1.0; 4] };
+        let cam = camera();
+        let ahead = cam.position + cam.forward() * 5.0;
+        let to_sun = Vec3::Y;
+        let instances = builder.add_instances(&[
+            at(ahead),                              // in the first cascade
+            at(ahead + Vec3::new(500.0, 0.0, 0.0)), // far to the side: culled everywhere
+            at(ahead + to_sun * 150.0),             // high above (towards the sun): still a caster
+            at(ahead - to_sun * 150.0),             // far below the receivers: culled
+            at(cam.position - cam.forward() * 3.0), // behind the camera: in the fitted sphere, not the slice
+        ]);
+        builder.add_draw(0, mesh, None, material, instances);
+        let bounds = InstanceBounds::new(&builder.finish());
+        let cascades = fit_cascades(&cam, 16.0 / 9.0, to_sun, &sun());
+        let casters = bounds.cascade_casters(&cascades, |_| true);
+        assert_eq!(casters[0].indices, vec![0, 2]);
+        assert_eq!(casters[0].runs, vec![(0, 0, 2)]);
+        assert!(casters.iter().all(|c| !c.indices.contains(&1) && !c.indices.contains(&3)));
+        assert!(!casters[0].indices.contains(&4), "slice culling should drop casters behind the camera");
+        assert!(bounds.cascade_casters(&cascades, |_| false).iter().all(|c| c.runs.is_empty()));
     }
 
     #[test]

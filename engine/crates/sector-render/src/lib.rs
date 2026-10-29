@@ -98,6 +98,8 @@ pub struct Renderer {
     no_occlusion: wgpu::TextureView,
     profiler: Option<GpuProfiler>,
     profiling: bool,
+    /// Instances drawn into each sun cascade last frame.
+    cascade_casters: Vec<u32>,
     stats: SceneStats,
 }
 
@@ -129,6 +131,8 @@ pub struct BenchResult {
     pub frame_ms: f64,
     /// Average GPU time per pass group, when the adapter supports timestamps.
     pub gpu_passes: Vec<(&'static str, f64)>,
+    /// Instances drawn into each sun cascade (of the scene's total).
+    pub cascade_casters: Vec<u32>,
 }
 
 impl Renderer {
@@ -162,6 +166,7 @@ impl Renderer {
             no_occlusion,
             profiler: GpuProfiler::new(device, queue),
             profiling: false,
+            cascade_casters: Vec::new(),
             stats: SceneStats {
                 draws: scene.draws.len(),
                 instances: scene.instances.len(),
@@ -212,6 +217,7 @@ impl Renderer {
             }
             _ => Vec::new(),
         };
+        self.cascade_casters = self.scene.update_cascade_casters(&cascades);
         let shadowed = shadows::pick_shadowed(inputs.lights, camera.position, settings.local_shadows.budget);
         let mut slots = vec![None; inputs.lights.len()];
         let mut faces = Vec::with_capacity(shadowed.len());
@@ -249,7 +255,7 @@ impl Renderer {
         let profiler = if self.profiling { &mut self.profiler } else { &mut None };
         for (i, layer) in self.shadow_maps.sun_layers.iter().enumerate().take(cascades.len()) {
             let mut pass = depth_pass(encoder, profiler, "sun shadows", layer);
-            self.scene.record_shadow(&mut pass, &self.shadow_maps.view_group, shadow_maps::cascade_view(i));
+            self.scene.record_shadow(&mut pass, i, &self.shadow_maps.view_group, shadow_maps::cascade_view(i));
         }
         for slot in 0..shadowed.len() {
             for face in 0..6 {
@@ -389,7 +395,7 @@ impl Renderer {
         for (_, total) in &mut gpu_passes {
             *total /= frames as f64;
         }
-        Ok(BenchResult { frame_ms, gpu_passes })
+        Ok(BenchResult { frame_ms, gpu_passes, cascade_casters: self.cascade_casters.clone() })
     }
 
     /// Renders one frame offscreen and returns tightly packed sRGB RGBA8 pixels.

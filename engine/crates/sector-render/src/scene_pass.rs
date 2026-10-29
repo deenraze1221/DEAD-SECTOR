@@ -7,7 +7,7 @@ use crate::gpu_util::{
 };
 use crate::lights::{MAX_LIGHTS, PointLight};
 use crate::settings::{Atmosphere, Lighting};
-use crate::shadows::{InstanceBounds, MAX_SHADOWED_LIGHTS};
+use crate::shadows::{Cascade, CascadeCasters, InstanceBounds, MAX_CASCADES, MAX_SHADOWED_LIGHTS};
 use anyhow::{Context, Result};
 use bytemuck::{Pod, Zeroable};
 use glam::{Mat4, Vec3};
@@ -143,6 +143,11 @@ pub(crate) struct ScenePass {
     main: [MainPipelines; 2],
     shadow_depth: wgpu::RenderPipeline,
     shadow_alpha: wgpu::RenderPipeline,
+    culled_depth: wgpu::RenderPipeline,
+    culled_alpha: wgpu::RenderPipeline,
+    instance_storage: wgpu::BindGroup,
+    /// Per cascade: buffer of instance indices and the draws they belong to.
+    cascades: Vec<(wgpu::Buffer, CascadeCasters)>,
     prepass_back: wgpu::RenderPipeline,
     prepass_double: wgpu::RenderPipeline,
     pools: wgpu::RenderPipeline,
@@ -167,6 +172,15 @@ fn decal_buffer(device: &wgpu::Device, count: usize) -> wgpu::Buffer {
     device.create_buffer(&wgpu::BufferDescriptor {
         label: Some("decals"),
         size: (count.max(1) * 16) as u64,
+        usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
+        mapped_at_creation: false,
+    })
+}
+
+fn index_buffer(device: &wgpu::Device, count: usize) -> wgpu::Buffer {
+    device.create_buffer(&wgpu::BufferDescriptor {
+        label: Some("cascade-casters"),
+        size: (count.max(1) * 4) as u64,
         usage: wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::COPY_DST,
         mapped_at_creation: false,
     })
@@ -265,6 +279,19 @@ impl ScenePass {
             ],
         );
         let depth_view_layout = layout("depth-view", &[uniform_entry(0, wgpu::ShaderStages::VERTEX, true)]);
+        let storage_layout = layout(
+            "instance-storage",
+            &[wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStages::VERTEX,
+                ty: wgpu::BindingType::Buffer {
+                    ty: wgpu::BufferBindingType::Storage { read_only: true },
+                    has_dynamic_offset: false,
+                    min_binding_size: None,
+                },
+                count: None,
+            }],
+        );
 
         let shader = |label, source: String| {
             device.create_shader_module(wgpu::ShaderModuleDescriptor {
@@ -285,6 +312,7 @@ impl ScenePass {
         };
         let scene_layout = pipeline_layout("scene", &[&frame_layout, &material_layout, &shadow_layout]);
         let depth_layout = pipeline_layout("depth", &[&depth_view_layout, &material_layout]);
+        let culled_layout = pipeline_layout("depth-culled", &[&depth_view_layout, &material_layout, &storage_layout]);
         let effects_pipeline_layout = pipeline_layout("effects", &[&frame_layout, &effects_layout]);
 
         let vertex_attributes =
@@ -301,6 +329,15 @@ impl ScenePass {
                 array_stride: std::mem::size_of::<Instance>() as u64,
                 step_mode: wgpu::VertexStepMode::Instance,
                 attributes: &instance_attributes,
+            }),
+        ];
+        let index_attributes = wgpu::vertex_attr_array![9 => Uint32];
+        let culled_geometry = [
+            geometry[0].clone(),
+            Some(wgpu::VertexBufferLayout {
+                array_stride: 4,
+                step_mode: wgpu::VertexStepMode::Instance,
+                attributes: &index_attributes,
             }),
         ];
         let decal_attributes = wgpu::vertex_attr_array![0 => Float32x4];
@@ -369,6 +406,16 @@ impl ScenePass {
         let shadow_depth = pipeline(device, caster);
         let shadow_alpha =
             pipeline(device, Spec { label: "shadow-casters-alpha", fragment: Some("fs_alpha_test"), ..caster });
+        let culled = Spec {
+            label: "sun-casters",
+            layout: &culled_layout,
+            vertex: "vs_shadow_culled",
+            buffers: &culled_geometry,
+            ..caster
+        };
+        let culled_depth = pipeline(device, culled);
+        let culled_alpha =
+            pipeline(device, Spec { label: "sun-casters-alpha", fragment: Some("fs_alpha_test"), ..culled });
         let prepass = Spec {
             label: "prepass",
             layout: &depth_layout,
@@ -504,6 +551,13 @@ impl ScenePass {
         let buffer = |label: &str, contents: &[u8], usage| {
             device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some(label), contents, usage })
         };
+        let instances = buffer(
+            "instances",
+            bytemuck::cast_slice(&scene.instances),
+            wgpu::BufferUsages::VERTEX | wgpu::BufferUsages::STORAGE,
+        );
+        let instance_storage =
+            bind_group(device, "instance-storage", &storage_layout, &[instances.as_entire_binding()]);
         let draws = scene
             .draws
             .iter()
@@ -535,7 +589,11 @@ impl ScenePass {
             effects_group,
             vertices: buffer("vertices", bytemuck::cast_slice(&scene.vertices), wgpu::BufferUsages::VERTEX),
             indices: buffer("indices", bytemuck::cast_slice(&scene.indices), wgpu::BufferUsages::INDEX),
-            instances: buffer("instances", bytemuck::cast_slice(&scene.instances), wgpu::BufferUsages::VERTEX),
+            instances,
+            instance_storage,
+            cascades: (0..MAX_CASCADES).map(|_| (index_buffer(device, 1), CascadeCasters::default())).collect(),
+            culled_depth,
+            culled_alpha,
             instance_data: scene.instances.clone(),
             bounds: InstanceBounds::new(scene),
             local: (0..MAX_SHADOWED_LIGHTS)
@@ -599,18 +657,44 @@ impl ScenePass {
         pass.set_index_buffer(self.indices.slice(..), wgpu::IndexFormat::Uint32);
     }
 
-    /// Draws every opaque instance into a shadow map.
-    pub(crate) fn record_shadow(&self, pass: &mut wgpu::RenderPass<'_>, view: &wgpu::BindGroup, offset: u32) {
+    /// Culls the opaque instances against each cascade and uploads the index
+    /// lists. Returns the caster count per cascade.
+    pub(crate) fn update_cascade_casters(&mut self, cascades: &[Cascade]) -> Vec<u32> {
+        let draws = &self.draws;
+        let casters = self.bounds.cascade_casters(cascades, |d| draws[d].pass != PassKind::Transparent);
+        let mut counts = Vec::with_capacity(casters.len());
+        for (slot, casters) in self.cascades.iter_mut().zip(casters) {
+            if (casters.indices.len() * 4) as u64 > slot.0.size() {
+                slot.0 = index_buffer(&self.device, casters.indices.len().next_power_of_two());
+            }
+            self.queue.write_buffer(&slot.0, 0, bytemuck::cast_slice(&casters.indices));
+            counts.push(casters.indices.len() as u32);
+            slot.1 = casters;
+        }
+        counts
+    }
+
+    /// Draws the culled casters of `cascade` into its shadow map.
+    pub(crate) fn record_shadow(
+        &self,
+        pass: &mut wgpu::RenderPass<'_>,
+        cascade: usize,
+        view: &wgpu::BindGroup,
+        offset: u32,
+    ) {
+        let (indices, casters) = &self.cascades[cascade];
         pass.set_bind_group(0, view, &[offset]);
-        self.bind_geometry(pass, &self.instances);
+        pass.set_bind_group(2, &self.instance_storage, &[]);
+        self.bind_geometry(pass, indices);
         let mut alpha = None;
-        for draw in self.draws.iter().filter(|d| d.pass != PassKind::Transparent) {
+        for &(index, first, count) in &casters.runs {
+            let draw = &self.draws[index];
             if alpha != Some(draw.alpha_test) {
-                pass.set_pipeline(if draw.alpha_test { &self.shadow_alpha } else { &self.shadow_depth });
+                pass.set_pipeline(if draw.alpha_test { &self.culled_alpha } else { &self.culled_depth });
                 alpha = Some(draw.alpha_test);
             }
             pass.set_bind_group(1, &self.material_groups[draw.material], &[]);
-            pass.draw_indexed(draw.indices.clone(), draw.base_vertex, draw.instances.clone());
+            pass.draw_indexed(draw.indices.clone(), draw.base_vertex, first..first + count);
         }
     }
 

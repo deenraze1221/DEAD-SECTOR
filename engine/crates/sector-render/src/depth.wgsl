@@ -54,6 +54,38 @@ fn vs_depth(v: VertexIn) -> DepthOut {
     return out;
 }
 
+// Culled sun-shadow casters: the per-instance stream carries an index into
+// the scene's instance buffer instead of the instance data itself.
+struct InstanceData {
+    model: mat4x4<f32>,
+    color: vec4<f32>,
+};
+
+@group(2) @binding(0) var<storage, read> instance_data: array<InstanceData>;
+
+struct CulledIn {
+    @location(0) position: vec3<f32>,
+    @location(1) normal: vec3<f32>,
+    @location(2) uv: vec2<f32>,
+    @location(3) color: vec3<f32>,
+    @location(9) instance: u32,
+};
+
+@vertex
+fn vs_shadow_culled(v: CulledIn) -> DepthOut {
+    let model = instance_data[v.instance].model;
+    let world = model * vec4<f32>(v.position, 1.0);
+    let a = model[0].xyz;
+    let b = model[1].xyz;
+    let c = model[2].xyz;
+    let det = dot(a, cross(b, c));
+    var out: DepthOut;
+    out.clip = depth_view.view_proj * world;
+    out.uv = v.uv;
+    out.normal = (cross(b, c) * v.normal.x + cross(c, a) * v.normal.y + cross(a, b) * v.normal.z) * sign(det);
+    return out;
+}
+
 // Shadow casters with alpha-tested textures (labels, signs).
 @fragment
 fn fs_alpha_test(in: DepthOut) {

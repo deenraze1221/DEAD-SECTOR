@@ -26,7 +26,7 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | Lighting | `sector-render::Lighting`, `PointLight` | Sun, ambient, exponential fog, sky gradient; up to 16 point lights per frame with Godot's omni falloff |
 | Shading | `scene.wgsl` | Burley diffuse, GGX specular, sky reflections, fog, HDR output |
 | Surface hook | `RendererConfig::surface_hook` | Game WGSL `surface_hook(shading, input)` changes albedo/roughness per material, with per-frame `frame.game` values |
-| Sun shadows | `shadows.rs`, `shadow_maps.rs` | Cascaded shadow maps, 1–4 cascades, 1024–4096 maps, distance, hard / PCF / soft filtering, texel-snapped stable cascades |
+| Sun shadows | `shadows.rs`, `shadow_maps.rs` | Cascaded shadow maps, 1–4 cascades, 1024–4096 maps, distance, hard / PCF / soft filtering, texel-snapped stable cascades, per-cascade caster culling (instances fetched from a storage buffer by index) |
 | Local shadows | same | Six-face shadow maps for the nearest `cast_shadows` point lights within a budget (0–4); casters culled to each light's range; a light's own fixture is ignored |
 | Contact shadows | `screen_space.rs` | Screen-space ray march towards the sun from the depth prepass |
 | SSAO | `screen_space.rs` | Normal-oriented hemisphere SSAO with depth-aware blur; ambient light only |
@@ -85,9 +85,13 @@ stage needs them, not before:
 
 ## Limitations (Stage 2b)
 
-- All four sun cascades draw the whole city (no per-cascade culling yet). On
-  the software rasteriser this is the largest pass. GPU-driven culling is the
-  planned optimisation.
+- Sun cascades are culled on the CPU each frame: an instance is drawn into a
+  cascade only if its bounding sphere overlaps the cascade's frustum slice in
+  light space (plus filter margin and everything towards the sun). Shadow maps
+  are bit-identical to unculled rendering. At the High preset from the spawn
+  point this drops cascade draws from 4 × 63,969 to about 47,000 instances. The
+  far cascade still draws about half the city; GPU-driven culling and caching
+  static cascades are the next options.
 - Local shadow maps use 32-bit depth: 4 lights × 6 faces × 1024² ≈ 96 MB on
   high.
 - SSAO and contact shadows run at the 3D resolution. SSAO only darkens ambient
