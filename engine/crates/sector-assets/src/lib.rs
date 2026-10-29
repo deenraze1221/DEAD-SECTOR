@@ -2,6 +2,7 @@
 //! Game-specific file formats live in the game crates and convert into these.
 
 pub mod color;
+pub mod rng;
 pub mod scene;
 
 pub use scene::{Instance, MaterialParams, Mesh, PassKind, SceneBuffers, SceneBuilder, Vertex};
