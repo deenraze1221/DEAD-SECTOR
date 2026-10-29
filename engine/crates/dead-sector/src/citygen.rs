@@ -9,7 +9,8 @@
 //! from the chosen source plot, shifted by the difference of plot centres.
 
 use crate::city::{Bounds, City, Owner};
-use crate::interiors;
+use crate::emit::Emitter;
+use crate::{buildings, interiors};
 use glam::{Mat4, Vec3};
 use sector_assets::rng::Rng;
 use std::collections::BTreeMap;
@@ -154,19 +155,22 @@ impl Layout {
 #[derive(Debug, Clone)]
 pub struct Report {
     pub layout: Layout,
+    pub buildings: buildings::Report,
     pub interiors: interiors::Report,
     pub millis: f64,
 }
 
-/// Rebuilds `city` for a seed: new plot layout, then new interiors. Deterministic:
+/// Rebuilds `city` for a seed: new plot layout, modular buildings, then new interiors. Deterministic:
 /// the same seed and source city give the same result on every machine.
 pub fn generate(city: &mut City, seed: u64) -> Report {
     let started = Instant::now();
     // Furniture prefabs come from the exported interiors, before plots move.
     let library = interiors::Library::capture(city);
     let layout = apply_layout(city, seed);
-    let interiors = interiors::rebuild(city, &library, seed);
-    Report { layout, interiors, millis: started.elapsed().as_secs_f64() * 1e3 }
+    let mut emit = Emitter::new(city);
+    let buildings = buildings::rebuild(city, &mut emit, seed);
+    let interiors = interiors::rebuild(city, &library, seed, &mut emit, &buildings.plans);
+    Report { layout, buildings, interiors, millis: started.elapsed().as_secs_f64() * 1e3 }
 }
 
 /// `city_generator.gd::apply`.

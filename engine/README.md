@@ -5,11 +5,12 @@ Windows); Dead Sector is its first game, migrated in stages from the Godot
 version. The HTML and Godot versions are not modified. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for what is engine and what is game.
 
-**Stage 4 (current):** the existing city with the Godot version's look,
+**Stage 5 (current):** the existing city with the Godot version's look,
 cascaded sun shadows, local-light shadows, contact shadows and optional SSAO,
-seeded city generation (`--seed N`; without it the exported city is shown
-unchanged), and a first-person player that walks, sprints and jumps with
-collision against buildings, walls, furniture and the ground. No combat yet.
+a first-person player that walks, sprints and jumps with collision, and
+seeded city generation (`--seed N`): new plot layout, modular multi-storey
+buildings with windows, doors, stairs and roofs, and furnished floors.
+Without `--seed` the exported city is shown unchanged. No combat yet.
 
 ## Build and run (Windows)
 
@@ -39,7 +40,7 @@ Options (`dead-sector --help`):
 | `--size 1920x1080` | Window / capture size |
 | `--no-vsync` | Uncapped FPS (use this to measure performance) |
 | `--camera x,y,z,yaw,pitch` | Start pose (metres, degrees; yaw 0 looks along −Z) |
-| `--seed <n>` | Generate the city layout and interiors from a seed (default: the exported seed-42 city, unchanged) |
+| `--seed <n>` | Generate the city layout, modular buildings and interiors from a seed (default: the exported seed-42 city, unchanged) |
 | `--quality low\|medium\|high` | Graphics quality (default medium, as in Godot) |
 | `--weather overcast\|rain\|storm\|clear` | Weather (default: the seeded wave 1 roll) |
 | `--fog-level light\|medium\|heavy` | Fog level (default: the seeded wave 1 roll) |
@@ -66,10 +67,10 @@ Vulkan → DX12 order.
 
 | Crate | Purpose |
 |---|---|
-| `crates/sector-assets` | Engine: scene builder and buffers, materials, images, colour helpers |
+| `crates/sector-assets` | Engine: scene builder and buffers, materials, images, colour helpers, seeded RNG, building modules |
 | `crates/sector-render` | Engine: renderer, lighting, shadows, SSAO, post chain, profiling, offscreen capture |
 | `crates/sector-physics` | Engine: static box collision world and kinematic character mover |
-| `crates/dead-sector` | Game: city data, seeded city/interior generation, player, climate, lamps, look, surface hook; `dead-sector` executable |
+| `crates/dead-sector` | Game: city data, seeded city/building/interior generation, player, climate, lamps, look, surface hook; `dead-sector` executable |
 
 Presets (`--quality`):
 

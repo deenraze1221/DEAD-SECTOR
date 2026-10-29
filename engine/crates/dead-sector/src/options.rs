@@ -6,7 +6,7 @@ use sector_render::{ContactShadows, RenderSettings, ShadowFilter, Ssao, SunShado
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Sector Engine, stage 4)
+DEAD SECTOR (Sector Engine, stage 5)
 
 USAGE: dead-sector [options]
 
@@ -15,7 +15,7 @@ USAGE: dead-sector [options]
   --camera <x,y,z,yaw,pitch>
                           Start camera: position in metres, angles in degrees
   --no-vsync              Present without vsync (uncapped FPS)
-  --seed <n>              Generate a new city layout and interiors from this seed
+  --seed <n>              Generate a new city: layout, modular buildings, interiors
                           (default: the exported seed-42 city, unchanged)
   --quality <q>           Graphics quality: low, medium (default), high
   --weather <w>           overcast, rain, storm or clear (default: seeded wave 1 roll)

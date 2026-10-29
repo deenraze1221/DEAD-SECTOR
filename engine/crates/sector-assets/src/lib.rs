@@ -2,6 +2,7 @@
 //! Game-specific file formats live in the game crates and convert into these.
 
 pub mod color;
+pub mod modular;
 pub mod rng;
 pub mod scene;
 

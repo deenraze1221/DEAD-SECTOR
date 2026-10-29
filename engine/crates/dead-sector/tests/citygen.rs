@@ -80,7 +80,7 @@ fn layout_is_pinned_for_a_known_seed() {
     let fingerprint = kinds.join(",");
     let expected = include_str!("citygen_seed7.txt").trim();
     assert_eq!(fingerprint, expected, "seed 7 layout changed");
-    assert_eq!((report.interiors.furniture, city.instance_count()), (1291, 65_708));
+    assert_eq!((report.interiors.furniture, city.instance_count()), (1819, 77_675));
     let pinned: Vec<usize> = (0..PLOTS).filter(|&p| report.layout.pinned[p]).collect();
     // No shared object reaches into a plot's core in the exported city, so only the fixed plots stay.
     assert_eq!(pinned, [0, 9, 44, 45, 54, 55, 90, 99]);
@@ -114,7 +114,11 @@ fn fixed_plots_keep_their_buildings_and_the_store() {
             if *pinned {
                 assert_eq!(report.layout.source_for[plot], plot);
                 let original = source.buildings.iter().find(|o| plot_at(o.cx, o.cz) == Some(plot)).unwrap();
-                assert_eq!(b, original, "seed {seed} plot {plot}");
+                // Same building; only the height follows its modular storeys (the store is untouched).
+                let floors = report.buildings.plans.iter().find(|p| p.building == b.id).map(|p| p.floors);
+                let h = floors.map_or(original.h, |f| f as f32 * dead_sector::buildings::STOREY);
+                assert_eq!(*b, dead_sector::city::Building { h, ..original.clone() }, "seed {seed} plot {plot}");
+                assert_eq!(floors.is_none(), b.kind == "grocery");
             }
         }
         // The store keeps its exported interior and partitions untouched.
@@ -264,7 +268,9 @@ fn furniture_stays_inside_its_room() {
             let building = building_of(&id);
             let union = boxes.iter().skip(1).fold(boxes[0], |u, b| u.union(b));
             let inside = report.interiors.rooms.iter().filter(|r| r.building == building).any(|r| {
-                union.min.x >= r.min_x - 1e-3
+                union.min.y >= r.floor_y - 1e-3
+                    && union.max.y <= r.floor_y + 3.2
+                    && union.min.x >= r.min_x - 1e-3
                     && union.max.x <= r.max_x + 1e-3
                     && union.min.z >= r.min_z - 1e-3
                     && union.max.z <= r.max_z + 1e-3
@@ -272,7 +278,6 @@ fn furniture_stays_inside_its_room() {
             assert!(inside, "seed {seed}: {id} outside its rooms");
             let b = city.buildings.iter().find(|b| b.id == building).unwrap();
             assert_ne!(b.kind, "grocery");
-            assert!(union.min.y >= -1e-3 && union.max.y <= 3.2, "{id} height {union:?}");
         }
     }
 }

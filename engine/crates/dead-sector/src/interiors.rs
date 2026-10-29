@@ -7,8 +7,10 @@
 //! An item is placed against a room wall only where its padded footprint
 //! misses every placed item and every doorway/corridor box.
 
-use crate::city::{City, Collider, Owner};
+use crate::buildings::{Plan, STOREY};
+use crate::city::{City, Owner};
 use crate::citygen::{Aabb, matrix};
+use crate::emit::Emitter;
 use glam::{Mat4, Vec3};
 use sector_assets::color::parse_hex_color;
 use sector_assets::rng::Rng;
@@ -113,6 +115,8 @@ impl Library {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Room {
     pub building: i64,
+    /// Floor height of the room's storey.
+    pub floor_y: f32,
     pub min_x: f32,
     pub max_x: f32,
     pub min_z: f32,
@@ -142,15 +146,18 @@ struct Builder<'a> {
     rng: Rng,
     unit_box: usize,
     plaster: usize,
-    /// Batch index of each (geometry, materials) for new instances.
-    fresh: HashMap<(usize, Vec<usize>), usize>,
+    emit: &'a mut Emitter,
+    /// Stairwells and doorways: partitions are cut around them.
+    keepouts: Vec<Aabb>,
     occupied: Vec<Aabb>,
     reserved: Vec<Aabb>,
     report: Report,
 }
 
-/// Replaces every interior except the store's with a seeded one.
-pub fn rebuild(city: &mut City, library: &Library, seed: u64) -> Report {
+/// Replaces every interior except the store's with a seeded one: the ground
+/// floor gets a floor plan with partitions, upper floors (from `plans`) are
+/// furnished as open-plan rooms around the stairwell.
+pub fn rebuild(city: &mut City, library: &Library, seed: u64, emit: &mut Emitter, plans: &[Plan]) -> Report {
     let unit_box = city.geometries.iter().position(|g| g.position.len() == 72 && g.index.len() == 36).unwrap_or(0);
     let plaster_color = parse_hex_color("#a6a58c").unwrap();
     let plaster = city.materials.iter().position(|m| m.color == plaster_color).unwrap_or(0);
@@ -163,13 +170,15 @@ pub fn rebuild(city: &mut City, library: &Library, seed: u64) -> Report {
         rng: Rng::new(seed ^ 0x524f_4f4d),
         unit_box,
         plaster,
-        fresh: HashMap::new(),
+        emit,
+        keepouts: Vec::new(),
         occupied: Vec::new(),
         reserved: Vec::new(),
         report: Report::default(),
     };
     for b in buildings.iter().filter(|b| b.kind != "grocery") {
-        builder.building(b);
+        let plan = plans.iter().find(|p| p.building == b.id);
+        builder.building(b, plan);
     }
     builder.report
 }
@@ -217,9 +226,11 @@ fn remove_generated_content(city: &mut City) {
 }
 
 impl Builder<'_> {
-    fn building(&mut self, b: &crate::city::Building) {
+    fn building(&mut self, b: &crate::city::Building, plan_of: Option<&Plan>) {
         self.occupied.clear();
         self.reserved.clear();
+        self.keepouts = plan_of.map(|p| p.keepouts(0)).unwrap_or_default();
+        self.reserved.extend(self.keepouts.iter().copied());
         let id = b.id;
         let left = b.x - b.w / 2.0 + 0.3;
         let right = b.x + b.w / 2.0 - 0.3;
@@ -229,6 +240,7 @@ impl Builder<'_> {
         self.report.floorplans.push((id, plan));
         let room = |min_x: f32, min_z: f32, w: f32, d: f32| Room {
             building: id,
+            floor_y: 0.0,
             min_x,
             max_x: min_x + w,
             min_z,
@@ -293,6 +305,32 @@ impl Builder<'_> {
         }
         self.report.reserved.extend(self.reserved.iter().map(|r| (id, *r)));
         self.report.footprints.extend(self.occupied.iter().map(|r| (id, *r)));
+
+        // Upper floors: one open room each, lightly furnished around the
+        // stairwell (a short program keeps the instance count down).
+        let Some(plan_of) = plan_of else { return };
+        let upper: &[&str] = if residential {
+            &["bed", "sofa"]
+        } else if service {
+            &["shelf", "workbench"]
+        } else {
+            &["desk", "shelf"]
+        };
+        for floor in 1..plan_of.floors {
+            self.occupied.clear();
+            self.reserved = plan_of.keepouts(floor);
+            let r = Room { floor_y: floor as f32 * STOREY, ..room(left, back, right - left, front - back) };
+            self.report.rooms.push(r);
+            for kind in upper {
+                for _ in 0..PLACE_ATTEMPTS {
+                    if self.place(kind, &r) {
+                        break;
+                    }
+                }
+            }
+            self.report.reserved.extend(self.reserved.iter().map(|r| (id, *r)));
+            self.report.footprints.extend(self.occupied.iter().map(|r| (id, *r)));
+        }
     }
 
     /// One attempt to put a `kind` item against a wall of `room`.
@@ -315,15 +353,16 @@ impl Builder<'_> {
             2 => z = room.max_z - sz / 2.0 - 0.12,
             _ => x = room.max_x - sx / 2.0 - 0.12,
         }
+        let y = room.floor_y;
         let footprint = Aabb::new(
-            Vec3::new(x - sx / 2.0 - 0.08, 0.0, z - sz / 2.0 - 0.08),
-            Vec3::new(x + sx / 2.0 + 0.08, 3.0, z + sz / 2.0 + 0.08),
+            Vec3::new(x - sx / 2.0 - 0.08, y, z - sz / 2.0 - 0.08),
+            Vec3::new(x + sx / 2.0 + 0.08, y + 3.0, z + sz / 2.0 + 0.08),
         );
         if self.blocked(&footprint) {
             return false;
         }
         self.occupied.push(footprint);
-        let anchor = Mat4::from_translation(Vec3::new(x, 0.0, z)) * Mat4::from_rotation_y(yaw);
+        let anchor = Mat4::from_translation(Vec3::new(x, y, z)) * Mat4::from_rotation_y(yaw);
         self.instantiate(prefab, &anchor, room.building);
         if ["desk", "table", "workbench", "counter"].contains(&kind) && library.get("chair").is_some() {
             let seat = anchor.transform_point3(Vec3::new(0.0, 0.0, prefab.d / 2.0 + 0.52));
@@ -338,8 +377,8 @@ impl Builder<'_> {
         let prefab = &prefabs[self.rng.index(prefabs.len())];
         let (sx, sz) = if yaw.sin().abs() > 0.5 { (prefab.d, prefab.w) } else { (prefab.w, prefab.d) };
         let footprint = Aabb::new(
-            Vec3::new(point.x - sx / 2.0 - 0.06, 0.0, point.z - sz / 2.0 - 0.06),
-            Vec3::new(point.x + sx / 2.0 + 0.06, 3.0, point.z + sz / 2.0 + 0.06),
+            Vec3::new(point.x - sx / 2.0 - 0.06, point.y, point.z - sz / 2.0 - 0.06),
+            Vec3::new(point.x + sx / 2.0 + 0.06, point.y + 3.0, point.z + sz / 2.0 + 0.06),
         );
         if footprint.min.x < room.min_x + 0.08
             || footprint.max.x > room.max_x - 0.08
@@ -369,52 +408,51 @@ impl Builder<'_> {
         self.report.furniture += 1;
     }
 
-    /// A plaster partition with its collider; skipped when degenerate.
+    /// A plaster partition with its collider, cut around stairwells and
+    /// doorways; pieces that end up degenerate are skipped.
     fn wall(&mut self, x: f32, z: f32, w: f32, d: f32, building: i64) {
-        if w <= 0.01 || d <= 0.01 {
-            return;
+        let whole =
+            Aabb::new(Vec3::new(x - w / 2.0, 0.0, z - d / 2.0), Vec3::new(x + w / 2.0, WALL_HEIGHT, z + d / 2.0));
+        for piece in cut(whole, &self.keepouts) {
+            let size = piece.size();
+            if size.x <= 0.01 || size.z <= 0.01 {
+                continue;
+            }
+            let t = Mat4::from_translation(piece.center()) * Mat4::from_scale(size);
+            let owner = Owner::Str(format!("partition-{building}"));
+            let (unit_box, plaster) = (self.unit_box, self.plaster);
+            self.emit.instance(self.city, (unit_box, &[plaster]), t, [1.0; 3], &owner, "fresh");
+            self.emit.collider(self.city, piece, "partition", Owner::Int(building));
         }
-        let t =
-            Mat4::from_translation(Vec3::new(x, WALL_HEIGHT / 2.0, z)) * Mat4::from_scale(Vec3::new(w, WALL_HEIGHT, d));
-        let owner = Owner::Str(format!("partition-{building}"));
-        self.append(self.unit_box, &[self.plaster], t, [1.0; 3], &owner);
-        let b = Aabb::new(Vec3::new(x - w / 2.0, 0.0, z - d / 2.0), Vec3::new(x + w / 2.0, WALL_HEIGHT, z + d / 2.0));
-        self.collider(b, "partition", Owner::Int(building));
     }
 
-    /// Adds an instance to the shared batch for its geometry and materials.
     fn append(&mut self, geometry: usize, materials: &[usize], t: Mat4, color: [f32; 3], owner: &Owner) {
-        let key = (geometry, materials.to_vec());
-        let batches = &mut self.city.batches;
-        let index = *self.fresh.entry(key).or_insert_with(|| {
-            batches.push(crate::city::Batch {
-                name: format!("generated/{geometry}"),
-                geometry,
-                materials: materials.to_vec(),
-                transforms: Vec::new(),
-                colors: Vec::new(),
-                owners: Vec::new(),
-                roles: Vec::new(),
-            });
-            batches.len() - 1
-        });
-        let batch = &mut batches[index];
-        batch.transforms.push(t.to_cols_array());
-        batch.colors.extend_from_slice(&color);
-        batch.owners.push(Some(owner.clone()));
-        batch.roles.push("fresh".to_string());
+        self.emit.instance(self.city, (geometry, materials), t, color, owner, "fresh");
     }
 
     fn collider(&mut self, b: Aabb, kind: &str, owner: Owner) {
-        self.city.colliders.push(Collider {
-            min_x: b.min.x,
-            max_x: b.max.x,
-            min_y: b.min.y,
-            max_y: b.max.y,
-            min_z: b.min.z,
-            max_z: b.max.z,
-            kind: kind.to_string(),
-            owner: Some(owner),
-        });
+        self.emit.collider(self.city, b, kind, owner);
     }
+}
+
+/// `wall` minus `keepouts`, cut along its long axis.
+fn cut(wall: Aabb, keepouts: &[Aabb]) -> Vec<Aabb> {
+    let axis = if wall.size().x >= wall.size().z { 0 } else { 2 };
+    let mut spans = vec![(wall.min[axis], wall.max[axis])];
+    for k in keepouts.iter().filter(|k| k.intersects(&wall)) {
+        spans = spans
+            .into_iter()
+            .flat_map(|(a, b)| [(a, b.min(k.min[axis])), (a.max(k.max[axis]), b)])
+            .filter(|(a, b)| b > a)
+            .collect();
+    }
+    spans
+        .into_iter()
+        .map(|(a, b)| {
+            let mut piece = wall;
+            piece.min[axis] = a;
+            piece.max[axis] = b;
+            piece
+        })
+        .collect()
 }

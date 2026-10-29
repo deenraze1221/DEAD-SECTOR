@@ -1,4 +1,4 @@
-//! Dead Sector — Rust engine, stage 4: walk the exported (or seeded) city with Godot's look.
+//! Dead Sector — Rust engine, stage 5: walk the exported city, or a seeded one with modular buildings.
 //!
 //! Window mode: free-fly camera over the static city.
 //! `--screenshot <png>` / `--bench <frames>`: offscreen, no window.
@@ -43,9 +43,11 @@ fn load(options: &Options) -> Result<LoadedCity> {
     if let Some(seed) = options.seed {
         let report = citygen::generate(&mut city, seed);
         log::info!(
-            "seed {seed}: {} plots moved, {} pinned, {} rooms, {} furniture items in {:.0} ms",
+            "seed {seed}: {} plots moved, {} pinned, {} storeys from {} module pieces, {} rooms, {} furniture items in {:.0} ms",
             report.layout.moved_plots(),
             report.layout.pinned.iter().filter(|p| **p).count(),
+            report.buildings.plans.iter().map(|p| p.floors).sum::<u32>(),
+            report.buildings.pieces,
             report.interiors.rooms.len(),
             report.interiors.furniture,
             report.millis
