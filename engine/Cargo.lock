@@ -418,6 +418,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f27ae1dd37df86211c42e150270f82743308803d90a6f6e6651cd730d5e1732f"
 
 [[package]]
+name = "dead-sector"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "env_logger",
+ "glam",
+ "image",
+ "log",
+ "naga",
+ "sector-assets",
+ "sector-render",
+ "serde",
+ "serde_json",
+ "wgpu",
+ "winit",
+]
+
+[[package]]
 name = "defmt"
 version = "1.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -493,46 +511,6 @@ name = "dpi"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d8b14ccef22fc6f5a8f4d7d768562a182c04ce9a3b3157b91390b52ddfdf1a76"
-
-[[package]]
-name = "ds-app"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "ds-assets",
- "ds-render",
- "env_logger",
- "glam",
- "image",
- "log",
- "wgpu",
- "winit",
-]
-
-[[package]]
-name = "ds-assets"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "image",
- "serde",
- "serde_json",
-]
-
-[[package]]
-name = "ds-render"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "bytemuck",
- "ds-assets",
- "glam",
- "log",
- "naga",
- "pollster",
- "wgpu",
-]
 
 [[package]]
 name = "env_filter"
@@ -1828,6 +1806,29 @@ dependencies = [
  "memmap2",
  "smithay-client-toolkit",
  "tiny-skia",
+]
+
+[[package]]
+name = "sector-assets"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "image",
+]
+
+[[package]]
+name = "sector-render"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytemuck",
+ "glam",
+ "log",
+ "naga",
+ "pollster",
+ "sector-assets",
+ "wgpu",
 ]
 
 [[package]]

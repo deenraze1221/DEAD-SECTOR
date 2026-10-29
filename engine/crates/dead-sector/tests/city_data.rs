@@ -1,0 +1,99 @@
+//! Checks the loader against the real exported city. Expected numbers were
+//! counted independently from `godot/assets/city.json` with Python.
+
+use dead_sector::city::City;
+use dead_sector::content::{SHADING_POWERED, build_scene, load_textures, locate_assets};
+use sector_assets::PassKind;
+use std::path::PathBuf;
+use std::sync::OnceLock;
+
+fn assets_dir() -> PathBuf {
+    let checkout = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../../godot/assets");
+    locate_assets(Some(&checkout)).expect("godot/assets/city.json must exist in the checkout")
+}
+
+fn city() -> &'static City {
+    static CITY: OnceLock<City> = OnceLock::new();
+    CITY.get_or_init(|| City::load(&assets_dir().join("city.json")).expect("city.json loads and validates"))
+}
+
+#[test]
+fn counts_match_export() {
+    let city = city();
+    assert_eq!(city.version, 1);
+    assert_eq!(city.seed, 42);
+    assert_eq!(city.geometries.len(), 318);
+    assert_eq!(city.materials.len(), 189);
+    assert_eq!(city.batches.len(), 313);
+    assert_eq!(city.instance_count(), 63_969);
+    assert_eq!(city.colliders.len(), 7_268);
+    assert_eq!((city.spawn.x, city.spawn.y, city.spawn.z), (10.35, 0.0, 17.1));
+    assert_eq!(city.buildings.len(), 100);
+    assert_eq!(city.source_assets.len(), 2608);
+    assert_eq!(city.lamps().count(), 106);
+    assert_eq!(city.lamps().next(), Some([-116.35, 0.0, -84.0]));
+    assert_eq!((city.terminal.x, city.terminal.z), (7.25, 10.9));
+}
+
+#[test]
+fn scene_buffers_cover_every_instance_and_triangle() {
+    let scene = build_scene(city());
+    assert_eq!(scene.vertices.len(), 104_312);
+    assert_eq!(scene.indices.len(), 114_945);
+    assert_eq!(scene.instances.len(), 63_969);
+    // No batch in this export uses material groups, so there is one draw per batch.
+    assert_eq!(scene.draws.len(), 313);
+    assert_eq!(scene.triangles_per_frame(), 864_760);
+    let drawn: u32 = scene.draws.iter().map(|d| d.instance_count).sum();
+    assert_eq!(drawn, 63_969);
+
+    let passes = |kind| scene.materials.iter().filter(|m| m.pass == kind).count();
+    assert_eq!(passes(PassKind::Transparent), 1);
+    assert_eq!(passes(PassKind::OpaqueDoubleSided), 1);
+    // 41 unlit materials, one of them the transparent glass.
+    assert_eq!(scene.materials.iter().filter(|m| m.shading == SHADING_POWERED).count(), 40);
+    assert_eq!(scene.materials.iter().filter(|m| (1..SHADING_POWERED).contains(&m.shading)).count(), 11);
+    assert!(
+        scene
+            .materials
+            .iter()
+            .filter(|m| (1..SHADING_POWERED).contains(&m.shading))
+            .all(|m| m.roughness == 0.92 && m.metallic == 0.0)
+    );
+
+    // Every draw stays inside the shared buffers.
+    for d in &scene.draws {
+        let end = (d.first_index + d.index_count) as usize;
+        assert!(end <= scene.indices.len());
+        let max = scene.indices[d.first_index as usize..end].iter().max().unwrap();
+        assert!((d.base_vertex as usize + *max as usize) < scene.vertices.len());
+        assert!((d.first_instance + d.instance_count) as usize <= scene.instances.len());
+    }
+}
+
+#[test]
+fn first_batch_keeps_transform_colour_and_material() {
+    let city = city();
+    let scene = build_scene(city);
+    let batch = &city.batches[0];
+    assert_eq!(batch.name, "city/box/industrialWall");
+    let draw = scene.draws.iter().find(|d| d.tag == 0).unwrap();
+    let first = scene.instances[draw.first_instance as usize];
+    assert_eq!(&first.model[12..15], &[-109.65, 1.56, -114.515]);
+    assert_eq!(first.color, [0.9, 0.87, 0.864, 1.0]);
+    // #786f60 in linear space.
+    let albedo = scene.materials[draw.material].albedo;
+    for (got, want) in albedo.iter().zip([0.18782, 0.15896, 0.11697, 1.0]) {
+        assert!((got - want).abs() < 1e-4, "{albedo:?}");
+    }
+}
+
+#[test]
+fn every_label_texture_loads() {
+    let textures = load_textures(city(), &assets_dir()).unwrap();
+    assert_eq!(textures.len(), 33);
+    for (i, image) in textures.iter().enumerate() {
+        assert_eq!(image.rgba.len(), (image.width * image.height * 4) as usize);
+        assert!(image.rgba.chunks(4).any(|p| p[3] > 0), "label {i} is fully transparent");
+    }
+}
