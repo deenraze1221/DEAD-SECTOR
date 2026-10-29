@@ -203,8 +203,9 @@ fn seeds_vary_storeys_and_add_no_draw_calls() {
     assert!(
         report.buildings.plans.iter().any(|p| p.floors >= 8) && report.buildings.plans.iter().any(|p| p.floors == 1)
     );
-    // Modules and furniture join existing batches; only the window glass adds one.
-    assert_eq!(city.batches.len(), exported().batches.len() + 1);
+    // Modules and furniture join existing batches; only the glass, stairs and
+    // roof materials (separate so they can take their own surface maps) add one each.
+    assert_eq!(city.batches.len(), exported().batches.len() + 3);
     let (draws, exported_draws) = (build_scene(city).draws.len(), build_scene(exported()).draws.len());
     assert!(draws <= exported_draws, "{draws} draws vs {exported_draws}");
 }

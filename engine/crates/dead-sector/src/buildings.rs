@@ -88,6 +88,7 @@ pub fn glass_material() -> Material {
         texture: None,
         surface: 0,
         glass: true,
+        name: Some("glass".to_string()),
     }
 }
 
@@ -111,8 +112,8 @@ impl Materials {
             floor: by_color("#9a9380"),
             glass: city.materials.iter().position(|m| m.glass).expect("glass material added"),
             wood: by_color("#806448"),
-            concrete: by_color("#8b8e7e"),
-            roof: by_color("#303c35"),
+            concrete: city.materials.iter().position(|m| m.name.as_deref() == Some("stairs")).unwrap_or(0),
+            roof: city.materials.iter().position(|m| m.name.as_deref() == Some("roof")).unwrap_or(0),
         }
     }
 }
@@ -121,6 +122,17 @@ impl Materials {
 pub fn rebuild(city: &mut City, emit: &mut Emitter, seed: u64) -> Report {
     if !city.materials.iter().any(|m| m.glass) {
         city.materials.push(glass_material());
+    }
+    // Stairs and roofs get their own named materials (concrete and dark
+    // roofing colours), so surface maps can be assigned to them separately.
+    for (name, hex) in [("stairs", "#8b8e7e"), ("roof", "#303c35")] {
+        if !city.materials.iter().any(|m| m.name.as_deref() == Some(name)) {
+            let color = parse_hex_color(hex).unwrap();
+            let base = city.materials.iter().find(|m| m.color == color && m.texture.is_none()).cloned();
+            let mut m = base.unwrap_or_else(glass_material);
+            m.name = Some(name.to_string());
+            city.materials.push(m);
+        }
     }
     let materials = Materials::find(city);
     let targets: Vec<usize> = (0..city.buildings.len()).filter(|&i| city.buildings[i].kind != STORE).collect();

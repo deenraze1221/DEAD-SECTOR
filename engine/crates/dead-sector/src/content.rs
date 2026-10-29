@@ -77,6 +77,10 @@ fn material(m: &crate::city::Material) -> MaterialParams {
         metallic: if m.surface > 0 { 0.0 } else { m.metalness },
         shading: if powered { SHADING_POWERED } else { m.surface },
         glass: m.glass,
+        // Assigned later from the material library (`surfaces.rs`).
+        surface_map: None,
+        tiling: 1.0,
+        surface_faces: sector_assets::scene::FACES_ALL,
     }
 }
 

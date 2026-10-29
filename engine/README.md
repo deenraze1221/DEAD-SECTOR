@@ -5,7 +5,11 @@ Windows); Dead Sector is its first game, migrated in stages from the Godot
 version. The HTML and Godot versions are not modified. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for what is engine and what is game.
 
-**Stage 5 (current):** the existing city with the Godot version's look,
+**Stage 6 (current):** PBR textures (colour, normal, AO, roughness) on roads,
+sidewalks, grass, brick and concrete walls, floors, roofs and stairs, from a
+data-driven material library (`assets/materials/library.json`).
+
+**Stage 5:** the existing city with the Godot version's look,
 cascaded sun shadows, local-light shadows, contact shadows and optional SSAO,
 a first-person player that walks, sprints and jumps with collision, and
 seeded city generation (`--seed N`): new plot layout, modular multi-storey
@@ -40,6 +44,8 @@ Options (`dead-sector --help`):
 | `--size 1920x1080` | Window / capture size |
 | `--no-vsync` | Uncapped FPS (use this to measure performance) |
 | `--camera x,y,z,yaw,pitch` | Start pose (metres, degrees; yaw 0 looks along −Z) |
+| `--no-textures` | Flat procedural surfaces (the look before stage 6) |
+| `--texture-size 512\|1024\|2048` | Largest material map side (default 2048) |
 | `--seed <n>` | Generate the city layout, modular buildings and interiors from a seed (default: the exported seed-42 city, unchanged) |
 | `--quality low\|medium\|high` | Graphics quality (default medium, as in Godot) |
 | `--weather overcast\|rain\|storm\|clear` | Weather (default: the seeded wave 1 roll) |

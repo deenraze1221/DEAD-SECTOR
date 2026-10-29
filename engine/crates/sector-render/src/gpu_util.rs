@@ -17,7 +17,7 @@ pub(crate) fn fragment_uniform_entry(binding: u32) -> wgpu::BindGroupLayoutEntry
     uniform_entry(binding, wgpu::ShaderStages::FRAGMENT, false)
 }
 
-fn texture_of(
+pub(crate) fn texture_of(
     binding: u32,
     sample_type: wgpu::TextureSampleType,
     dimension: wgpu::TextureViewDimension,

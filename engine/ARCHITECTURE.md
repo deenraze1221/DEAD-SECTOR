@@ -6,7 +6,7 @@ game. Everything lives in `engine/` for now; the original Godot project
 
 ```
 engine/crates/
-  sector-assets   (engine)  scene data, images, colour helpers, seeded RNG, building modules
+  sector-assets   (engine)  scene data, images, colour helpers, seeded RNG, building modules, material packs
   sector-render   (engine)  renderer: lighting, shadows, AO, post chain
   sector-physics  (engine)  static box world, grid broadphase, kinematic box mover
   dead-sector     (game)    city.json, city/building/interior generation, player, climate, lamps, look, surface hook, executable
@@ -28,6 +28,8 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | Camera | `sector-render::view::Camera` | Position, yaw/pitch, FOV, near/far, reversed-Z projection |
 | Lighting | `sector-render::Lighting`, `PointLight` | Sun, ambient, exponential fog, sky gradient; up to 16 point lights per frame with Godot's omni falloff |
 | Shading | `scene.wgsl` | Burley diffuse, GGX specular, sky reflections, fog, HDR output |
+| Material packs | `sector-assets::materials` | `.smat` files: colour (BC1 sRGB), tangent normal XY (BC5, DirectX +Y = +v) and AO + roughness (BC5), each with a full mip chain; encode (mips in linear light, normals renormalised) and decode (fallback) |
+| Surface maps | `RendererConfig::surface_maps`, `MaterialParams::{surface_map, tiling, surface_faces}` | Any number of packs as three shared texture arrays (one layer each), 16× anisotropic trilinear sampler; world-space box projection on the face's dominant axis (no stretching on scaled instances), tangent frame from the projection, AO on indirect light only, face mask (up / down / sides). BC when the adapter has it, else decoded to ≤ 1024². `max_map_size` drops top mips. Shadows use the face normal |
 | Glass | `MaterialParams::glass` (transparent pass) | Front faces only (one layer per pane), Schlick-Fresnel opacity, reflections not dimmed by the blend, no screen-space occlusion from what is behind; like all transparent draws, not a shadow caster and not in the depth prepass |
 | Surface hook | `RendererConfig::surface_hook` | Game WGSL `surface_hook(shading, input)` changes albedo/roughness per material, with per-frame `frame.game` values |
 | Sun shadows | `shadows.rs`, `shadow_maps.rs` | Cascaded shadow maps, 1–4 cascades, 1024–4096 maps, distance, hard / PCF / soft filtering, texel-snapped stable cascades, per-cascade caster culling (instances fetched from a storage buffer by index) |
@@ -48,6 +50,8 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | `city.rs` | `godot/assets/city.json` format and validation, including owners, roles, collider kinds and asset bounds |
 | `citygen.rs` | Seeded plot layout (`city_generator.gd`) |
 | `buildings.rs` | Seeded modular buildings: storeys, facades, door, slabs, switchback stairwell with guard rails, roof |
+| `surfaces.rs` | Loads `engine/assets/materials/library.json` and the packs it names, and assigns them to city materials by colour or generated name |
+| `examples/import_materials.rs` | Converts PBR texture folders (colour, normal, ambient, specular) into `.smat` packs |
 | `emit.rs` | Adds generated instances to the existing batch with the same geometry and materials, and colliders |
 | `interiors.rs` | Seeded floor plans and furniture (`interior_layout.gd`), on every storey |
 | `player.rs` | First-person player with `player.gd`'s tuning on a fixed 60 Hz step; the city's collision world |
@@ -220,6 +224,40 @@ count does not grow.
 Seed 7: 81,023 instances (Stage 5: 77,675), one more batch (the glass).
 Software renderer frame time unchanged within noise (~502 → ~509 ms).
 
+## Textures and materials (Stage 6)
+
+The user's 12 PBR materials (2048², colour / normal / ambient / displacement /
+specular PNGs, 270 MB) were imported with `examples/import_materials.rs` into
+`engine/assets/materials/*.smat`: colour and normal at 2048², AO + roughness
+at 1024² (roughness = 0.95 − 0.45 × specular), full mip chains,
+block-compressed: 113 MB on disk, about 117 MB of VRAM. Displacement is not
+used. Normal maps are DirectX (Y−), measured from the data: the green channel
+correlates with the height gradient the same way as red. The shader keeps that
+convention (green follows +v); a GPU test checks that normals tilted towards
++v darken a wall lit from above and brighten it lit from below.
+
+`library.json` (data, not code) lists the packs with their tile size in
+metres and assigns them to city materials by exported colour or generated
+material name, with optional `tint` (how much the city's palette colour tints
+the texture) and `faces`. Current assignment: roads Asphalt (4 m),
+sidewalks TilesFloorSquare (2 m), yards Grass (3 m), industrial walls
+GrayBricks, market walls and brick RedBricks, residential walls WhiteBricks
+(2 m), civic walls ConcreteWall, concrete Concrete, plaster ConcreteWhite
+(3 m), interior floors TilesFloor (tops only: their undersides are ceilings),
+modular roofs ConcreteGray (tops only), modular stairs TilesFloorGray. The
+procedural brick, tile and wood patterns are skipped on textured surfaces;
+grime and wet asphalt still apply.
+
+Adding a material: put `Name/Name.png`, `Name_normal.png`,
+`Name_ambient.png`, `Name_specular.png` in a folder, run
+`cargo run --release -p dead-sector --example import_materials -- <folder> assets/materials`,
+then add it to `library.json` and assign it. No code changes.
+
+No draw calls are added: textured materials are the same materials. Seeded
+cities add two batches (named stairs and roof materials). `--no-textures`
+renders exactly as Stage 5.1 (pixel-identical to the baseline);
+`--texture-size 512|1024` uploads smaller mips.
+
 ## Planned engine systems (not built yet)
 
 These have no user in the code yet, so they will be added when a Dead Sector
@@ -236,6 +274,15 @@ stage needs them, not before:
   predicted on clients in the co-op stage.
 - **Audio** (sound effects, music, 3D sound, volume buses): audio stage.
 - **Mesh and animation import (glTF)**: weapons stage.
+
+## Limitations (Stage 6)
+
+- Box projection picks one axis per pixel: rounded props (cylinders,
+  spheres) show seams where the axis changes, and textures do not follow
+  rotated surfaces' own orientation (fine for the city's axis-aligned boxes).
+- Displacement maps are ignored (no parallax or tessellation).
+- Without BC support the maps are decoded to at most 1024² (more memory).
+- 113 MB of packs are committed to the repository.
 
 ## Limitations (Stage 5.1)
 

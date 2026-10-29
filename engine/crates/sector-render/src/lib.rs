@@ -17,6 +17,7 @@ mod screen_space;
 pub mod settings;
 mod shadow_maps;
 mod shadows;
+mod surface_maps;
 pub mod view;
 
 pub use gpu::{Connection, backend_order, connect, request_device};
@@ -59,11 +60,20 @@ pub struct RendererConfig {
     /// WGSL defining `fn surface_hook(shading: u32, input: SurfaceInput) -> SurfaceOutput`.
     pub surface_hook: String,
     pub post: PostSettings,
+    /// Tiling material maps; `MaterialParams::surface_map` indexes this list.
+    pub surface_maps: std::sync::Arc<Vec<sector_assets::materials::MaterialPack>>,
+    /// Largest colour/normal map side to upload (smaller mips are used above it).
+    pub max_map_size: u32,
 }
 
 impl Default for RendererConfig {
     fn default() -> Self {
-        RendererConfig { surface_hook: DEFAULT_SURFACE_HOOK.to_string(), post: PostSettings::default() }
+        RendererConfig {
+            surface_hook: DEFAULT_SURFACE_HOOK.to_string(),
+            post: PostSettings::default(),
+            surface_maps: Default::default(),
+            max_map_size: 2048,
+        }
     }
 }
 
@@ -147,7 +157,22 @@ impl Renderer {
         textures: &[Image],
         config: &RendererConfig,
     ) -> Result<Self> {
-        let scene_pass = ScenePass::new(device, queue, scene, textures, &config.surface_hook)?;
+        let maps = surface_maps::SurfaceMaps::new(device, queue, &config.surface_maps, config.max_map_size)?;
+        if !config.surface_maps.is_empty() {
+            log::info!(
+                "surface maps: {} materials at {}²{}",
+                config.surface_maps.len(),
+                maps.size,
+                if maps.compressed { " (BC)" } else { " (decoded, no BC support)" }
+            );
+        }
+        let used = scene.materials.iter().filter_map(|m| m.surface_map).max();
+        anyhow::ensure!(
+            used.is_none_or(|l| (l as usize) < config.surface_maps.len()),
+            "a material uses surface map {used:?}, only {} given",
+            config.surface_maps.len()
+        );
+        let scene_pass = ScenePass::new(device, queue, scene, textures, &config.surface_hook, &maps)?;
         let shadow_maps =
             ShadowMaps::new(device, &scene_pass.depth_view_layout, MapConfig::new(&RenderSettings::default()));
         let no_occlusion =

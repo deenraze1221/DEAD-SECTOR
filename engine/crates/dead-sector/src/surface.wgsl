@@ -32,7 +32,9 @@ struct Surface {
 };
 
 // The world-space grids are evaluated unconditionally so fwidth() stays in uniform control flow.
-fn procedural_surface(kind: u32, tint: vec3<f32>, world: vec3<f32>, normal: vec3<f32>) -> Surface {
+// `textured`: the albedo and roughness already come from a surface map, so the
+// procedural patterns are skipped and only grime and wetness are applied.
+fn procedural_surface(kind: u32, tint: vec3<f32>, world: vec3<f32>, normal: vec3<f32>, textured: bool, roughness: f32) -> Surface {
     var p: vec2<f32>;
     if abs(normal.y) > 0.7 {
         p = world.xz;
@@ -42,6 +44,9 @@ fn procedural_surface(kind: u32, tint: vec3<f32>, world: vec3<f32>, normal: vec3
         p = vec2<f32>(world.x, world.y);
     }
     var detail = 0.97 + hash(floor(p * 12.0)) * 0.06;
+    if textured {
+        detail = 1.0;
+    }
 
     let row = floor(p.y / 0.25);
     let brick_cell = vec2<f32>((p.x + gmod(row, 2.0) * 0.3) / 0.6, p.y / 0.25);
@@ -49,19 +54,19 @@ fn procedural_surface(kind: u32, tint: vec3<f32>, world: vec3<f32>, normal: vec3
     let tile_cell = p * 0.8;
     let tile_width = max(fwidth(tile_cell), vec2<f32>(0.001));
 
-    if kind == 1u {
+    if kind == 1u && !textured {
         let brick = fract(brick_cell);
         let edge = min(brick, 1.0 - brick);
         let line = 1.0 - smoothstep(vec2<f32>(0.014, 0.025), vec2<f32>(0.014, 0.025) + brick_width, edge);
         let mortar = max(line.x, line.y);
         detail *= mix(0.88 + hash(floor(brick_cell)) * 0.15, 0.65, mortar);
     }
-    if kind == 3u {
+    if kind == 3u && !textured {
         let edge = min(fract(tile_cell), 1.0 - fract(tile_cell));
         let line = 1.0 - smoothstep(vec2<f32>(0.008), vec2<f32>(0.008) + tile_width, edge);
         detail *= mix(0.96, 0.72, max(line.x, line.y));
     }
-    if kind == 5u {
+    if kind == 5u && !textured {
         detail *= 0.94 + 0.06 * sin(p.x * 70.0 + sin(p.y * 3.0) * 2.0);
     }
     var base = tint * detail;
@@ -84,18 +89,19 @@ fn procedural_surface(kind: u32, tint: vec3<f32>, world: vec3<f32>, normal: vec3
 
     var out: Surface;
     out.albedo = base;
-    out.roughness = 0.92;
+    out.roughness = select(0.92, roughness, textured);
     if kind == 4u {
         let wetness = frame.game.x;
         out.albedo *= mix(1.0, 0.55, wetness);
-        out.roughness = mix(0.92, 0.2, wetness);
+        out.roughness = mix(out.roughness, 0.2, wetness);
     }
     return out;
 }
 
 fn surface_hook(shading: u32, input: SurfaceInput) -> SurfaceOutput {
     // Evaluated for every material so fwidth() stays in uniform control flow.
-    let procedural = procedural_surface(shading, input.tint, input.world, input.normal);
+    let textured = input.textured == 1u;
+    let procedural = procedural_surface(shading, input.tint, input.world, input.normal, textured, input.roughness);
     var out = SurfaceOutput(input.albedo, input.roughness);
     if shading > 0u && shading < SHADING_POWERED {
         out.albedo = procedural.albedo;

@@ -12,6 +12,7 @@ use dead_sector::citygen;
 use dead_sector::climate::{Environment, Weather};
 use dead_sector::content::{self, CITY_FILE, locate_assets};
 use dead_sector::frame::{CityLights, FrameData};
+use dead_sector::surfaces::{self, SurfaceLibrary};
 use glam::Vec3;
 use options::Options;
 use sector_assets::{Image, SceneBuffers};
@@ -26,12 +27,20 @@ pub struct LoadedCity {
     pub scene: SceneBuffers,
     pub textures: Vec<Image>,
     pub lights: CityLights,
+    /// Tiling surface materials (empty with `--no-textures` or when none are found).
+    pub surface_maps: std::sync::Arc<Vec<sector_assets::materials::MaterialPack>>,
+    pub texture_size: u32,
 }
 
 impl LoadedCity {
     /// A renderer for this city with Dead Sector's surface hook.
     pub fn renderer(&self, gpu: &sector_render::Connection, format: wgpu::TextureFormat) -> Result<Renderer> {
-        let config = RendererConfig { surface_hook: content::SURFACE_HOOK.to_string(), ..Default::default() };
+        let config = RendererConfig {
+            surface_hook: content::SURFACE_HOOK.to_string(),
+            surface_maps: self.surface_maps.clone(),
+            max_map_size: self.texture_size,
+            ..Default::default()
+        };
         Renderer::new(&gpu.device, &gpu.queue, format, &self.scene, &self.textures, &config)
     }
 }
@@ -55,7 +64,7 @@ fn load(options: &Options) -> Result<LoadedCity> {
         city.validate()?;
     }
     let parsed = started.elapsed();
-    let scene = content::build_scene(&city);
+    let mut scene = content::build_scene(&city);
     log::info!(
         "loaded {} in {:.0} ms (+{:.0} ms buffers): {} batches, {} instances, {} triangles/frame",
         assets.join(CITY_FILE).display(),
@@ -65,9 +74,35 @@ fn load(options: &Options) -> Result<LoadedCity> {
         scene.instances.len(),
         scene.triangles_per_frame(),
     );
+    let mut surface_maps = Vec::new();
+    if options.textures {
+        match surfaces::locate(&assets) {
+            Some(dir) => {
+                let started = Instant::now();
+                let library = SurfaceLibrary::load(&dir)?;
+                let assigned = library.apply(&city, &mut scene);
+                log::info!(
+                    "surface materials: {} packs from {} on {assigned} city materials in {:.0} ms",
+                    library.packs.len(),
+                    dir.display(),
+                    started.elapsed().as_secs_f64() * 1e3
+                );
+                surface_maps = library.packs;
+            }
+            None => log::warn!("no material library found (engine/assets/materials); using flat surfaces"),
+        }
+    }
     let textures = content::load_textures(&city, &assets)?;
     let lights = CityLights::new(&city);
-    Ok(LoadedCity { assets, city, scene, textures, lights })
+    Ok(LoadedCity {
+        assets,
+        city,
+        scene,
+        textures,
+        lights,
+        surface_maps: std::sync::Arc::new(surface_maps),
+        texture_size: options.texture_size,
+    })
 }
 
 /// Starting camera: the player's spawn point and eye height, or `--camera`.

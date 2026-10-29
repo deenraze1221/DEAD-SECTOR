@@ -12,3 +12,4 @@ pub mod interiors;
 pub mod lamps;
 pub mod look;
 pub mod player;
+pub mod surfaces;

@@ -54,6 +54,15 @@ pub struct MaterialParams {
     pub metallic: f32,
     /// Game-defined shading id passed to the surface hook; 0 means standard.
     pub shading: u32,
+    /// Layer of the renderer's tiling material maps (see
+    /// `sector_assets::materials`), projected in world space; the albedo
+    /// above multiplies the map's colour.
+    pub surface_map: Option<u32>,
+    /// World metres covered by one repeat of the surface map.
+    pub tiling: f32,
+    /// Which faces get the surface map: [`FACES_UP`], [`FACES_DOWN`] and/or
+    /// [`FACES_SIDE`] by the face's dominant axis (e.g. floors but not ceilings).
+    pub surface_faces: u32,
     /// Window glass (with [`PassKind::Transparent`]): front faces only,
     /// Fresnel-weighted opacity, reflections not dimmed by the blend, and no
     /// screen-space occlusion from the surfaces behind it.
@@ -72,10 +81,21 @@ impl Default for MaterialParams {
             roughness: 1.0,
             metallic: 0.0,
             shading: 0,
+            surface_map: None,
+            tiling: 1.0,
+            surface_faces: FACES_ALL,
             glass: false,
         }
     }
 }
+
+/// Faces whose normal points mostly up (+Y).
+pub const FACES_UP: u32 = 1;
+/// Faces whose normal points mostly down (−Y).
+pub const FACES_DOWN: u32 = 2;
+/// Faces whose normal is mostly horizontal.
+pub const FACES_SIDE: u32 = 4;
+pub const FACES_ALL: u32 = FACES_UP | FACES_DOWN | FACES_SIDE;
 
 /// A mesh stored in the shared buffers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

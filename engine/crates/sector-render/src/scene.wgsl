@@ -44,9 +44,11 @@ struct Frame {
 struct Material {
     albedo: vec4<f32>,
     emission: vec4<f32>,
-    // x = roughness, y = metallic.
+    // x = roughness, y = metallic, z = surface-map repeats per metre.
     pbr: vec4<f32>,
-    // x = flags (FLAG_*), y = game shading id for the surface hook.
+    // x = flags (FLAG_*), y = game shading id for the surface hook,
+    // z = surface-map layer + 1 (0 = none), w = faces that get it
+    // (1 = up, 2 = down, 4 = sides).
     flags: vec4<u32>,
 };
 
@@ -64,6 +66,8 @@ struct SurfaceInput {
     roughness: f32,
     world: vec3<f32>,
     normal: vec3<f32>,
+    // 1 when albedo, roughness and normal come from a surface map.
+    textured: u32,
 };
 
 struct SurfaceOutput {
@@ -89,6 +93,12 @@ struct Shadows {
 @group(1) @binding(0) var<uniform> material: Material;
 @group(1) @binding(1) var label_texture: texture_2d<f32>;
 @group(1) @binding(2) var label_sampler: sampler;
+// Tiling material maps, one layer per material pack (colour sRGB, normal XY
+// in the DirectX convention, R = ambient occlusion, G = roughness).
+@group(1) @binding(3) var albedo_maps: texture_2d_array<f32>;
+@group(1) @binding(4) var normal_maps: texture_2d_array<f32>;
+@group(1) @binding(5) var orm_maps: texture_2d_array<f32>;
+@group(1) @binding(6) var map_sampler: sampler;
 @group(2) @binding(0) var<uniform> shadows: Shadows;
 @group(2) @binding(1) var sun_shadow_map: texture_depth_2d_array;
 @group(2) @binding(2) var local_shadow_map: texture_depth_2d_array;
@@ -324,9 +334,56 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
         n = -n;
     }
 
+    // Surface maps: world-space box projection on the face's dominant axis,
+    // so scaled box instances tile at a fixed size without stretching.
+    let geometric = n;
+    let layer = material.flags.z;
+    var map_albedo = vec3<f32>(1.0);
+    var map_roughness = material.pbr.x;
+    var map_ao = 1.0;
+    var textured = 0u;
+    if layer > 0u {
+        let a = abs(n);
+        let w = in.world * material.pbr.z;
+        // tu / tv: world directions of increasing u / v (v runs down the image).
+        var uv = vec2<f32>(w.x, -w.y);
+        var tu = vec3<f32>(1.0, 0.0, 0.0);
+        var tv = vec3<f32>(0.0, -1.0, 0.0);
+        if a.y >= a.x && a.y >= a.z {
+            uv = w.xz;
+            tv = vec3<f32>(0.0, 0.0, 1.0);
+        } else if a.x >= a.z {
+            uv = vec2<f32>(w.z, -w.y);
+            tu = vec3<f32>(0.0, 0.0, 1.0);
+        }
+        let l = i32(layer - 1u);
+        // Sampled for every face (uniform control flow), applied only to the masked ones.
+        let albedo_texel = textureSample(albedo_maps, map_sampler, uv, l).rgb;
+        let xy = textureSample(normal_maps, map_sampler, uv, l).rg * 2.0 - 1.0;
+        let orm = textureSample(orm_maps, map_sampler, uv, l).rg;
+        let face = select(4u, select(2u, 1u, n.y > 0.0), a.y >= a.x && a.y >= a.z);
+        if (material.flags.w & face) != 0u {
+            // DirectX normals: +Y follows +v, which is exactly tv.
+            let t = normalize(tu - n * dot(n, tu));
+            let b = normalize(tv - n * dot(n, tv));
+            n = normalize(t * xy.x + b * xy.y + n * sqrt(max(1.0 - dot(xy, xy), 0.0)));
+            map_albedo = albedo_texel;
+            map_ao = orm.r;
+            map_roughness = orm.g;
+            textured = 1u;
+        }
+    }
+
     let surface = surface_hook(
         material.flags.y,
-        SurfaceInput(material.albedo.rgb * in.color * texel.rgb, material.albedo.rgb * in.color, material.pbr.x, in.world, n),
+        SurfaceInput(
+            material.albedo.rgb * in.color * texel.rgb * map_albedo,
+            material.albedo.rgb * in.color * map_albedo,
+            map_roughness,
+            in.world,
+            n,
+            textured,
+        ),
     );
     let albedo = surface.albedo;
     let roughness = surface.roughness;
@@ -343,7 +400,8 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
         if shadows.local.z > 0.5 && !glass {
             screen_occlusion = textureLoad(occlusion_map, vec2<i32>(in.clip.xy), 0).rg;
         }
-        let sun_visibility = sun_shadow(in.world, n, in.clip.xy) * screen_occlusion.g;
+        // Shadow lookups use the face normal; normal maps only change shading.
+        let sun_visibility = sun_shadow(in.world, geometric, in.clip.xy) * screen_occlusion.g;
         let sun = direct_light(n, v, frame.sun_dir.xyz, frame.sun_color.rgb * sun_visibility, roughness, f0, metallic);
         var diffuse = sun[0];
         var specular = sun[1];
@@ -358,7 +416,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
             attenuation = max(1.0 - attenuation, 0.0);
             attenuation = attenuation * attenuation / max(distance, 0.0001);
             if attenuation > 0.0 && light.shadow.x >= 0.0 {
-                attenuation *= local_shadow(u32(light.shadow.x), light.position_range.xyz, in.world, n, in.clip.xy);
+                attenuation *= local_shadow(u32(light.shadow.x), light.position_range.xyz, in.world, geometric, in.clip.xy);
             }
             if attenuation > 0.0 {
                 let lit = direct_light(n, v, to_light / distance, light.color.rgb * attenuation, roughness, f0, metallic);
@@ -370,7 +428,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
         // Rough surfaces see a blurred sky: fade the reflection towards the horizon colour.
         let reflected = mix(sky_color(reflect(-v, n)), frame.sky_horizon.rgb, roughness);
         // Ambient occlusion darkens only indirect light, as in Godot (ao_light_affect 0).
-        let ao = screen_occlusion.r;
+        let ao = screen_occlusion.r * map_ao;
         specular += reflected * env_brdf(f0, roughness, n_dot_v) * ao;
         if glass {
             // More opaque at grazing angles; the reflection is divided by the

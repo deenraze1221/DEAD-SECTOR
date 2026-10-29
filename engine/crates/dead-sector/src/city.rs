@@ -175,6 +175,10 @@ pub struct Material {
     /// Window glass (generated cities only; never in the export).
     #[serde(default)]
     pub glass: bool,
+    /// Name of a material the generator added ("glass", "roof", …), so
+    /// surface maps can be assigned to it; exported materials have none.
+    #[serde(default)]
+    pub name: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

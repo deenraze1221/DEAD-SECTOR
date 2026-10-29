@@ -6,7 +6,7 @@ use sector_render::{ContactShadows, RenderSettings, ShadowFilter, Ssao, SunShado
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Sector Engine, stage 5.1)
+DEAD SECTOR (Sector Engine, stage 6)
 
 USAGE: dead-sector [options]
 
@@ -23,6 +23,8 @@ USAGE: dead-sector [options]
   --night                 Night lighting (default: day, as in wave 1)
   --blackout <0-3>        Cut power to one city quadrant
   --no-fog                Disable fog and mist (debug view of the whole city)
+  --no-textures           Flat procedural surfaces (the look before stage 6)
+  --texture-size <px>     Largest material map side: 512, 1024 or 2048 (default 2048)
   --time <seconds>        Fixed effect time for screenshots (mist, rain, grain)
 
 Shadow and occlusion overrides (on top of --quality):
@@ -51,6 +53,8 @@ pub struct Options {
     pub camera: Option<[f32; 5]>,
     pub vsync: bool,
     pub fog: bool,
+    pub textures: bool,
+    pub texture_size: u32,
     pub quality: Quality,
     pub seed: Option<u64>,
     pub weather: Option<WeatherKind>,
@@ -79,6 +83,8 @@ impl Default for Options {
             camera: None,
             vsync: true,
             fog: true,
+            textures: true,
+            texture_size: 2048,
             quality: Quality::Medium,
             seed: None,
             weather: None,
@@ -115,6 +121,14 @@ impl Options {
                 "--camera" => options.camera = Some(parse_camera(&value()?)?),
                 "--no-vsync" => options.vsync = false,
                 "--no-fog" => options.fog = false,
+                "--no-textures" => options.textures = false,
+                "--texture-size" => {
+                    let size: u32 = value()?.parse().context("--texture-size expects 512, 1024 or 2048")?;
+                    if ![512, 1024, 2048].contains(&size) {
+                        bail!("--texture-size expects 512, 1024 or 2048");
+                    }
+                    options.texture_size = size;
+                }
                 "--quality" => {
                     let text = value()?;
                     options.quality = Quality::parse(&text).with_context(|| format!("unknown quality {text:?}"))?;
@@ -278,6 +292,9 @@ mod tests {
             "1,2,3,90,-10",
             "--no-vsync",
             "--no-fog",
+            "--no-textures",
+            "--texture-size",
+            "1024",
             "--quality",
             "high",
             "--seed",
@@ -303,6 +320,8 @@ mod tests {
         assert_eq!(options.camera, Some([1.0, 2.0, 3.0, 90.0, -10.0]));
         assert!(!options.vsync);
         assert!(!options.fog);
+        assert!(!options.textures);
+        assert_eq!(options.texture_size, 1024);
         assert_eq!(options.quality, Quality::High);
         assert_eq!(options.seed, Some(1234));
         assert_eq!(options.weather, Some(WeatherKind::Storm));
@@ -329,6 +348,7 @@ mod tests {
         assert!(parse(&["--bench", "0"]).is_err());
         assert!(parse(&["--assets"]).is_err());
         assert!(parse(&["--bogus"]).is_err());
+        assert!(parse(&["--texture-size", "300"]).is_err());
         assert!(parse(&["--seed", "-1"]).is_err());
         assert!(parse(&["--seed", "abc"]).is_err());
         assert!(parse(&["--weather", "snow"]).is_err());

@@ -3,7 +3,7 @@
 
 use crate::gpu_util::{
     bind_group, comparison_sampler_entry, depth_texture_entry, fragment_uniform_entry, sampler_entry, texture_entry,
-    unfiltered_texture_entry, uniform_entry, upload_texture,
+    texture_of, unfiltered_texture_entry, uniform_entry, upload_texture,
 };
 use crate::lights::{MAX_LIGHTS, PointLight};
 use crate::settings::{Atmosphere, Lighting};
@@ -259,12 +259,31 @@ impl ScenePass {
         scene: &SceneBuffers,
         textures: &[Image],
         surface_hook: &str,
+        maps: &crate::surface_maps::SurfaceMaps,
     ) -> Result<Self> {
         let layout = |label, entries: &[wgpu::BindGroupLayoutEntry]| {
             device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries })
         };
         let frame_layout = layout("frame", &[uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT, false)]);
-        let material_layout = layout("material", &[fragment_uniform_entry(0), texture_entry(1), sampler_entry(2)]);
+        let map_entry = |binding| {
+            texture_of(
+                binding,
+                wgpu::TextureSampleType::Float { filterable: true },
+                wgpu::TextureViewDimension::D2Array,
+            )
+        };
+        let material_layout = layout(
+            "material",
+            &[
+                fragment_uniform_entry(0),
+                texture_entry(1),
+                sampler_entry(2),
+                map_entry(3),
+                map_entry(4),
+                map_entry(5),
+                sampler_entry(6),
+            ],
+        );
         let effects_layout = layout(
             "effects",
             &[uniform_entry(0, wgpu::ShaderStages::VERTEX_FRAGMENT, false), texture_entry(1), sampler_entry(2)],
@@ -498,12 +517,12 @@ impl ScenePass {
                 let uniform = MaterialUniform {
                     albedo: m.albedo,
                     emission: [m.emission[0], m.emission[1], m.emission[2], 0.0],
-                    pbr: [m.roughness, m.metallic, 0.0, 0.0],
+                    pbr: [m.roughness, m.metallic, 1.0 / m.tiling.max(1e-3), 0.0],
                     flags: [
                         flag(m.unlit, FLAG_UNLIT) | flag(m.alpha_test, FLAG_ALPHA_TEST) | flag(m.glass, FLAG_GLASS),
                         m.shading,
-                        0,
-                        0,
+                        m.surface_map.map_or(0, |l| l + 1),
+                        m.surface_faces,
                     ],
                 };
                 let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -520,6 +539,10 @@ impl ScenePass {
                         buffer.as_entire_binding(),
                         wgpu::BindingResource::TextureView(texture),
                         wgpu::BindingResource::Sampler(&nearest),
+                        wgpu::BindingResource::TextureView(&maps.albedo),
+                        wgpu::BindingResource::TextureView(&maps.normal),
+                        wgpu::BindingResource::TextureView(&maps.orm),
+                        wgpu::BindingResource::Sampler(&maps.sampler),
                     ],
                 )
             })

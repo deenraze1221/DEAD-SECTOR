@@ -74,7 +74,9 @@ pub async fn request_device(
         .request_device(&wgpu::DeviceDescriptor {
             label: Some("dead-sector"),
             // Pass timings for benchmarks, where the adapter supports them.
-            required_features: adapter.features() & wgpu::Features::TIMESTAMP_QUERY,
+            // and block-compressed material maps where available.
+            required_features: adapter.features()
+                & (wgpu::Features::TIMESTAMP_QUERY | wgpu::Features::TEXTURE_COMPRESSION_BC),
             required_limits: wgpu::Limits::default(),
             ..Default::default()
         })
