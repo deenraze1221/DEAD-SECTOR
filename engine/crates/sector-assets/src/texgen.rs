@@ -135,6 +135,8 @@ pub struct Voronoi {
     pub f1: Field,
     pub f2: Field,
     pub id: Vec<u32>,
+    /// Pixel minus its nearest feature point (cell units), for radial shapes and lighting.
+    pub offset: Vec<(f32, f32)>,
 }
 
 pub fn voronoi(size: usize, cells: usize, jitter: f32, seed: u32) -> Voronoi {
@@ -148,12 +150,13 @@ pub fn voronoi(size: usize, cells: usize, jitter: f32, seed: u32) -> Voronoi {
     let mut f1 = Field::new(size, 0.0);
     let mut f2 = Field::new(size, 0.0);
     let mut id = vec![0; size * size];
+    let mut offset = vec![(0.0, 0.0); size * size];
     for y in 0..size {
         for x in 0..size {
             let u = x as f32 * cells as f32 / size as f32;
             let v = y as f32 * cells as f32 / size as f32;
             let (ci, cj) = (u.floor() as i64, v.floor() as i64);
-            let (mut d1, mut d2, mut best) = (f32::MAX, f32::MAX, 0);
+            let (mut d1, mut d2, mut best, mut off) = (f32::MAX, f32::MAX, 0, (0.0, 0.0));
             for dj in -1..=1 {
                 for di in -1..=1 {
                     let (px, py, pid) = point(ci + di, cj + dj);
@@ -162,6 +165,7 @@ pub fn voronoi(size: usize, cells: usize, jitter: f32, seed: u32) -> Voronoi {
                         d2 = d1;
                         d1 = d;
                         best = pid;
+                        off = (u - px, v - py);
                     } else if d < d2 {
                         d2 = d;
                     }
@@ -170,9 +174,10 @@ pub fn voronoi(size: usize, cells: usize, jitter: f32, seed: u32) -> Voronoi {
             f1.data[y * size + x] = d1;
             f2.data[y * size + x] = d2;
             id[y * size + x] = best;
+            offset[y * size + x] = off;
         }
     }
-    Voronoi { f1, f2, id }
+    Voronoi { f1, f2, id, offset }
 }
 
 pub fn smoothstep(e0: f32, e1: f32, x: f32) -> f32 {

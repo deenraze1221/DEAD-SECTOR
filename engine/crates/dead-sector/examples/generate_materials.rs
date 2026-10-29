@@ -6,9 +6,13 @@
 //!
 //! Then import the folders with `import_materials` like any other material.
 //! Every map is checked for seams (wrap-around jump vs. ordinary pixel steps)
-//! and generation fails if one shows. Art direction: clean readable shapes,
-//! bevelled edges with painted highlights, soft baked occlusion, controlled
-//! palettes and light wear. All materials assume a 3 m tile (≈ 341 px/m).
+//! and generation fails if one shows. Art direction (Valorant-inspired, all
+//! original): one shared palette; large deliberate colour shapes; every
+//! element (brick, slab, board, rib, sheet, clump, pebble) painted with a lit
+//! top-left bevel, shaded bottom-right and a soft gradient; colour blocking
+//! per element instead of pixel noise; wear only at element edges as clean
+//! shapes; detail grouped on purpose and sized to read at gameplay distance.
+//! Buildings and ground assume a 3 m tile (≈ 341 px/m), props 2 m.
 
 use anyhow::{Context, Result, bail};
 use sector_assets::texgen::{
@@ -28,34 +32,82 @@ struct Recipe {
     roughness: Field,
     /// Relief in texels across the height range (normal strength).
     relief: f32,
-    /// Extra occlusion multiplied into the cavity AO (1 = none).
-    occlusion: Option<Field>,
 }
 
-fn field(f: impl Fn(usize, usize) -> f32) -> Field {
-    Field::from_fn(SIZE, f)
+fn scale(c: [f32; 3], k: f32) -> [f32; 3] {
+    c.map(|v| v * k)
 }
 
-/// Rounded-bevel profile: 0 in a gap, rising to 1 over `bevel` texels from the edge.
-fn bevel(edge_distance: f32, bevel: f32) -> f32 {
-    let t = (edge_distance / bevel).clamp(0.0, 1.0);
+fn pick(palette: &[u32], key: i64, seed: u32) -> [f32; 3] {
+    hex(palette[(hash01(key, 0, seed) * palette.len() as f32) as usize % palette.len()])
+}
+
+// --- Art direction -------------------------------------------------------
+//
+// One world palette, shared by every material (sRGB hex): warm creams and
+// sands, terracotta, sage and teal accents, slate blues, warm woods, and
+// blue-grey asphalt. Values stay in a controlled mid range so materials sit
+// together under the same light.
+
+const CREAM: u32 = 0xe6dbc3;
+const CREAM_SHADE: u32 = 0xd6c9ae;
+const SAND: [u32; 4] = [0xc6bca8, 0xbdb3a0, 0xcdc4b1, 0xb5ac9a];
+const STONE_JOINT: u32 = 0x857e72;
+const TERRACOTTA: [u32; 4] = [0xb9583d, 0xab4f37, 0xc5684a, 0xb35d41];
+const TERRACOTTA_DARK: u32 = 0x8a4131;
+const TERRACOTTA_LIGHT: u32 = 0xcf7c58;
+const MORTAR: u32 = 0xd6cab1;
+const TEAL: [u32; 2] = [0x5d918a, 0x67998f];
+const SAGE: [u32; 2] = [0x667a71, 0x71857b];
+const SLATE: [u32; 2] = [0x6c7f8e, 0x75889a];
+const BARE_METAL: u32 = 0xa9b0b3;
+const WOOD: [u32; 4] = [0x9b6a3f, 0xa97546, 0x8d5f37, 0xb38050];
+const OAK: [u32; 3] = [0xd2a877, 0xc89c6a, 0xdbb383];
+const RUST: [u32; 3] = [0x6d3523, 0xa2522b, 0xcf7a3c];
+const ASPHALT: [u32; 2] = [0x30353d, 0x3a4049];
+const GRASS: [u32; 3] = [0x4f7d2f, 0x5b8a35, 0x47752b];
+const GRASS_TIP: u32 = 0x9cc25a;
+const GRASS_GAP: u32 = 0x34561f;
+const EARTH: [u32; 2] = [0x7a5a3d, 0x8a6847];
+const PEBBLES: [u32; 3] = [0xa39686, 0x8e8273, 0xb3a796];
+const ROOFING: [u32; 3] = [0x4c5057, 0x545860, 0x484c53];
+
+/// Rounded bevel: 0 in a joint, rising to 1 over `band` texels from the edge.
+fn bevel(edge: f32, band: f32) -> f32 {
+    let t = (edge / band).clamp(0.0, 1.0);
     (1.0 - (1.0 - t).powi(2)).sqrt()
 }
 
-/// A running-bond or grid layout of rectangles: per pixel, distance to the
-/// nearest edge (texels), the element's id, and the position inside it (0..1).
-struct Layout {
-    edge: Field,
-    id: Vec<u32>,
-    local: Vec<(f32, f32)>,
+/// Painted light on a rectangular element (light from the upper left):
+/// a bright band along the top and left edges, shadow along the bottom and
+/// right, and a soft top-to-bottom gradient. `lx`, `ly` are texels from the
+/// element's top-left corner; `w`, `h` its size.
+fn paint_light(lx: f32, ly: f32, w: f32, h: f32, band: f32, strength: f32) -> f32 {
+    let t = smoothstep(band, 0.0, ly);
+    let l = smoothstep(band, 0.0, lx);
+    let b = smoothstep(band, 0.0, h - ly);
+    let r = smoothstep(band, 0.0, w - lx);
+    let gradient = 0.09 * (0.5 - ly / h);
+    1.0 + strength * (0.32 * t + 0.14 * l - 0.28 * b - 0.12 * r) + gradient
 }
 
-fn layout(cols: usize, rows: usize, stagger: bool, gap: f32, seed: u32) -> Layout {
+/// Per pixel: which rectangle it is in and where, for brick, slab, tile and
+/// board layouts. Rows can be staggered by half an element.
+struct Elements {
+    id: Vec<i64>,
+    /// Texels from the element's top-left corner.
+    local: Vec<(f32, f32)>,
+    /// Texels to the nearest element edge (joint half-width already removed).
+    edge: Field,
+    w: f32,
+    h: f32,
+}
+
+fn elements(cols: usize, rows: usize, stagger: bool, joint: f32) -> Elements {
     let (w, h) = (SIZE as f32 / cols as f32, SIZE as f32 / rows as f32);
-    let wobble = fbm(SIZE, 16, 3, 0.5, seed ^ 0x51);
-    let mut edge = Field::new(SIZE, 0.0);
     let mut id = vec![0; SIZE * SIZE];
     let mut local = vec![(0.0, 0.0); SIZE * SIZE];
+    let mut edge = Field::new(SIZE, 0.0);
     for y in 0..SIZE {
         let row = (y as f32 / h) as usize;
         let shift = if stagger && row % 2 == 1 { w / 2.0 } else { 0.0 };
@@ -63,452 +115,508 @@ fn layout(cols: usize, rows: usize, stagger: bool, gap: f32, seed: u32) -> Layou
             let xs = (x as f32 + shift).rem_euclid(SIZE as f32);
             let col = (xs / w) as usize % cols;
             let (lx, ly) = (xs - col as f32 * w, y as f32 - row as f32 * h);
-            let d = lx.min(w - lx).min(ly).min(h - ly);
-            // Hand-chipped edges: the gap wobbles a little.
             let i = y * SIZE + x;
-            edge.data[i] = d - gap / 2.0 - wobble.data[i] * gap * 0.8;
-            id[i] = (row * cols + col) as u32;
-            local[i] = (lx / w, ly / h);
+            id[i] = (row * cols + col) as i64;
+            local[i] = (lx, ly);
+            edge.data[i] = lx.min(w - lx).min(ly).min(h - ly) - joint / 2.0;
         }
     }
-    Layout { edge, id, local }
+    Elements { id, local, edge, w, h }
 }
 
-fn pick(palette: &[u32], id: u32, seed: u32) -> [f32; 3] {
-    hex(palette[(hash01(id as i64, 0, seed) * palette.len() as f32) as usize % palette.len()])
-}
-
-fn scale(c: [f32; 3], k: f32) -> [f32; 3] {
-    c.map(|v| v * k)
-}
-
-// --- Style helpers -------------------------------------------------------
-
-/// Hand-painted value bands: `v` (0..1) quantised to `steps` tones with soft
-/// transitions, instead of continuous noise.
-fn poster(v: f32, steps: f32) -> f32 {
-    let x = v.clamp(0.0, 0.9999) * steps;
-    (x.floor() + smoothstep(0.4, 0.6, x.fract())) / steps
-}
-
-/// Painted top light across an element: brighter at the top (`ly` = 0).
-fn top_light(ly: f32, amount: f32) -> f32 {
-    1.0 + amount * (0.5 - ly)
+/// Clean edge wear: true where an element's edge is chipped. Only elements
+/// picked by `share`, only within `depth` texels of an edge, in broad
+/// patches (never scattered spots).
+fn edge_chipped(e: &Elements, patches: &Field, i: usize, depth: f32, share: f32, seed: u32) -> bool {
+    hash01(e.id[i], 21, seed) < share && e.edge.data[i] < depth && e.edge.data[i] > 0.0 && patches.data[i] > 0.55
 }
 
 // --- Recipes -------------------------------------------------------------
 
 fn bricks(painted: bool) -> Recipe {
-    let l = layout(10, 30, true, 9.0, 11);
-    let stain = fbm(SIZE, 3, 3, 0.5, 12);
-    let chips = fbm(SIZE, 10, 4, 0.5, 14);
-    let height = field(|x, y| {
-        let i = y * SIZE + x;
-        let jitter = hash01(l.id[i] as i64, 1, 15) * 0.12;
-        bevel(l.edge.data[i], 7.0) * (0.86 + jitter)
-    });
-    let reds = [0xa84c36, 0xb65c40, 0x98452f, 0xbd6a48];
+    // 9 × 28 per 3 m tile: 33 × 11 cm bricks, staggered, 8-texel mortar.
+    let e = elements(9, 28, true, 8.0);
+    let patches = fbm(SIZE, 6, 3, 0.5, 13);
+    let broad = fbm(SIZE, 2, 2, 0.5, 12);
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut roughness = Field::new(SIZE, 0.0);
+    let mut height = Field::new(SIZE, 0.0);
     for i in 0..SIZE * SIZE {
-        let mortar = l.edge.data[i] <= 0.0;
-        let ly = l.local[i].1;
-        let tone = poster(stain.data[i], 3.0);
-        let mut c = if mortar {
-            hex(0xcbc1ac)
+        let (lx, ly) = e.local[i];
+        let joint = e.edge.data[i] <= 0.0;
+        let tone = hash01(e.id[i], 1, 16);
+        // Deliberate variation: mostly the four terracottas, a few burnt and a few pale bricks.
+        let brick = if tone < 0.07 {
+            hex(TERRACOTTA_DARK)
+        } else if tone > 0.95 {
+            hex(TERRACOTTA_LIGHT)
         } else {
-            scale(pick(&reds, l.id[i], 16), top_light(ly, 0.16) * (0.94 + tone * 0.1))
+            pick(&TERRACOTTA, e.id[i], 17)
         };
-        let mut r = if mortar { 0.92 } else { 0.8 };
+        let light = paint_light(lx, ly, e.w, e.h, 9.0, 1.0);
+        let chipped = edge_chipped(&e, &patches, i, 9.0, 0.18, 18);
+        let (mut c, mut r, mut h) = if joint {
+            // Mortar sits in the shadow of the brick above.
+            let under = smoothstep(0.0, 6.0, ly.min(e.h - ly));
+            (scale(hex(MORTAR), 0.86 + 0.14 * under), 0.92, 0.0)
+        } else {
+            (scale(brick, light), 0.78, bevel(e.edge.data[i], 9.0) * (0.9 + tone * 0.1))
+        };
+        if chipped && !painted {
+            c = scale(hex(TERRACOTTA_DARK), 0.95);
+            h *= 0.7;
+        }
         if painted {
-            // Cream paint over the wall; clean chips show the brick, with a
-            // lighter rim of lifted paint around each one.
-            let chip = chips.data[i];
-            if mortar || chip < 0.68 {
-                let rim = smoothstep(0.62, 0.68, chip);
-                c = scale(hex(0xe8ddc4), (if mortar { 0.9 } else { top_light(ly, 0.08) }) * (1.0 + rim * 0.08));
+            // Cream paint everywhere; worn through only at some brick edges,
+            // with a lighter rim of lifted paint around each worn patch.
+            if chipped {
+                c = scale(brick, light * 0.95);
+                h *= 0.85;
+                r = 0.78;
+            } else {
+                let rim = !joint && hash01(e.id[i], 21, 18) < 0.18 && e.edge.data[i] < 13.0 && patches.data[i] > 0.5;
+                let base = if joint { scale(hex(CREAM_SHADE), 0.92) } else { scale(hex(CREAM), light) };
+                c = if rim { scale(base, 1.06) } else { base };
                 r = 0.6;
             }
         }
-        albedo.push(c);
+        albedo.push(scale(c, 0.97 + broad.data[i] * 0.06));
         roughness.data[i] = r;
-    }
-    Recipe { albedo, height, roughness, relief: 10.0, occlusion: None }
-}
-
-#[allow(clippy::too_many_arguments)]
-fn tiles(
-    cols: usize,
-    gap: f32,
-    palette: &[u32],
-    grout: u32,
-    checker: bool,
-    gloss: f32,
-    cracks: bool,
-    seed: u32,
-) -> Recipe {
-    let l = layout(cols, cols, false, gap, seed);
-    let stain = fbm(SIZE, 3, 3, 0.5, seed + 1);
-    let crack = voronoi(SIZE, 4, 0.9, seed + 3);
-    let mut albedo = Vec::with_capacity(SIZE * SIZE);
-    let mut roughness = Field::new(SIZE, 0.0);
-    let mut height = Field::new(SIZE, 0.0);
-    for i in 0..SIZE * SIZE {
-        let id = l.id[i];
-        let (row, col) = (id as usize / cols, id as usize % cols);
-        let grouted = l.edge.data[i] <= 0.0;
-        let base = if checker { hex(palette[(row + col) % palette.len()]) } else { pick(palette, id, seed + 5) };
-        let (_, ly) = l.local[i];
-        let mut c = scale(base, top_light(ly, 0.1) * (0.95 + hash01(id as i64, 2, seed) * 0.08));
-        let mut h = bevel(l.edge.data[i], 6.0) * 0.9;
-        // A few cracked slabs: one clean crack line through the tile.
-        if cracks && hash01(id as i64, 3, seed) > 0.85 && (crack.f2.data[i] - crack.f1.data[i]) < 0.012 {
-            h -= 0.3;
-            c = scale(c, 0.62);
-        }
-        if grouted {
-            c = hex(grout);
-        }
-        albedo.push(scale(c, 0.95 + poster(stain.data[i], 3.0) * 0.08));
-        roughness.data[i] = if grouted { 0.92 } else { gloss };
         height.data[i] = h;
     }
-    Recipe { albedo, height, roughness, relief: 8.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 12.0 }
 }
 
-fn planks(boards: usize, palette: &[u32], gloss: f32, seed: u32) -> Recipe {
-    let w = SIZE as f32 / boards as f32;
-    let flow = fbm(SIZE, 2, 2, 0.5, seed + 1);
+/// Square slabs or tiles with joints, painted bevel light and colour blocking.
+#[allow(clippy::too_many_arguments)]
+fn slabs(
+    n: usize,
+    joint: f32,
+    band: f32,
+    palette: &[u32],
+    joint_colour: u32,
+    checker: bool,
+    gloss: f32,
+    seed: u32,
+) -> Recipe {
+    let e = elements(n, n, false, joint);
+    let patches = fbm(SIZE, 4, 3, 0.5, seed + 1);
+    let broad = fbm(SIZE, 2, 2, 0.5, seed + 2);
+    let sheen = noise(SIZE, 4, 48, seed + 3);
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut roughness = Field::new(SIZE, 0.0);
-    let mut height = Field::new(SIZE, 0.0);
-    for y in 0..SIZE {
-        for x in 0..SIZE {
-            let i = y * SIZE + x;
-            let col = (x as f32 / w) as usize;
-            // Each board column has 1–3 butt joints at its own offsets (periodic in y).
-            let pieces = 1 + (hash01(col as i64, 7, seed) * 3.0) as usize;
-            let offset = hash01(col as i64, 8, seed) * SIZE as f32;
-            let len = SIZE as f32 / pieces as f32;
-            let along = (y as f32 + offset).rem_euclid(SIZE as f32);
-            let piece = (along / len) as usize;
-            let lx = x as f32 - col as f32 * w;
-            let ly = along - piece as f32 * len;
-            let edge = lx.min(w - lx).min(ly).min(len - ly) - 2.5;
-            let id = (col * 4 + piece) as u32;
-            // Grain: smooth flowing lines along the board, a whole number of waves per tile.
-            let phase = hash01(id as i64, 10, seed) * std::f32::consts::TAU;
-            let wave = (y as f32 / SIZE as f32 * std::f32::consts::TAU * 3.0 + phase).sin() * 0.18 + flow.data[i] * 0.5;
-            let line = ((lx / w * 7.0 + wave).fract() - 0.5).abs();
-            let grain = smoothstep(0.42, 0.5, line);
-            let mut c = scale(pick(palette, id, seed + 3), top_light(lx / w, 0.12) * (1.0 - grain * 0.18));
-            if edge <= 0.0 {
-                c = scale(c, 0.45);
-            }
-            albedo.push(c);
-            height.data[i] = bevel(edge, 4.0) * (0.9 + hash01(id as i64, 9, seed) * 0.1) - grain * 0.04;
-            roughness.data[i] = gloss + grain * 0.1;
-        }
-    }
-    Recipe { albedo, height, roughness, relief: 7.0, occlusion: None }
-}
-
-fn asphalt() -> Recipe {
-    let patches = fbm(SIZE, 2, 3, 0.5, 21);
-    let flakes = voronoi(SIZE, 40, 0.9, 23);
-    let cracks = voronoi(SIZE, 2, 0.9, 24);
-    let crack_mask = fbm(SIZE, 2, 2, 0.5, 25);
-    let mut albedo = Vec::with_capacity(SIZE * SIZE);
-    let mut roughness = Field::new(SIZE, 0.0);
-    let mut height = Field::new(SIZE, 0.0);
-    for y in 0..SIZE {
-        for x in 0..SIZE {
-            let i = y * SIZE + x;
-            // Three painted tones in broad patches.
-            let mut c = lerp3(hex(0x33373c), hex(0x40444a), poster(patches.data[i], 3.0));
-            let mut h = 0.3;
-            let mut r = 0.84;
-            // Sparse light aggregate flakes, painted with a highlight.
-            let f = hash01(flakes.id[i] as i64, 3, 27);
-            if f > 0.93 && flakes.f1.data[i] < 0.14 {
-                c = lerp3(c, hex(0x7a7d82), 0.45);
-                h += 0.2;
-            }
-            // Sealed cracks: smooth dark tar lines.
-            if crack_mask.data[i] > 0.7 && cracks.f2.data[i] - cracks.f1.data[i] < 0.008 {
-                c = scale(c, 0.72);
-                h += 0.05;
-                r = 0.55;
-            }
-            albedo.push(c);
-            height.data[i] = h;
-            roughness.data[i] = r;
-        }
-    }
-    Recipe { albedo, height, roughness, relief: 3.0, occlusion: None }
-}
-
-fn grass() -> Recipe {
-    let clumps = voronoi(SIZE, 16, 0.85, 31);
-    let tone = fbm(SIZE, 2, 2, 0.5, 32);
-    let blades = noise(SIZE, 160, 18, 33);
-    let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut height = Field::new(SIZE, 0.0);
     for i in 0..SIZE * SIZE {
-        let dome = 1.0 - smoothstep(0.0, 0.8, clumps.f1.data[i]);
-        let lift = hash01(clumps.id[i] as i64, 4, 35);
-        // Blade tips in the upper part of each clump, two tones only.
-        let tip = smoothstep(0.55, 0.62, blades.data[i]) * smoothstep(0.35, 0.7, dome);
-        let shade = poster(dome * 0.75 + lift * 0.25, 4.0);
-        let mut c = lerp3(hex(0x3c6a25), hex(0x7aa23e), shade);
-        c = lerp3(c, hex(0xa9c45c), tip * 0.7);
-        c = scale(c, 0.94 + poster(tone.data[i], 2.0) * 0.1);
-        albedo.push(c);
-        height.data[i] = dome * 0.7 + tip * 0.3;
-    }
-    let roughness = Field::new(SIZE, 0.9);
-    Recipe { albedo, height, roughness, relief: 6.0, occlusion: None }
-}
-
-fn dirt() -> Recipe {
-    let tone = fbm(SIZE, 3, 3, 0.5, 41);
-    let pebbles = voronoi(SIZE, 14, 0.8, 43);
-    let mut albedo = Vec::with_capacity(SIZE * SIZE);
-    let mut height = Field::new(SIZE, 0.0);
-    for y in 0..SIZE {
-        for x in 0..SIZE {
-            let i = y * SIZE + x;
-            let mut c = lerp3(hex(0x6b4f36), hex(0x8b6b49), poster(tone.data[i], 3.0));
-            let mut h = poster(tone.data[i], 3.0) * 0.3;
-            let p = hash01(pebbles.id[i] as i64, 5, 44);
-            let d = pebbles.f1.data[i];
-            let radius = 0.18 + p * 0.1;
-            if p > 0.62 {
-                if d < radius {
-                    // Pebble: flat colour, painted highlight towards the top.
-                    let dome = (1.0 - d / radius).sqrt();
-                    let v = (y as f32 * 14.0 / SIZE as f32).fract() - 0.5;
-                    c = scale(lerp3(hex(0x8f8577), hex(0xa79d8e), p), 0.9 + dome * 0.12 - v * 0.15);
-                    h += dome * 0.55;
-                } else if d < radius + 0.06 {
-                    c = scale(c, 0.75);
-                }
-            }
-            albedo.push(c);
-            height.data[i] = h;
+        let (lx, ly) = e.local[i];
+        let joint_px = e.edge.data[i] <= 0.0;
+        let (row, col) = (e.id[i] / n as i64, e.id[i] % n as i64);
+        let base = if checker {
+            hex(palette[((row + col) % palette.len() as i64) as usize])
+        } else {
+            pick(palette, e.id[i], seed)
+        };
+        let mut c = scale(base, paint_light(lx, ly, e.w, e.h, band, 1.0));
+        let mut h = bevel(e.edge.data[i], band);
+        let mut r = gloss;
+        // Glazed tiles: a soft painted gloss stroke across the upper-left corner.
+        if checker {
+            let stroke = smoothstep(0.18, 0.05, ((lx + ly) / (e.w + e.h) - 0.22).abs());
+            c = scale(c, 1.0 + stroke * 0.07);
+        } else {
+            // Subtle broom-finish direction, alternating per slab.
+            let s = if (row + col) % 2 == 0 { sheen.data[i] } else { sheen.get(((i % SIZE) + 512) % SIZE, i / SIZE) };
+            c = scale(c, 0.985 + s * 0.03);
         }
+        // A few corners knocked off, as clean shapes.
+        if edge_chipped(&e, &patches, i, band * 1.1, 0.12, seed + 4) {
+            c = scale(c, 0.82);
+            h *= 0.6;
+            r = 0.9;
+        }
+        if joint_px {
+            c = hex(joint_colour);
+            r = 0.92;
+        }
+        albedo.push(scale(c, 0.97 + broad.data[i] * 0.06));
+        roughness.data[i] = r;
+        height.data[i] = h;
     }
-    let roughness = Field::new(SIZE, 0.95);
-    Recipe { albedo, height, roughness, relief: 6.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 10.0 }
 }
 
 fn concrete() -> Recipe {
-    // 2 × 2 cast panels (1.5 m) with shallow joints and 3 × 3 tie holes each.
-    let l = layout(2, 2, false, 6.0, 51);
-    let stain = fbm(SIZE, 3, 3, 0.5, 52);
+    // 2 × 2 cast panels (1.5 m) per tile, each its own tone; formwork bands,
+    // four cone tie holes, and exposed aggregate only along the splash zone.
+    let e = elements(2, 2, false, 10.0);
+    let broad = fbm(SIZE, 2, 2, 0.5, 52);
+    let stones = voronoi(SIZE, 64, 0.85, 53);
+    let palette = [0xb3ada1, 0xa9a397, 0xbdb7ab, 0xa49e93];
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
-    let mut roughness = Field::new(SIZE, 0.0);
+    let roughness = Field::new(SIZE, 0.84);
     let mut height = Field::new(SIZE, 0.0);
     for i in 0..SIZE * SIZE {
-        let (lx, ly) = l.local[i];
-        let hole_x = ((lx * 3.0).fract() - 0.5) * SIZE as f32 / 6.0;
-        let hole_y = ((ly * 3.0).fract() - 0.5) * SIZE as f32 / 6.0;
-        let hole = (hole_x * hole_x + hole_y * hole_y).sqrt();
-        let mut h = bevel(l.edge.data[i], 5.0) * 0.8;
-        let panel = hash01(l.id[i] as i64, 2, 53) * 0.06;
-        let mut c = scale(lerp3(hex(0x9d9c95), hex(0xb0aea6), poster(stain.data[i], 3.0)), top_light(ly, 0.08) + panel);
-        if hole < 7.0 {
-            h -= 0.4 * (1.0 - hole / 7.0);
-            c = scale(c, 0.62);
+        let (lx, ly) = e.local[i];
+        let mut c = scale(pick(&palette, e.id[i], 54), paint_light(lx, ly, e.w, e.h, 14.0, 0.9));
+        let mut h = bevel(e.edge.data[i], 14.0);
+        // Formwork: four faint horizontal pour bands per panel.
+        let band = (ly / e.h * 4.0).fract();
+        c = scale(c, 1.0 - smoothstep(0.92, 1.0, band) * 0.05 + smoothstep(0.08, 0.0, band) * 0.03);
+        // Tie holes at the panel's quarter points: dark cone, lit lower rim.
+        for (fx, fy) in [(0.25, 0.25), (0.75, 0.25), (0.25, 0.75), (0.75, 0.75)] {
+            let (dx, dy) = (lx - fx * e.w, ly - fy * e.h);
+            let d = (dx * dx + dy * dy).sqrt();
+            if d < 11.0 {
+                c = scale(c, 0.55 + 0.35 * (d / 11.0) + if dy > 4.0 { 0.15 } else { 0.0 });
+                h -= 0.35 * (1.0 - d / 11.0);
+            }
         }
-        if l.edge.data[i] <= 0.0 {
-            c = scale(c, 0.72);
+        // Splash zone: aggregate in the bottom fifth of each panel.
+        let splash = smoothstep(0.78, 0.9, ly / e.h);
+        let stone = hash01(stones.id[i] as i64, 3, 55);
+        if splash > 0.0 && stone > 0.45 && stones.f1.data[i] < 0.3 {
+            let (ox, oy) = stones.offset[i];
+            c = scale(pick(&PEBBLES, stones.id[i] as i64, 56), 1.0 - (ox + oy) * 0.4);
+            h += 0.15 * splash;
         }
-        albedo.push(c);
+        if e.edge.data[i] <= 0.0 {
+            c = scale(hex(0xa39d91), 0.7);
+        }
+        albedo.push(scale(c, 0.97 + broad.data[i] * 0.06));
         height.data[i] = h;
-        roughness.data[i] = 0.84;
     }
-    Recipe { albedo, height, roughness, relief: 5.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 8.0 }
 }
 
 fn plaster() -> Recipe {
-    // Clean painted plaster: two soft tones and a faint trowel texture. No chips
-    // or cracks: on large walls any distinct mark repeats every tile and makes
-    // the tiling readable; wear comes from the game's world-space grime.
-    let tone = fbm(SIZE, 2, 3, 0.5, 61);
-    let trowel = fbm(SIZE, 24, 2, 0.5, 62);
+    // Clean two-tone painted plaster: broad soft tonal shapes and wide, faint
+    // trowel sweeps. No marks: on large walls any mark repeats every tile.
+    let broad = fbm(SIZE, 2, 2, 0.5, 61);
+    let sweeps = noise(SIZE, 6, 3, 62);
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut height = Field::new(SIZE, 0.0);
-    for i in 0..SIZE * SIZE {
-        let t = poster(tone.data[i], 2.0);
-        albedo.push(scale(lerp3(hex(0xd8d0c1), hex(0xe0d9ca), t), 0.99 + trowel.data[i] * 0.02));
-        height.data[i] = t * 0.2 + trowel.data[i] * 0.3;
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let i = y * SIZE + x;
+            let tone = smoothstep(0.35, 0.65, broad.data[i]);
+            let sweep = sweeps.get((x + y) % SIZE, y);
+            albedo.push(scale(lerp3(hex(CREAM_SHADE), hex(CREAM), tone), 0.985 + sweep * 0.03));
+            height.data[i] = tone * 0.3 + sweep * 0.4;
+        }
     }
-    let roughness = Field::new(SIZE, 0.72);
-    Recipe { albedo, height, roughness, relief: 1.5, occlusion: None }
+    let roughness = Field::new(SIZE, 0.74);
+    Recipe { albedo, height, roughness, relief: 1.5 }
 }
 
 fn siding() -> Recipe {
-    // Horizontal lap boards: 16 per tile, each thicker at its lower edge.
-    let boards = 16;
-    let h_board = SIZE as f32 / boards as f32;
-    let tone = fbm(SIZE, 2, 3, 0.5, 72);
-    let chips = fbm(SIZE, 12, 4, 0.5, 73);
+    // 12 lap boards per tile (25 cm): a strong shadow under each lip, a lit
+    // top edge, two teal tones, wear only along a few lower lips.
+    let boards = 12;
+    let bh = SIZE as f32 / boards as f32;
+    let grain = noise(SIZE, 3, 96, 71);
+    let patches = fbm(SIZE, 6, 3, 0.5, 72);
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut roughness = Field::new(SIZE, 0.0);
     let mut height = Field::new(SIZE, 0.0);
     for y in 0..SIZE {
-        let t = (y as f32 % h_board) / h_board;
-        let profile = smoothstep(0.0, 0.08, t) * (0.6 + 0.4 * t);
+        let board = (y as f32 / bh) as i64;
+        let t = (y as f32 % bh) / bh;
+        let profile = smoothstep(0.0, 0.06, t) * (0.55 + 0.45 * t);
+        let light = 1.0 + 0.22 * smoothstep(0.12, 0.02, t) - 0.3 * smoothstep(0.86, 1.0, t) + 0.08 * (0.5 - t);
         for x in 0..SIZE {
             let i = y * SIZE + x;
-            let mut c = scale(lerp3(hex(0x5a8b85), hex(0x679890), poster(tone.data[i], 2.0)), top_light(t, 0.14));
+            let mut c = scale(pick(&TEAL, board, 73), light * (0.985 + grain.data[i] * 0.03));
             let mut r = 0.55;
-            if chips.data[i] > 0.86 {
-                c = hex(0x8f7558);
+            let worn = hash01(board, 2, 74) < 0.3 && t > 0.88 && patches.data[i] > 0.6;
+            if worn {
+                c = scale(hex(0xa0784e), light);
                 r = 0.8;
-            } else if chips.data[i] > 0.84 {
-                c = scale(c, 1.08);
             }
-            if t < 0.05 {
-                c = scale(c, 0.5);
+            if t < 0.035 {
+                c = scale(c, 0.45);
             }
             albedo.push(c);
             height.data[i] = profile;
             roughness.data[i] = r;
         }
     }
-    Recipe { albedo, height, roughness, relief: 9.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 12.0 }
 }
 
 fn metal_panel() -> Recipe {
-    // Vertical ribs every 1/32 of the tile, panel seams every half, rivets along seams.
-    let ribs = 32.0;
-    let streaks = noise(SIZE, 48, 2, 81);
-    let tone = fbm(SIZE, 2, 3, 0.5, 82);
+    // Trapezoid standing ribs, 12 per tile (25 cm), two panels per tile with
+    // an overlap seam and a rivet on every rib; the lit and shaded rib faces
+    // are painted in, and short streaks run down from the rivets.
+    let ribs = 12.0;
+    let pitch = SIZE as f32 / ribs;
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
-    let mut roughness = Field::new(SIZE, 0.0);
+    let mut roughness = Field::new(SIZE, 0.45);
     let mut height = Field::new(SIZE, 0.0);
+    let half = SIZE as f32 / 2.0;
     for y in 0..SIZE {
+        let panel = (y as f32 / half) as i64;
+        let v = (y as f32 % half) / half;
+        let seam_d = (y as f32 % half).min(half - y as f32 % half);
         for x in 0..SIZE {
             let i = y * SIZE + x;
-            let u = x as f32 / SIZE as f32 * ribs;
-            let rib = (u.fract() - 0.5).abs() * 2.0;
-            let profile = smoothstep(0.55, 0.35, rib);
-            let v = (y as f32 / (SIZE as f32 / 2.0)).fract();
-            let seam_d = v.min(1.0 - v) * SIZE as f32 / 2.0;
-            let mut h = profile * 0.7;
-            // Ribs catch light on their crest: painted two-tone.
-            let mut c = scale(
-                lerp3(hex(0x74818b), hex(0x84919c), poster(tone.data[i], 2.0)),
-                0.9 + poster(profile, 2.0) * 0.14,
-            );
-            if seam_d < 10.0 {
-                h = h * 0.4 + 0.5;
-                c = scale(c, 0.82);
-                let (rx, ry) = ((u.fract() - 0.5) * SIZE as f32 / ribs, seam_d - 5.0);
-                if (u as usize).is_multiple_of(2) && (rx * rx + ry * ry).sqrt() < 4.0 {
-                    h += 0.3;
-                    c = scale(c, 1.2);
-                }
+            let u = (x as f32 % pitch) / pitch;
+            // Profile: valley, rising face, flat crest, falling face.
+            let (h, face) = if u < 0.25 {
+                (0.0, 0.0)
+            } else if u < 0.4 {
+                ((u - 0.25) / 0.15, 0.3)
+            } else if u < 0.8 {
+                (1.0, 0.08)
+            } else if u < 0.95 {
+                (1.0 - (u - 0.8) / 0.15, -0.26)
+            } else {
+                (0.0, 0.0)
+            };
+            // Same tone for both panels, so the seam inside the tile and the one
+            // at its edge read alike; broad tone shifts come from macro variation.
+            let mut c = scale(hex(SLATE[0]), 1.0 + face + 0.08 * (0.5 - v));
+            let mut hh = h * 0.8;
+            if seam_d < 9.0 {
+                hh = 0.9;
+                c = scale(c, if y as f32 % half < half / 2.0 { 1.12 } else { 0.78 });
             }
-            // Clean vertical drip streaks.
-            c = scale(c, 1.0 - smoothstep(0.7, 0.74, streaks.data[i]) * 0.12);
+            // Rivet on each crest, just below the seam, with a streak under it.
+            let (rx, ry) = ((u - 0.6) * pitch, y as f32 % half - 16.0);
+            let rivet = (rx * rx + ry * ry).sqrt();
+            if rivet < 5.0 {
+                hh += 0.25;
+                c = scale(c, 1.0 + 0.25 * (-(rx + ry) / 5.0).max(-0.6));
+            } else if rx.abs() < 2.5 && ry > 5.0 && ry < 90.0 && hash01((x as f32 / pitch) as i64, panel, 82) < 0.4 {
+                c = scale(c, 0.9 + 0.1 * (ry / 90.0));
+            }
             albedo.push(c);
-            height.data[i] = h;
-            roughness.data[i] = 0.45;
+            height.data[i] = hh;
+            if seam_d < 9.0 {
+                roughness.data[i] = 0.5;
+            }
         }
     }
-    Recipe { albedo, height, roughness, relief: 6.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 9.0 }
 }
 
 fn painted_metal() -> Recipe {
-    let tone = fbm(SIZE, 2, 3, 0.5, 91);
-    let chips = fbm(SIZE, 12, 4, 0.5, 93);
-    let scratches = noise(SIZE, 3, 192, 94);
+    // Smooth sage paint for props: a broad two-tone gradient, faint brushing,
+    // and a few horizontal scuffs where the paint is rubbed to bare metal.
+    let broad = fbm(SIZE, 2, 2, 0.5, 91);
+    let brush = noise(SIZE, 2, 128, 92);
+    let scuffs = fbm(SIZE, 4, 3, 0.5, 93);
+    let band = noise(SIZE, 2, 16, 94);
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut roughness = Field::new(SIZE, 0.0);
     let mut height = Field::new(SIZE, 0.0);
     for i in 0..SIZE * SIZE {
-        let mut c = lerp3(hex(0x5d6e67), hex(0x6a7b73), poster(tone.data[i], 2.0));
-        let mut r = 0.48;
+        let tone = smoothstep(0.35, 0.65, broad.data[i]);
+        let mut c = scale(lerp3(hex(SAGE[0]), hex(SAGE[1]), tone), 0.985 + brush.data[i] * 0.03);
+        let mut r = 0.46;
         let mut h = 0.6;
-        // Chipped paint as clean shapes with a lighter rim; a few long scratches.
-        if chips.data[i] > 0.77 || scratches.data[i] > 0.965 {
-            c = hex(0xa6adb0);
+        let scuff = scuffs.data[i] > 0.66 && band.data[i] > 0.7;
+        if scuff {
+            c = hex(BARE_METAL);
             r = 0.3;
-            h = 0.45;
-        } else if chips.data[i] > 0.74 {
-            c = scale(c, 1.12);
+            h = 0.5;
+        } else if scuffs.data[i] > 0.64 && band.data[i] > 0.67 {
+            c = scale(c, 1.1);
         }
         albedo.push(c);
-        height.data[i] = h;
         roughness.data[i] = r;
+        height.data[i] = h;
     }
-    Recipe { albedo, height, roughness, relief: 3.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 3.0 }
 }
 
 fn rust() -> Recipe {
-    let blotch = fbm(SIZE, 3, 4, 0.55, 101);
-    let paint = fbm(SIZE, 5, 3, 0.5, 103);
-    let pits = voronoi(SIZE, 40, 0.9, 104);
+    // Rust blooms running down old sage paint: elongated vertical shapes in
+    // three tones, with a bright orange rim where rust meets paint.
+    let drip = noise(SIZE, 10, 2, 101);
+    let bloom = fbm(SIZE, 3, 3, 0.5, 102);
+    let core = fbm(SIZE, 6, 2, 0.5, 103);
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut roughness = Field::new(SIZE, 0.0);
     let mut height = Field::new(SIZE, 0.0);
     for i in 0..SIZE * SIZE {
-        // Three rust tones in clean bands.
-        let band = poster(blotch.data[i], 3.0);
-        let mut c = if band < 0.34 {
-            hex(0x9a5530)
-        } else if band < 0.67 {
-            hex(0x7d4127)
+        let amount = drip.data[i] * 0.55 + bloom.data[i] * 0.45;
+        let (c, r, h) = if amount > 0.46 {
+            let deep = smoothstep(0.55, 0.62, amount + core.data[i] * 0.1);
+            let colour = if deep > 0.5 { hex(RUST[0]) } else { hex(RUST[1]) };
+            (scale(colour, 0.95 + core.data[i] * 0.1), 0.86, 0.4 - deep * 0.1)
+        } else if amount > 0.43 {
+            (hex(RUST[2]), 0.7, 0.55)
         } else {
-            hex(0x58301f)
+            (scale(hex(SAGE[0]), 0.9), 0.5, 0.6)
         };
-        let mut h = 0.4 + band * 0.2;
-        let mut r = 0.88;
-        if paint.data[i] > 0.74 {
-            c = hex(0x5d6e67);
-            h = 0.75;
-            r = 0.55;
-        } else if paint.data[i] > 0.71 {
-            c = hex(0xb06a3e);
-        }
-        let pit = hash01(pits.id[i] as i64, 6, 105);
-        if pit > 0.8 && pits.f1.data[i] < 0.2 {
-            h -= 0.25 * (1.0 - pits.f1.data[i] / 0.2);
-            c = scale(c, 0.7);
-        }
         albedo.push(c);
-        height.data[i] = h;
         roughness.data[i] = r;
+        height.data[i] = h;
     }
-    Recipe { albedo, height, roughness, relief: 5.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 5.0 }
+}
+
+fn planks(boards: usize, palette: &[u32], gloss: f32, seed: u32) -> Recipe {
+    // Boards along y with butt joints; each board its own tone, a lit top
+    // edge, two or three long flowing grain lines and the odd knot.
+    let w = SIZE as f32 / boards as f32;
+    let mut albedo = Vec::with_capacity(SIZE * SIZE);
+    let mut roughness = Field::new(SIZE, 0.0);
+    let mut height = Field::new(SIZE, 0.0);
+    for y in 0..SIZE {
+        for x in 0..SIZE {
+            let i = y * SIZE + x;
+            let col = (x as f32 / w) as i64;
+            let pieces = 1 + (hash01(col, 7, seed) * 2.0) as usize;
+            let offset = hash01(col, 8, seed) * SIZE as f32;
+            let len = SIZE as f32 / pieces as f32;
+            let along = (y as f32 + offset).rem_euclid(SIZE as f32);
+            let piece = (along / len) as i64;
+            let (lx, ly) = (x as f32 - col as f32 * w, along - piece as f32 * len);
+            let edge = lx.min(w - lx).min(ly).min(len - ly) - 3.0;
+            let id = col * 4 + piece;
+            let mut c = scale(pick(palette, id, seed + 3), paint_light(lx, ly, w, len, 8.0, 0.9));
+            // Grain lines: smooth waves, a whole number per tile so they wrap.
+            let mut grain: f32 = 0.0;
+            for k in 0..3 {
+                let phase = hash01(id, 10 + k, seed) * std::f32::consts::TAU;
+                let centre = w * (0.25 + 0.25 * k as f32)
+                    + (along / SIZE as f32 * std::f32::consts::TAU * 2.0 + phase).sin() * w * 0.08;
+                grain = grain.max(smoothstep(2.5, 0.5, (lx - centre).abs()));
+            }
+            c = scale(c, 1.0 - grain * 0.14);
+            // A knot on about one board in three: dark eye with a ring.
+            if hash01(id, 20, seed) < 0.33 {
+                let (kx, ky) = (w * 0.5, len * (0.2 + 0.6 * hash01(id, 21, seed)));
+                let d = (((lx - kx) / 1.0).powi(2) + ((ly - ky) / 2.2).powi(2)).sqrt();
+                if d < 7.0 {
+                    c = scale(c, 0.62);
+                } else if d < 10.0 {
+                    c = scale(c, 0.85);
+                }
+            }
+            if edge <= 0.0 {
+                c = scale(c, 0.42);
+            }
+            albedo.push(c);
+            height.data[i] = bevel(edge, 6.0) * (0.9 + hash01(id, 9, seed) * 0.1) - grain * 0.05;
+            roughness.data[i] = gloss + grain * 0.1;
+        }
+    }
+    Recipe { albedo, height, roughness, relief: 9.0 }
 }
 
 fn roof() -> Recipe {
-    // Bitumen membrane in 4 rolls (0.75 m) with raised overlap seams and fine
-    // granules; 4 keeps every seam on the same compression-block phase.
-    let rolls = 4.0;
+    // Membrane sheets, four per tile (75 cm), each overlapping the next with
+    // a lit lip and a shadow below it; per-sheet tone, fine granule sheen.
+    let sheets = 4.0;
     let granules = fbm(SIZE, 128, 2, 0.6, 111);
-    let tone = fbm(SIZE, 2, 3, 0.5, 112);
+    let broad = fbm(SIZE, 2, 2, 0.5, 112);
     let mut albedo = Vec::with_capacity(SIZE * SIZE);
     let mut height = Field::new(SIZE, 0.0);
     for y in 0..SIZE {
-        let v = (y as f32 / SIZE as f32 * rolls).fract();
-        let seam = smoothstep(0.035, 0.0, v.min(1.0 - v));
+        let v = (y as f32 / SIZE as f32 * sheets).fract();
+        let sheet = (y as f32 / SIZE as f32 * sheets) as i64;
+        let lip = smoothstep(0.05, 0.0, v);
+        let shadow = smoothstep(0.05, 0.12, v) * smoothstep(0.2, 0.12, v);
         for x in 0..SIZE {
             let i = y * SIZE + x;
             let c = scale(
-                lerp3(hex(0x45484d), hex(0x505358), poster(tone.data[i], 2.0)),
-                top_light(v, 0.06) * (0.95 + granules.data[i] * 0.08) - seam * 0.12,
+                pick(&ROOFING, sheet, 113),
+                (1.0 + lip * 0.25 - shadow * 0.12) * (0.97 + granules.data[i] * 0.05) * (0.97 + broad.data[i] * 0.06),
             );
             albedo.push(c);
-            height.data[i] = seam * 0.6 + granules.data[i] * 0.15;
+            height.data[i] = lip * 0.7 + (1.0 - shadow) * 0.2 + granules.data[i] * 0.08;
         }
     }
+    let roughness = Field::new(SIZE, 0.88);
+    Recipe { albedo, height, roughness, relief: 6.0 }
+}
+
+fn asphalt() -> Recipe {
+    // Controlled dark blue-grey with broad soft variation; light aggregate
+    // only in clustered zones, each stone lit from the upper left.
+    let broad = fbm(SIZE, 2, 3, 0.5, 21);
+    let zones = fbm(SIZE, 4, 2, 0.5, 22);
+    let stones = voronoi(SIZE, 56, 0.85, 23);
+    let mut albedo = Vec::with_capacity(SIZE * SIZE);
+    let mut roughness = Field::new(SIZE, 0.0);
+    let mut height = Field::new(SIZE, 0.0);
+    for i in 0..SIZE * SIZE {
+        let mut c = lerp3(hex(ASPHALT[0]), hex(ASPHALT[1]), smoothstep(0.3, 0.7, broad.data[i]));
+        let mut h = 0.3;
+        let mut r = 0.84;
+        let stone = hash01(stones.id[i] as i64, 3, 24);
+        if zones.data[i] > 0.55 && stone > 0.6 && stones.f1.data[i] < 0.24 {
+            let (ox, oy) = stones.offset[i];
+            c = scale(hex(0x5c6169), 1.0 - (ox + oy) * 0.9);
+            h += 0.3 * (1.0 - stones.f1.data[i] / 0.24);
+            r = 0.72;
+        }
+        albedo.push(c);
+        roughness.data[i] = r;
+        height.data[i] = h;
+    }
+    Recipe { albedo, height, roughness, relief: 4.0 }
+}
+
+fn grass() -> Recipe {
+    // Painted grass clumps (~30 cm): fans of blades radiating from each
+    // clump centre, lit on the upper left, darker gaps between clumps.
+    let clumps = voronoi(SIZE, 10, 0.8, 31);
+    let broad = fbm(SIZE, 2, 2, 0.5, 32);
+    let mut albedo = Vec::with_capacity(SIZE * SIZE);
+    let mut height = Field::new(SIZE, 0.0);
+    for i in 0..SIZE * SIZE {
+        let id = clumps.id[i] as i64;
+        let (ox, oy) = clumps.offset[i];
+        let d = clumps.f1.data[i];
+        let angle = oy.atan2(ox);
+        let blades = 7.0 + (hash01(id, 1, 33) * 4.0).floor();
+        let fan =
+            smoothstep(0.55, 0.85, (angle * blades + hash01(id, 2, 33) * std::f32::consts::TAU).cos() * 0.5 + 0.5);
+        let dome = 1.0 - smoothstep(0.1, 0.75, d);
+        let lit = (-(ox + oy) * 0.9).clamp(-0.4, 0.5);
+        let base = if hash01(id, 3, 33) > 0.9 { hex(0x86a245) } else { pick(&GRASS, id, 34) };
+        let mut c = scale(base, 1.0 + lit * 0.35);
+        c = lerp3(c, hex(GRASS_TIP), fan * dome * 0.55);
+        c = lerp3(hex(GRASS_GAP), c, smoothstep(0.0, 0.35, dome + fan * 0.2));
+        albedo.push(scale(c, 0.97 + broad.data[i] * 0.06));
+        height.data[i] = dome * (0.6 + 0.4 * fan);
+    }
     let roughness = Field::new(SIZE, 0.9);
-    Recipe { albedo, height, roughness, relief: 6.0, occlusion: None }
+    Recipe { albedo, height, roughness, relief: 8.0 }
+}
+
+fn dirt() -> Recipe {
+    // Packed earth in two broad tones; pebbles gathered in a few clusters,
+    // each with a painted highlight and a contact shadow.
+    let broad = fbm(SIZE, 2, 3, 0.5, 41);
+    let zones = fbm(SIZE, 3, 2, 0.5, 42);
+    let pebbles = voronoi(SIZE, 18, 0.8, 43);
+    let mut albedo = Vec::with_capacity(SIZE * SIZE);
+    let mut height = Field::new(SIZE, 0.0);
+    for i in 0..SIZE * SIZE {
+        let tone = smoothstep(0.35, 0.65, broad.data[i]);
+        let mut c = lerp3(hex(EARTH[0]), hex(EARTH[1]), tone);
+        let mut h = tone * 0.25;
+        let id = pebbles.id[i] as i64;
+        let radius = 0.24 + hash01(id, 2, 44) * 0.12;
+        let d = pebbles.f1.data[i];
+        if zones.data[i] > 0.5 && hash01(id, 1, 44) > 0.35 {
+            let (ox, oy) = pebbles.offset[i];
+            if d < radius {
+                let dome = (1.0 - d / radius).sqrt();
+                c = scale(pick(&PEBBLES, id, 45), 1.0 - (ox + oy) / radius * 0.22);
+                h += dome * 0.6;
+            } else if d < radius + 0.07 && oy > 0.0 {
+                c = scale(c, 0.72);
+            }
+        }
+        albedo.push(c);
+        height.data[i] = h;
+    }
+    let roughness = Field::new(SIZE, 0.95);
+    Recipe { albedo, height, roughness, relief: 7.0 }
 }
 
 // --- Output --------------------------------------------------------------
@@ -532,10 +640,7 @@ fn write(name: &str, recipe: Recipe, out: &Path, previews: Option<&Path>) -> Res
     let height = recipe.height.normalized();
     // Stylized occlusion stays subtle (never below 0.55): the city is lit
     // mostly by ambient light, which AO multiplies.
-    let mut ao = cavity_ao(&height, 6, 1.2).zip(&cavity_ao(&height, 24, 0.8), |a, b| 0.55 + 0.45 * a * b);
-    if let Some(extra) = &recipe.occlusion {
-        ao = ao.zip(extra, |a, b| a * b);
-    }
+    let ao = cavity_ao(&height, 6, 1.2).zip(&cavity_ao(&height, 24, 0.8), |a, b| 0.55 + 0.45 * a * b);
     // Hand-painted look: soft occlusion and convex-edge highlights baked into the colour.
     let curvature = height.zip(&height.blurred(2), |h, b| (h - b).max(0.0));
     let albedo: Vec<u8> = recipe
@@ -543,7 +648,7 @@ fn write(name: &str, recipe: Recipe, out: &Path, previews: Option<&Path>) -> Res
         .iter()
         .enumerate()
         .flat_map(|(i, &c)| {
-            let lit = scale(c, 0.8 + 0.2 * ao.data[i] + (curvature.data[i] * 2.5).min(0.12));
+            let lit = scale(c, 0.85 + 0.15 * ao.data[i] + (curvature.data[i] * 2.0).min(0.08));
             let [r, g, b] = to_srgb8(lit);
             [r, g, b, 255]
         })
@@ -602,7 +707,7 @@ fn main() -> Result<()> {
     let out = Path::new(out);
     let recipes: Vec<(&str, RecipeFn)> = vec![
         ("StylizedAsphalt", asphalt),
-        ("StylizedSidewalk", || tiles(6, 9.0, &[0xb4aea2, 0xbab4a8, 0xaea89c], 0x8a857b, false, 0.8, true, 201)),
+        ("StylizedSidewalk", || slabs(4, 10.0, 14.0, &SAND, STONE_JOINT, false, 0.82, 201)),
         ("StylizedGrass", grass),
         ("StylizedDirt", dirt),
         ("StylizedConcrete", concrete),
@@ -613,11 +718,12 @@ fn main() -> Result<()> {
         ("StylizedMetalPanel", metal_panel),
         ("StylizedPaintedMetal", painted_metal),
         ("StylizedRust", rust),
-        ("StylizedWoodPlanks", || planks(12, &[0x8c5d36, 0x9a6a3f, 0x845733, 0xa57447], 0.62, 301)),
-        ("StylizedInteriorFloor", || planks(8, &[0xc39a68, 0xcfa774, 0xb98f5f], 0.42, 311)),
+        ("StylizedWoodPlanks", || planks(8, &WOOD, 0.62, 301)),
+        ("StylizedInteriorFloor", || planks(10, &OAK, 0.38, 311)),
         ("StylizedRoof", roof),
-        ("StylizedFloorTiles", || tiles(10, 6.0, &[0xd9d4c7, 0xa7b6b6], 0x9a958b, true, 0.3, false, 211)),
+        ("StylizedFloorTiles", || slabs(8, 7.0, 9.0, &[0xe3dccb, 0x9bb3ae], 0xa49d90, true, 0.25, 211)),
     ];
+
     for (name, recipe) in recipes {
         write(name, recipe(), out, previews)?;
     }
