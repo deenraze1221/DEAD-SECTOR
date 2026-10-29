@@ -54,6 +54,10 @@ pub struct MaterialParams {
     pub metallic: f32,
     /// Game-defined shading id passed to the surface hook; 0 means standard.
     pub shading: u32,
+    /// Window glass (with [`PassKind::Transparent`]): front faces only,
+    /// Fresnel-weighted opacity, reflections not dimmed by the blend, and no
+    /// screen-space occlusion from the surfaces behind it.
+    pub glass: bool,
 }
 
 impl Default for MaterialParams {
@@ -68,6 +72,7 @@ impl Default for MaterialParams {
             roughness: 1.0,
             metallic: 0.0,
             shading: 0,
+            glass: false,
         }
     }
 }

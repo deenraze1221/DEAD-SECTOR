@@ -21,6 +21,7 @@ pub const SHADOW_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float
 
 const FLAG_UNLIT: u32 = 1;
 const FLAG_ALPHA_TEST: u32 = 2;
+const FLAG_GLASS: u32 = 4;
 
 #[repr(C)]
 #[derive(Clone, Copy, Pod, Zeroable)]
@@ -498,7 +499,12 @@ impl ScenePass {
                     albedo: m.albedo,
                     emission: [m.emission[0], m.emission[1], m.emission[2], 0.0],
                     pbr: [m.roughness, m.metallic, 0.0, 0.0],
-                    flags: [flag(m.unlit, FLAG_UNLIT) | flag(m.alpha_test, FLAG_ALPHA_TEST), m.shading, 0, 0],
+                    flags: [
+                        flag(m.unlit, FLAG_UNLIT) | flag(m.alpha_test, FLAG_ALPHA_TEST) | flag(m.glass, FLAG_GLASS),
+                        m.shading,
+                        0,
+                        0,
+                    ],
                 };
                 let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some(&format!("material-{i}")),

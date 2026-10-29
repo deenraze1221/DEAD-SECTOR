@@ -7,7 +7,7 @@
 //! An item is placed against a room wall only where its padded footprint
 //! misses every placed item and every doorway/corridor box.
 
-use crate::buildings::{Plan, STOREY};
+use crate::buildings::{Plan, STOREY, THICKNESS};
 use crate::city::{City, Owner};
 use crate::citygen::{Aabb, matrix};
 use crate::emit::Emitter;
@@ -21,6 +21,8 @@ use std::f32::consts::{FRAC_PI_2, PI};
 const PREFABS_PER_TYPE: usize = 5;
 const PLACE_ATTEMPTS: usize = 12;
 const WALL_HEIGHT: f32 = 3.12;
+/// Partitions ending this close to an exterior wall are extended to it.
+const SNAP: f32 = 0.1;
 /// The store keeps its exported interior.
 const STORE_ID: i64 = 55;
 const RESIDENTIAL: [&str; 4] = ["apartment", "hotel", "motel", "residentialHighrise"];
@@ -149,6 +151,9 @@ struct Builder<'a> {
     emit: &'a mut Emitter,
     /// Stairwells and doorways: partitions are cut around them.
     keepouts: Vec<Aabb>,
+    /// Inner faces of the exterior walls (min x, max x, min z, max z):
+    /// partitions ending near them are extended to meet them.
+    shell: Option<[f32; 4]>,
     occupied: Vec<Aabb>,
     reserved: Vec<Aabb>,
     report: Report,
@@ -172,6 +177,7 @@ pub fn rebuild(city: &mut City, library: &Library, seed: u64, emit: &mut Emitter
         plaster,
         emit,
         keepouts: Vec::new(),
+        shell: None,
         occupied: Vec::new(),
         reserved: Vec::new(),
         report: Report::default(),
@@ -230,6 +236,10 @@ impl Builder<'_> {
         self.occupied.clear();
         self.reserved.clear();
         self.keepouts = plan_of.map(|p| p.keepouts(0)).unwrap_or_default();
+        self.shell = plan_of.map(|p| {
+            let (f, t) = (p.footprint, THICKNESS);
+            [f.min_x + t, f.max_x - t, f.min_z + t, f.max_z - t]
+        });
         self.reserved.extend(self.keepouts.iter().copied());
         let id = b.id;
         let left = b.x - b.w / 2.0 + 0.3;
@@ -264,8 +274,9 @@ impl Builder<'_> {
             let corridor = back + 1.7 + 0.06;
             self.reserved.push(clear(b.x - 0.8, corridor, 1.6, front + 0.8 - corridor));
             rooms.push(room(b.x - 0.85, back, 1.7, 1.6));
-            self.wall(b.x - 0.7, back + 1.7, 0.5, 0.12, id);
-            self.wall(b.x + 0.7, back + 1.7, 0.5, 0.12, id);
+            // Back-room walls end at the side walls' faces (x ± 0.89).
+            self.wall(b.x - 0.67, back + 1.7, 0.44, 0.12, id);
+            self.wall(b.x + 0.67, back + 1.7, 0.44, 0.12, id);
         } else {
             // Front and back halves split by a wall with a gap; plan 1 adds a washroom.
             let split = back + (front - back) * if plan == 1 { 0.47 } else { 0.32 };
@@ -281,7 +292,8 @@ impl Builder<'_> {
                 rooms.push(room(left, back, 1.95, depth.min(1.8)));
                 self.wall(left + 2.05, back + 0.9, 0.12, 1.8, id);
                 self.wall(left + 0.25, back + 1.85, 0.5, 0.12, id);
-                self.wall(left + 1.8, back + 1.85, 0.5, 0.12, id);
+                // Ends at the washroom wall's face (left + 1.99).
+                self.wall(left + 1.77, back + 1.85, 0.44, 0.12, id);
             }
         }
         let residential = RESIDENTIAL.contains(&b.kind.as_str());
@@ -411,8 +423,24 @@ impl Builder<'_> {
     /// A plaster partition with its collider, cut around stairwells and
     /// doorways; pieces that end up degenerate are skipped.
     fn wall(&mut self, x: f32, z: f32, w: f32, d: f32, building: i64) {
-        let whole =
+        let mut whole =
             Aabb::new(Vec3::new(x - w / 2.0, 0.0, z - d / 2.0), Vec3::new(x + w / 2.0, WALL_HEIGHT, z + d / 2.0));
+        // Meet the exterior walls instead of stopping 8 cm short of them.
+        if let Some([x0, x1, z0, z1]) = self.shell {
+            let near = |a: f32, b: f32| (a - b).abs() < SNAP;
+            if near(whole.min.x, x0) {
+                whole.min.x = x0;
+            }
+            if near(whole.max.x, x1) {
+                whole.max.x = x1;
+            }
+            if near(whole.min.z, z0) {
+                whole.min.z = z0;
+            }
+            if near(whole.max.z, z1) {
+                whole.max.z = z1;
+            }
+        }
         for piece in cut(whole, &self.keepouts) {
             let size = piece.size();
             if size.x <= 0.01 || size.z <= 0.01 {

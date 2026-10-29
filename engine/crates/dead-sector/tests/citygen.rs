@@ -80,7 +80,7 @@ fn layout_is_pinned_for_a_known_seed() {
     let fingerprint = kinds.join(",");
     let expected = include_str!("citygen_seed7.txt").trim();
     assert_eq!(fingerprint, expected, "seed 7 layout changed");
-    assert_eq!((report.interiors.furniture, city.instance_count()), (1819, 77_675));
+    assert_eq!((report.interiors.furniture, city.instance_count()), (1819, 81_023));
     let pinned: Vec<usize> = (0..PLOTS).filter(|&p| report.layout.pinned[p]).collect();
     // No shared object reaches into a plot's core in the exported city, so only the fixed plots stay.
     assert_eq!(pinned, [0, 9, 44, 45, 54, 55, 90, 99]);

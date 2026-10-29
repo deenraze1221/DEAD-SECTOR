@@ -9,7 +9,7 @@ version. The HTML and Godot versions are not modified. See
 cascaded sun shadows, local-light shadows, contact shadows and optional SSAO,
 a first-person player that walks, sprints and jumps with collision, and
 seeded city generation (`--seed N`): new plot layout, modular multi-storey
-buildings with windows, doors, stairs and roofs, and furnished floors.
+buildings with glass windows, doors, stairs and roofs, and furnished floors.
 Without `--seed` the exported city is shown unchanged. No combat yet.
 
 ## Build and run (Windows)

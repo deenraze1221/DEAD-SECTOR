@@ -172,6 +172,9 @@ pub struct Material {
     pub texture: Option<u32>,
     /// Procedural city surface kind (0 = plain, 1 brick, 3 tile, 4 asphalt, 5 wood …).
     pub surface: u32,
+    /// Window glass (generated cities only; never in the export).
+    #[serde(default)]
+    pub glass: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Deserialize)]

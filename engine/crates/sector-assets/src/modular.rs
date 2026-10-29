@@ -61,6 +61,8 @@ pub struct WallSpec {
     /// Window band, relative to `base`: openings span `sill..top`; doors span `0..top`.
     pub sill: f32,
     pub top: f32,
+    /// Which side is outdoors: −1 below `plane`, +1 above `plane + thickness`.
+    pub outward: f32,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -77,6 +79,11 @@ impl Opening {
 }
 
 impl WallSpec {
+    /// The ledge's span across the wall, on the outdoor side.
+    fn ledge(&self) -> (f32, f32) {
+        if self.outward < 0.0 { (-LEDGE, 0.0) } else { (1.0, 1.0 + LEDGE) }
+    }
+
     /// A box spanning `a..b` along the wall, `y0..y1` above the base, and
     /// `c0..c1` across (fractions of the thickness).
     fn piece(
@@ -97,10 +104,18 @@ impl WallSpec {
     }
 }
 
+/// Door frame and glass sizes (metres).
+pub const FRAME: f32 = 0.06;
+/// Glass sits in the middle tenth of the wall thickness.
+const GLASS: (f32, f32) = (0.45, 0.55);
+/// Sill ledges stick out of the outer face by this fraction of the thickness.
+const LEDGE: f32 = 0.3;
+
 /// Emits a wall with openings, banded to keep the box count low: one strip
 /// below the window band (split only at doors), one strip above it, piers
-/// between openings, and one glass strip per run of windows. Openings must not
-/// overlap and must lie inside the wall.
+/// between openings, a glass pane in each window and a frame inside each
+/// door. No two boxes overlap, so no faces fight. Openings must not overlap
+/// and must lie inside the wall.
 pub fn wall(spec: &WallSpec, openings: &[Opening], out: &mut Vec<Part>) {
     let mut openings = openings.to_vec();
     openings.sort_by(|a, b| a.span().0.total_cmp(&b.span().0));
@@ -113,35 +128,24 @@ pub fn wall(spec: &WallSpec, openings: &[Opening], out: &mut Vec<Part>) {
         if let Opening::Door { .. } = o {
             let (a, b) = o.span();
             out.extend(spec.piece((cursor, a), (0.0, sill), (0.0, 1.0), Slot::Wall, true));
-            out.extend(spec.piece((a - 0.06, a), (0.0, top), (-0.25, 1.25), Slot::Frame, false));
-            out.extend(spec.piece((b, b + 0.06), (0.0, top), (-0.25, 1.25), Slot::Frame, false));
-            out.extend(spec.piece((a - 0.06, b + 0.06), (top, top + 0.06), (-0.25, 1.25), Slot::Frame, false));
+            // Frame inside the opening: two jambs and a head, standing proud of both faces.
+            out.extend(spec.piece((a, a + FRAME), (0.0, top - FRAME), (-0.25, 1.25), Slot::Frame, false));
+            out.extend(spec.piece((b - FRAME, b), (0.0, top - FRAME), (-0.25, 1.25), Slot::Frame, false));
+            out.extend(spec.piece((a, b), (top - FRAME, top), (-0.25, 1.25), Slot::Frame, false));
             cursor = b;
         }
     }
     out.extend(spec.piece((cursor, spec.to), (0.0, sill), (0.0, 1.0), Slot::Wall, true));
-    // Piers in the band, and glass behind each run of consecutive windows.
+    // Piers in the band; a pane and an outside sill ledge in each window.
     let mut cursor = spec.from;
-    let mut glass_from: Option<f32> = None;
     for o in &openings {
         let (a, b) = o.span();
         out.extend(spec.piece((cursor, a), (sill, top), (0.0, 1.0), Slot::Wall, true));
-        match o {
-            Opening::Window { .. } => {
-                glass_from.get_or_insert(a);
-                // Sill ledge, outside.
-                out.extend(spec.piece((a - 0.05, b + 0.05), (sill - 0.06, sill), (-0.3, 0.5), Slot::Frame, false));
-            }
-            Opening::Door { .. } => {
-                if let Some(g) = glass_from.take() {
-                    out.extend(spec.piece((g, cursor), (sill, top), (0.35, 0.65), Slot::Glass, true));
-                }
-            }
+        if let Opening::Window { .. } = o {
+            out.extend(spec.piece((a, b), (sill, top), GLASS, Slot::Glass, true));
+            out.extend(spec.piece((a - 0.05, b + 0.05), (sill - FRAME, sill), spec.ledge(), Slot::Frame, false));
         }
         cursor = b;
-    }
-    if let Some(g) = glass_from {
-        out.extend(spec.piece((g, cursor), (sill, top), (0.35, 0.65), Slot::Glass, true));
     }
     out.extend(spec.piece((cursor, spec.to), (sill, top), (0.0, 1.0), Slot::Wall, true));
 }
@@ -149,9 +153,9 @@ pub fn wall(spec: &WallSpec, openings: &[Opening], out: &mut Vec<Part>) {
 /// Several identical storeys of one wall, stacked from `spec.base`, each
 /// `storey` high with windows at `windows` (centres, all `width` wide) in the
 /// `spec.sill..spec.top` band of every storey. Emitted as full-height piers
-/// between the window columns, one spandrel strip per floor line, and one
-/// glass strip and sill ledge per storey, so the box count barely grows with
-/// height. Spandrels overlap the piers inside the wall.
+/// between the window columns, spandrels between the bands inside each
+/// column, a pane per window and one outside sill ledge per storey, so the
+/// box count grows slowly with height. No two boxes overlap.
 pub fn facade(spec: &WallSpec, storey: f32, storeys: u32, windows: &[f32], width: f32, out: &mut Vec<Part>) {
     if storeys == 0 {
         return;
@@ -166,26 +170,24 @@ pub fn facade(spec: &WallSpec, storey: f32, storeys: u32, windows: &[f32], width
         cursor = c + width / 2.0;
     }
     out.extend(spec.piece((cursor, spec.to), (0.0, total), (0.0, 1.0), Slot::Wall, true));
-    if centers.is_empty() {
-        return;
+    let Some((first, last)) = centers.first().zip(centers.last()) else { return };
+    let run = (first - width / 2.0 - 0.05, last + width / 2.0 + 0.05);
+    for c in &centers {
+        let column = (c - width / 2.0, c + width / 2.0);
+        // Spandrels: below the first band, between bands, above the last band.
+        let mut below = 0.0;
+        for floor in 0..storeys {
+            let y = floor as f32 * storey;
+            out.extend(spec.piece(column, (below, y + spec.sill), (0.0, 1.0), Slot::Wall, true));
+            out.extend(spec.piece(column, (y + spec.sill, y + spec.top), GLASS, Slot::Glass, true));
+            below = y + spec.top;
+        }
+        out.extend(spec.piece(column, (below, total), (0.0, 1.0), Slot::Wall, true));
     }
-    let run = (centers[0] - width / 2.0, centers[centers.len() - 1] + width / 2.0);
-    // Spandrels: below the first band, between bands, above the last band.
-    let mut below = 0.0;
     for floor in 0..storeys {
-        let y = floor as f32 * storey;
-        out.extend(spec.piece((spec.from, spec.to), (below, y + spec.sill), (0.0, 1.0), Slot::Wall, true));
-        out.extend(spec.piece(run, (y + spec.sill, y + spec.top), (0.35, 0.65), Slot::Glass, true));
-        out.extend(spec.piece(
-            (run.0 - 0.05, run.1 + 0.05),
-            (y + spec.sill - 0.06, y + spec.sill),
-            (-0.3, 0.5),
-            Slot::Frame,
-            false,
-        ));
-        below = y + spec.top;
+        let y = floor as f32 * storey + spec.sill;
+        out.extend(spec.piece(run, (y - FRAME, y), spec.ledge(), Slot::Frame, false));
     }
-    out.extend(spec.piece((spec.from, spec.to), (below, total), (0.0, 1.0), Slot::Wall, true));
 }
 
 /// Evenly spaced window centres along `from..to`, about `bay` apart, skipping
@@ -308,6 +310,16 @@ mod tests {
         a.min.cmplt(b.max).all() && a.max.cmpgt(b.min).all()
     }
 
+    /// No two boxes share volume: overlapping boxes are what make coplanar faces fight.
+    fn assert_no_overlap(parts: &[Part]) {
+        for (i, a) in parts.iter().enumerate() {
+            for b in &parts[i + 1..] {
+                let shared = (a.max.min(b.max) - a.min.max(b.min)).min_element();
+                assert!(shared <= 1e-5, "{a:?} overlaps {b:?}");
+            }
+        }
+    }
+
     fn spec() -> WallSpec {
         WallSpec {
             axis: Axis::X,
@@ -319,6 +331,7 @@ mod tests {
             height: 3.12,
             sill: 0.9,
             top: 2.3,
+            outward: -1.0,
         }
     }
 
@@ -353,6 +366,7 @@ mod tests {
             Part { min: Vec3::new(4.21, 3.31, -0.5), max: Vec3::new(5.79, 5.59, 0.7), slot: Slot::Wall, solid: true };
         assert!(parts.iter().filter(|p| p.solid).all(|p| !overlap(p, &door)));
         assert_eq!(parts.iter().filter(|p| p.slot == Slot::Glass).count(), 2);
+        assert_no_overlap(&parts);
     }
 
     #[test]
@@ -361,13 +375,13 @@ mod tests {
         let windows = [2.0, 5.0, 8.0];
         let mut parts = Vec::new();
         facade(&spec, 3.3, 4, &windows, 1.0, &mut parts);
-        // Far fewer boxes than four separate storeys of `wall`.
+        // Fewer boxes than four separate storeys of `wall`.
         let mut separate = Vec::new();
         for floor in 0..4 {
             let s = WallSpec { base: 3.3 + floor as f32 * 3.3, ..spec };
             wall(&s, &windows.map(|center| Opening::Window { center, width: 1.0 }), &mut separate);
         }
-        assert!(parts.len() * 2 < separate.len(), "{} vs {}", parts.len(), separate.len());
+        assert!(parts.len() < separate.len(), "{} vs {}", parts.len(), separate.len());
         // Sample the wall face: solid wall everywhere except inside window openings.
         for i in 0..100 {
             for j in 0..132 {
@@ -380,7 +394,8 @@ mod tests {
                 assert_eq!(walled, !in_window, "at {a} {y}");
             }
         }
-        assert_eq!(parts.iter().filter(|p| p.slot == Slot::Glass).count(), 4);
+        assert_eq!(parts.iter().filter(|p| p.slot == Slot::Glass).count(), 12);
+        assert_no_overlap(&parts);
         assert!(parts.iter().all(|p| p.min.y >= 3.3 - 1e-4 && p.max.y <= 3.3 + 13.2 + 1e-4));
     }
 

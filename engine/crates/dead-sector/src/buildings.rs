@@ -6,7 +6,7 @@
 //! city's floor, glass, wood and concrete materials), and each solid piece is
 //! also a collider.
 
-use crate::city::{City, Owner};
+use crate::city::{City, Material, Owner, Side};
 use crate::citygen::{Aabb, matrix};
 use crate::emit::Emitter;
 use glam::{Mat4, Vec3};
@@ -72,6 +72,25 @@ pub struct Report {
     pub colliders: usize,
 }
 
+/// The glass material modular windows use (added to the city's materials).
+pub fn glass_material() -> Material {
+    Material {
+        // Subtle blue-green tint, moderate transparency, glossy but not mirror-like.
+        opacity: 0.3,
+        transparent: true,
+        side: Side::Double,
+        color: parse_hex_color("#8cb8b0").unwrap(),
+        emissive: [0.0; 3],
+        energy: 0.0,
+        roughness: 0.12,
+        metalness: 0.0,
+        unlit: false,
+        texture: None,
+        surface: 0,
+        glass: true,
+    }
+}
+
 struct Materials {
     unit_box: usize,
     floor: usize,
@@ -90,7 +109,7 @@ impl Materials {
         Materials {
             unit_box: city.geometries.iter().position(|g| g.position.len() == 72 && g.index.len() == 36).unwrap_or(0),
             floor: by_color("#9a9380"),
-            glass: by_color("#354d50"),
+            glass: city.materials.iter().position(|m| m.glass).expect("glass material added"),
             wood: by_color("#806448"),
             concrete: by_color("#8b8e7e"),
             roof: by_color("#303c35"),
@@ -100,6 +119,9 @@ impl Materials {
 
 /// Rebuilds every building except the store from modules.
 pub fn rebuild(city: &mut City, emit: &mut Emitter, seed: u64) -> Report {
+    if !city.materials.iter().any(|m| m.glass) {
+        city.materials.push(glass_material());
+    }
     let materials = Materials::find(city);
     let targets: Vec<usize> = (0..city.buildings.len()).filter(|&i| city.buildings[i].kind != STORE).collect();
     let ids: HashSet<i64> = targets.iter().map(|&i| city.buildings[i].id).collect();
@@ -254,7 +276,7 @@ pub fn building_parts(
 
     let mut parts = Vec::new();
     // Walls run the full storey height; slabs sit inside them.
-    let spec = |axis, from, to, plane, base| WallSpec {
+    let spec = |axis, from, to, plane, base, outward| WallSpec {
         axis,
         from,
         to,
@@ -264,6 +286,7 @@ pub fn building_parts(
         height: STOREY,
         sill,
         top: WINDOW_TOP,
+        outward,
     };
     let centers = |from: f32, to: f32, avoid| modular::window_centers(from, to, bay, window, avoid, 0.35);
     let door = (b.x - DOOR_WIDTH / 2.0, b.x + DOOR_WIDTH / 2.0);
@@ -276,12 +299,12 @@ pub fn building_parts(
     let front_upper = centers(f.min_x + t, f.max_x - t, None);
     // Front (+Z) and back run the full width; the sides fit between them.
     let walls = [
-        (Axis::X, f.min_x, f.max_x, f.max_z - t, &front_upper),
-        (Axis::X, f.min_x, f.max_x, f.min_z, &back),
-        (Axis::Z, f.min_z + t, f.max_z - t, f.min_x, &side),
-        (Axis::Z, f.min_z + t, f.max_z - t, f.max_x - t, &side),
+        (Axis::X, f.min_x, f.max_x, f.max_z - t, 1.0, &front_upper),
+        (Axis::X, f.min_x, f.max_x, f.min_z, -1.0, &back),
+        (Axis::Z, f.min_z + t, f.max_z - t, f.min_x, -1.0, &side),
+        (Axis::Z, f.min_z + t, f.max_z - t, f.max_x - t, 1.0, &side),
     ];
-    for (i, (axis, from, to, plane, upper)) in walls.into_iter().enumerate() {
+    for (i, (axis, from, to, plane, outward, upper)) in walls.into_iter().enumerate() {
         // Ground floor: its own wall, with the front door.
         let mut openings: Vec<Opening> = if i == 0 {
             centers(f.min_x + t, f.max_x - t, Some(door))
@@ -294,9 +317,9 @@ pub fn building_parts(
         if i == 0 {
             openings.push(Opening::Door { center: b.x, width: DOOR_WIDTH });
         }
-        modular::wall(&spec(axis, from, to, plane, 0.0), &openings, &mut parts);
+        modular::wall(&spec(axis, from, to, plane, 0.0, outward), &openings, &mut parts);
         // Upper storeys: one stacked facade.
-        modular::facade(&spec(axis, from, to, plane, STOREY), STOREY, floors - 1, upper, window, &mut parts);
+        modular::facade(&spec(axis, from, to, plane, STOREY, outward), STOREY, floors - 1, upper, window, &mut parts);
     }
     let inner = Rect { min_x: f.min_x + t, max_x: f.max_x - t, min_z: f.min_z + t, max_z: f.max_z - t };
     for floor in 0..floors {
@@ -319,12 +342,13 @@ pub fn building_parts(
                 tread: TREAD,
             };
             modular::stairs(&flight, &mut parts);
-            // Guard rails round the hole above: along each long side that is
-            // not the back wall, and across the end the flight starts from
-            // (the top end stays open).
+            // Guard rails round the hole above: inside the hole along each
+            // long side that is not the back wall (so they never share volume
+            // with the slab or the next flight), and on the landing across the
+            // end the flight starts from (the top end stays open).
             let rail = |min: Vec3, max: Vec3| Part::new(min, max, Slot::Frame, true);
-            for edge in [strip.0 - RAIL, strip.1] {
-                if edge < strip_z {
+            for edge in [strip.0, strip.1 - RAIL] {
+                if edge <= strip_z {
                     continue;
                 }
                 parts.extend(rail(

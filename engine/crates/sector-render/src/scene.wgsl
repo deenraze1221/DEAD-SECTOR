@@ -52,6 +52,9 @@ struct Material {
 
 const FLAG_UNLIT: u32 = 1u;
 const FLAG_ALPHA_TEST: u32 = 2u;
+// Window glass: front faces only, Fresnel opacity, unattenuated reflections,
+// no screen-space occlusion (that belongs to the opaque surface behind).
+const FLAG_GLASS: u32 = 4u;
 
 struct SurfaceInput {
     // Material colour × vertex colour × texture.
@@ -310,6 +313,11 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
     if (flags & FLAG_ALPHA_TEST) != 0u && texel.a < 0.5 {
         discard;
     }
+    let glass = (flags & FLAG_GLASS) != 0u;
+    // One layer per pane: the far side of a glass box is not drawn.
+    if glass && !front {
+        discard;
+    }
     let len = length(in.normal);
     var n = select(vec3<f32>(0.0, 1.0, 0.0), in.normal / len, len > 1e-6);
     if !front {
@@ -324,6 +332,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
     let roughness = surface.roughness;
 
     var color: vec3<f32>;
+    var alpha = material.albedo.a;
     if (flags & FLAG_UNLIT) != 0u {
         color = albedo;
     } else {
@@ -331,7 +340,7 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
         let v = normalize(frame.camera_pos.xyz - in.world);
         let f0 = mix(vec3<f32>(0.04), albedo, metallic);
         var screen_occlusion = vec2<f32>(1.0);
-        if shadows.local.z > 0.5 {
+        if shadows.local.z > 0.5 && !glass {
             screen_occlusion = textureLoad(occlusion_map, vec2<i32>(in.clip.xy), 0).rg;
         }
         let sun_visibility = sun_shadow(in.world, n, in.clip.xy) * screen_occlusion.g;
@@ -363,7 +372,15 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
         // Ambient occlusion darkens only indirect light, as in Godot (ao_light_affect 0).
         let ao = screen_occlusion.r;
         specular += reflected * env_brdf(f0, roughness, n_dot_v) * ao;
-        color = (diffuse + frame.ambient.rgb * ao) * albedo * (1.0 - metallic) + specular + material.emission.rgb;
+        if glass {
+            // More opaque at grazing angles; the reflection is divided by the
+            // blend factor so alpha blending does not dim it.
+            let fresnel = pow(1.0 - n_dot_v, 5.0);
+            alpha = mix(alpha, 1.0, fresnel);
+            color = (diffuse + frame.ambient.rgb * ao) * albedo + specular / alpha + material.emission.rgb;
+        } else {
+            color = (diffuse + frame.ambient.rgb * ao) * albedo * (1.0 - metallic) + specular + material.emission.rgb;
+        }
     }
-    return vec4<f32>(apply_fog(color, in.world), material.albedo.a);
+    return vec4<f32>(apply_fog(color, in.world), alpha);
 }

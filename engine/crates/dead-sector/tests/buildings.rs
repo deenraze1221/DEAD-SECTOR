@@ -120,11 +120,7 @@ fn module_parts(city: &City, id: i64) -> Vec<(Aabb, usize)> {
 #[test]
 fn modules_connect_without_overlap_and_collide() {
     let (city, report) = seeded(7);
-    let glass = city
-        .materials
-        .iter()
-        .position(|m| m.color == sector_assets::color::parse_hex_color("#354d50").unwrap())
-        .unwrap();
+    let glass = city.materials.iter().position(|m| m.glass).unwrap();
     let mut solid_colliders = 0;
     for plan in &report.buildings.plans {
         let colliders: Vec<Aabb> = city
@@ -137,24 +133,8 @@ fn modules_connect_without_overlap_and_collide() {
             .map(|c| Aabb::new(Vec3::new(c.min_x, c.min_y, c.min_z), Vec3::new(c.max_x, c.max_y, c.max_z)))
             .collect();
         solid_colliders += colliders.len();
-        // Structural boxes never overlap each other, except inside a wall
-        // (glass and spandrel strips cross the piers of stacked facades).
-        let f = plan.footprint;
-        let t = dead_sector::buildings::THICKNESS;
-        let in_wall = |c: &Aabb| {
-            c.max.x <= f.min_x + t + 1e-4
-                || c.min.x >= f.max_x - t - 1e-4
-                || c.max.z <= f.min_z + t + 1e-4
-                || c.min.z >= f.max_z - t - 1e-4
-        };
-        let structure: Vec<&Aabb> = colliders.iter().filter(|c| c.size().min_element() > 0.07).collect();
-        for (i, a) in structure.iter().enumerate() {
-            for b in &structure[i + 1..] {
-                let overlap =
-                    a.min.cmplt(b.max - 1e-4).all() && a.max.cmpgt(b.min + 1e-4).all() && !(in_wall(a) && in_wall(b));
-                assert!(!overlap, "building {}: {a:?} overlaps {b:?}", plan.building);
-            }
-        }
+        // No two solid boxes share volume (shared volume is what makes faces fight).
+        assert_disjoint(&colliders, &format!("building {}", plan.building));
         // Every collider is one of the drawn module boxes.
         let drawn = module_parts(city, plan.building);
         for c in &colliders {
@@ -223,10 +203,95 @@ fn seeds_vary_storeys_and_add_no_draw_calls() {
     assert!(
         report.buildings.plans.iter().any(|p| p.floors >= 8) && report.buildings.plans.iter().any(|p| p.floors == 1)
     );
-    // Modules and furniture join existing batches: the draw list does not grow.
-    assert_eq!(city.batches.len(), exported().batches.len());
+    // Modules and furniture join existing batches; only the window glass adds one.
+    assert_eq!(city.batches.len(), exported().batches.len() + 1);
     let (draws, exported_draws) = (build_scene(city).draws.len(), build_scene(exported()).draws.len());
     assert!(draws <= exported_draws, "{draws} draws vs {exported_draws}");
+}
+
+/// Panics if any two boxes share volume beyond 0.1 mm.
+fn assert_disjoint(boxes: &[Aabb], what: &str) {
+    let mut order: Vec<usize> = (0..boxes.len()).collect();
+    order.sort_by(|&a, &b| boxes[a].min.x.total_cmp(&boxes[b].min.x));
+    for (i, &a) in order.iter().enumerate() {
+        for &b in &order[i + 1..] {
+            if boxes[b].min.x >= boxes[a].max.x {
+                break;
+            }
+            let shared = (boxes[a].max.min(boxes[b].max) - boxes[a].min.max(boxes[b].min)).min_element();
+            assert!(shared <= 1e-4, "{what}: {:?} overlaps {:?}", boxes[a], boxes[b]);
+        }
+    }
+}
+
+/// Every box drawn for a building: modules, partitions and stair rails.
+fn drawn_boxes(city: &City, id: i64) -> Vec<Aabb> {
+    let owners = [Some(Owner::Str(format!("module-{id}"))), Some(Owner::Str(format!("partition-{id}")))];
+    let mut boxes = Vec::new();
+    for batch in &city.batches {
+        for (i, o) in batch.owners.iter().enumerate() {
+            if owners.contains(o) {
+                let m = citygen::matrix(&batch.transforms[i]);
+                let half = Vec3::new(m.x_axis.length(), m.y_axis.length(), m.z_axis.length()) / 2.0;
+                let c = m.w_axis.truncate();
+                boxes.push(Aabb::new(c - half, c + half));
+            }
+        }
+    }
+    boxes
+}
+
+#[test]
+fn no_drawn_boxes_overlap_in_any_building() {
+    // Walls, facades, frames, sills, glass, slabs, stairs, rails, roofs and partitions.
+    for seed in [7, 1234] {
+        let (city, report) = seeded(seed);
+        for plan in &report.buildings.plans {
+            let boxes = drawn_boxes(city, plan.building);
+            assert!(boxes.len() > 20);
+            assert_disjoint(&boxes, &format!("seed {seed} building {}", plan.building));
+        }
+    }
+}
+
+#[test]
+fn buildings_of_1_4_8_and_12_floors_are_clean() {
+    let template = exported().buildings.iter().find(|b| b.kind != "grocery").unwrap().clone();
+    for floors in [1, 4, 8, 12] {
+        for mirror in [false, true] {
+            let (parts, plan) = dead_sector::buildings::building_parts(&template, floors, 2.0, 1.0, 0.95, mirror, 0.8);
+            let boxes: Vec<Aabb> = parts.iter().map(|p| Aabb::new(p.min, p.max)).collect();
+            assert_disjoint(&boxes, &format!("{floors} floors"));
+            assert_eq!(plan.flights.len(), floors as usize - 1);
+            let top = parts.iter().map(|p| p.max.y).fold(0.0, f32::max);
+            assert!((top - (floors as f32 * STOREY + 0.8)).abs() < 1e-4, "{floors}: top {top}");
+            // Glass in every storey's windows, all opaque pieces closed around them.
+            let glass = parts.iter().filter(|p| p.slot == sector_assets::modular::Slot::Glass);
+            let levels: std::collections::BTreeSet<i32> = glass.map(|p| (p.min.y / STOREY).floor() as i32).collect();
+            assert_eq!(levels.len(), floors as usize);
+        }
+    }
+}
+
+#[test]
+fn window_glass_is_a_dedicated_transparent_material() {
+    let (city, _) = seeded(7);
+    let index = city.materials.iter().position(|m| m.glass).unwrap();
+    let m = &city.materials[index];
+    assert!(m.transparent && (0.2..=0.45).contains(&m.opacity));
+    assert!(m.color[1] > m.color[0] && m.color[2] > m.color[0], "blue-green tint {:?}", m.color);
+    assert!(m.roughness < 0.3 && m.metalness == 0.0);
+    // The export has no glass, so the default city renders as before.
+    assert!(!exported().materials.iter().any(|m| m.glass));
+    let scene = build_scene(city);
+    let params = &scene.materials[index];
+    assert!(params.glass && params.pass == sector_assets::PassKind::Transparent);
+    let glass_draws: Vec<_> = scene.draws.iter().filter(|d| d.material == index).collect();
+    assert_eq!(glass_draws.len(), 1, "all panes are one instanced draw");
+    assert!(glass_draws[0].instance_count > 1000);
+    // Every pane collides like a window.
+    let panes = city.batches.iter().find(|b| b.materials == [index]).unwrap().transforms.len();
+    assert_eq!(city.colliders.iter().filter(|c| c.kind == "window").count(), panes);
 }
 
 /// Walks straight towards `target` (XZ) until within 5 cm; returns whether it got there.

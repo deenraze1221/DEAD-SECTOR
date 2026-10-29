@@ -22,12 +22,13 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | Scene data | `sector-assets::scene` | `SceneBuilder`: add meshes, materials, instances and instanced draws; any game converts its formats into this |
 | Materials | `sector-assets::MaterialParams` | Albedo, emission, roughness, metallic, unlit, alpha test, texture, pass (opaque / double-sided / transparent) and a game **shading id** |
 | Images | `sector-assets::load_image` | Any PNG; the game decides paths |
-| Building modules | `sector-assets::modular` | Box-based kit: `wall` (door and window openings, banded: one strip below and above the window band, piers, one glass strip per window run), `facade` (identical storeys stacked as full-height piers plus one spandrel per floor line), `slab` (rectangle minus holes), `stairs` (`Flight` of solid steps), `parapet`. Each box has a material `Slot` and a `solid` flag, for drawing as unit-box instances and for collision |
+| Building modules | `sector-assets::modular` | Box-based kit: `wall` (door and window openings, banded: one strip below and above the window band, piers, a pane per window, a frame inside each door), `facade` (identical storeys stacked as full-height piers plus spandrels per window column), `slab` (rectangle minus holes), `stairs` (`Flight` of solid steps), `parapet`. No two boxes share volume, so no faces fight. Each box has a material `Slot` and a `solid` flag, for drawing as unit-box instances and for collision; `WallSpec::outward` puts sills on the outdoor side |
 | Random numbers | `sector-assets::rng::Rng` | PCG32: same seed, same sequence on every platform (integer ranges, floats, shuffles); for anything every co-op client must build identically |
 | GPU setup | `sector-render::gpu` | Vulkan first, DX12 fallback on Windows, `WGPU_BACKEND` override |
 | Camera | `sector-render::view::Camera` | Position, yaw/pitch, FOV, near/far, reversed-Z projection |
 | Lighting | `sector-render::Lighting`, `PointLight` | Sun, ambient, exponential fog, sky gradient; up to 16 point lights per frame with Godot's omni falloff |
 | Shading | `scene.wgsl` | Burley diffuse, GGX specular, sky reflections, fog, HDR output |
+| Glass | `MaterialParams::glass` (transparent pass) | Front faces only (one layer per pane), Schlick-Fresnel opacity, reflections not dimmed by the blend, no screen-space occlusion from what is behind; like all transparent draws, not a shadow caster and not in the depth prepass |
 | Surface hook | `RendererConfig::surface_hook` | Game WGSL `surface_hook(shading, input)` changes albedo/roughness per material, with per-frame `frame.game` values |
 | Sun shadows | `shadows.rs`, `shadow_maps.rs` | Cascaded shadow maps, 1–4 cascades, 1024–4096 maps, distance, hard / PCF / soft filtering, texel-snapped stable cascades, per-cascade caster culling (instances fetched from a storage buffer by index) |
 | Local shadows | same | Six-face shadow maps for the nearest `cast_shadows` point lights within a budget (0–4); casters culled to each light's range; a light's own fixture is ignored |
@@ -190,6 +191,35 @@ interior minus the stair hole; building heights match their storeys;
 stairwells are free of partitions and furniture; seeds vary storeys; draw
 count does not grow.
 
+## Clean modules and glass (Stage 5.1)
+
+- **No overlapping boxes.** Every box drawn for a building (walls, facades,
+  door frames, sills, panes, slabs, stairs, rails, roof, partitions) is
+  disjoint from every other; a test checks all buildings of two seeds and
+  synthetic 1-, 4-, 8- and 12-storey buildings (both stair mirrorings).
+  Fixes, all by removing shared volume rather than offsetting faces:
+  - facade spandrels now fill only the window columns between full-height
+    piers (they used to span the whole wall through the piers);
+  - one pane per window, exactly filling the opening (was a strip through
+    the piers);
+  - door frames sit inside the opening (were overlapping the wall);
+  - sill ledges stick out of the outer face only, on the outdoor side (on
+    front and right walls they used to point indoors);
+  - stair-hole rails sit inside the hole (used to share volume with the next
+    flight);
+  - partitions run to the exterior walls' inner faces (they stopped 8 cm
+    short) and the back-room and washroom stubs end at the walls they meet.
+- **Glass.** Windows use a generated material (`#8cb8b0`, opacity 0.3,
+  roughness 0.12) marked `glass`, drawn in one instanced transparent draw.
+  Interiors and furniture show through; sunlight now reaches interiors
+  through the windows. A GPU test renders a red wall behind a pane, behind no
+  pane and behind an opaque pane and checks the wall stays visible, tinted.
+- The export has no glass material, so the default city is unchanged
+  (pixel-identical to the Stage 2b baseline).
+
+Seed 7: 81,023 instances (Stage 5: 77,675), one more batch (the glass).
+Software renderer frame time unchanged within noise (~502 → ~509 ms).
+
 ## Planned engine systems (not built yet)
 
 These have no user in the code yet, so they will be added when a Dead Sector
@@ -207,14 +237,16 @@ stage needs them, not before:
 - **Audio** (sound effects, music, 3D sound, volume buses): audio stage.
 - **Mesh and animation import (glTF)**: weapons stage.
 
-## Limitations (Stage 5)
+## Limitations (Stage 5.1)
 
 - Modular buildings exist only in seeded cities (`--seed`); the default city
   is the exported one, unchanged.
-- No roof access; upper floors are single open rooms; windows are opaque
-  (as in the export), so interiors are dark.
-- Stacked facade spandrels and glass overlap the piers inside the wall
-  (same material, invisible).
+- No roof access; upper floors are single open rooms.
+- Glass panes are not sorted against each other (one instanced draw); with
+  identical tint the blend order barely matters, but looking through two
+  panes at a grazing angle can differ slightly.
+- Glass casts no shadow and does not refract; its own diffuse term lightens
+  it near bright lights.
 - Hidden interiors still cost shadow and depth work: there is no occlusion
   culling.
 

@@ -6,7 +6,7 @@ use sector_render::{ContactShadows, RenderSettings, ShadowFilter, Ssao, SunShado
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Sector Engine, stage 5)
+DEAD SECTOR (Sector Engine, stage 5.1)
 
 USAGE: dead-sector [options]
 

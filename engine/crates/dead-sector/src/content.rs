@@ -76,6 +76,7 @@ fn material(m: &crate::city::Material) -> MaterialParams {
         roughness: if m.surface > 0 { 0.92 } else { m.roughness },
         metallic: if m.surface > 0 { 0.0 } else { m.metalness },
         shading: if powered { SHADING_POWERED } else { m.surface },
+        glass: m.glass,
     }
 }
 
