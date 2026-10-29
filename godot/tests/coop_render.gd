@@ -17,7 +17,7 @@ func run() -> void:
  main.climate.kind="rain";main.climate.fog="light"
  var actor=preload("res://scripts/coop_avatar.gd").new()
  main.add_child(actor);actor.setup(main,"guest")
- actor.update_pose({"p":[24,.05,27],"yaw":PI,"pitch":-.1,"hp":100,"weapon":"Kalash","light":true})
+ actor.update_pose({"p":[24,.05,27],"yaw":PI,"pitch":-.1,"hp":100,"weapon":"Kapano","light":true})
  main.coop.peers.guest=actor
  main.battle.announce("SQUAD READY · DEFEND THE SECTOR","mission")
  await shot("soldier-hud")

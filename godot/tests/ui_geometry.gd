@@ -11,7 +11,6 @@ func run() -> void:
  check(ui.mono.font_names[0]=="Courier New","Terminal uses browser monospace family on Windows")
  check(ui.heading.font_names[0]=="Arial","Brand uses browser Arial family")
  check(is_equal_approx(main.player.weapon_camera.fov,45),"Pistol uses original HTML viewmodel projection")
- check(main.player.gun.scale.is_equal_approx(Vector3.ONE*.65),"Pistol has a compact viewmodel scale")
  check(ui.menu_camera.current and not ui.started,"Fresh launch shows real cinematic city camera")
  check(not ui.hud_root.visible,"Gameplay HUD hidden in menu")
  for size in [Vector2(960,600),Vector2(1280,720),Vector2(1920,1080)]:
@@ -34,8 +33,8 @@ func run() -> void:
   for i in range(3): await process_frame
   check(bounds.encloses(main.store_panel.get_global_rect()),"Store in bounds "+str(size))
   check(main.store_grid.get_child_count()==9,"Nine weapon cards")
-  check(main.store_grid.get_child(0).name=="CardShotgun","Weapons sorted by price")
-  check(main.store_grid.get_child(8).name=="CardHelsing","Most expensive weapon last")
+  check(main.store_grid.get_child(0).name=="CardDiaglo","Weapons sorted by price")
+  check(main.store_grid.get_child(8).name=="CardMDR-ROSE50","Most expensive weapon last")
   var bottom=main.store_grid.get_child(8).get_global_rect().end.y
   check(bottom<main.store_panel.get_global_rect().end.y-20,"All nine cards fit without scrolling "+str(size))
   main.store_tab="supplies"
@@ -51,10 +50,10 @@ func run() -> void:
  main.battle.completed=25
  main.open_store()
  main.render_store()
- var buy=main.store_grid.get_node("CardShotgun").find_children("*","Button",true,false)[0]
+ var buy=main.store_grid.get_node("CardDiaglo").find_children("*","Button",true,false)[0]
  buy.pressed.emit()
- check(main.battle.primary=="Shotgun","Actual weapon purchase button buys its own card")
- check(main.battle.money==98000,"Correct UI purchase price")
+ check(main.battle.primary=="Diaglo","Actual weapon purchase button buys its own card")
+ check(main.battle.money==99000,"Correct UI purchase price")
  check(ui.carried_ammo()==92,"HUD counts holstered pistol ammo")
  main.close_store()
  for i in range(3): await process_frame

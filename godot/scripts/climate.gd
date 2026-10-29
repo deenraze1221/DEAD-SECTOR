@@ -15,6 +15,8 @@ var flash_timer=0.0
 var thunder_timer=-1.0
 var flash: DirectionalLight3D
 var weather_materials: Array=[]
+var applied_cut=-2
+var ambient_base=.46
 var roof_cells: Dictionary={}
 
 static func selection(seed_value: int, number: int) -> Dictionary:
@@ -74,30 +76,38 @@ func _process(delta: float) -> void:
  # Dawn/dusk blend according to the same clock; two day waves, two night waves.
  var env=main.get_node("WorldEnvironment").environment
  var sky=env.sky.sky_material
- var base=Color({"overcast":"#202b30","rain":"#1a2831","storm":"#131e29","clear":"#3c4a4d"}[kind])
- var color=base.lerp(Color("#090f1a") if night else Color("#47534f"),.65 if night else .45)
+ var base=Color({"overcast":"#1b262b","rain":"#16232b","storm":"#101a24","clear":"#34423f"}[kind])
+ var color=base.lerp(Color("#060a12") if night else Color("#404b48"),.75 if night else .42)
  var blend=1-exp(-delta*.7)
  env.fog_light_color=env.fog_light_color.lerp(color,blend)
- env.fog_density={"light":.009,"medium":.016,"heavy":.058}[fog]
- env.ambient_light_energy=lerpf(env.ambient_light_energy,.22 if night else .48,blend)
+ env.fog_density={"light":.012,"medium":.021,"heavy":.062}[fog]
+ ambient_base=lerpf(ambient_base,.11 if night else .46,blend)
+ env.ambient_light_energy=ambient_base
  sky.sky_top_color=sky.sky_top_color.lerp(color*.75,blend)
  sky.sky_horizon_color=sky.sky_horizon_color.lerp(color,blend)
  sky.ground_horizon_color=sky.ground_horizon_color.lerp(color,blend)
  var sun=main.get_node("Sun")
  sun.rotation_degrees=Vector3(-57,-30,0)
- sun.light_color=Color("#9cb8de") if night else Color("#ddbb92") if hour>16 else Color("#b8cbd7")
- sun.light_energy=lerpf(sun.light_energy,.135 if night else .9 if kind=="clear" else .75,blend)
+ sun.light_color=Color("#6f8cba") if night else Color("#c9a074") if hour>16 else Color("#a9bcc8")
+ sun.light_energy=lerpf(sun.light_energy,.09 if night else .95 if kind=="clear" else .72 if kind=="overcast" else .55,blend)
  wetness=move_toward(wetness,1.0 if kind in ["rain","storm"] else 0.0,delta*(.08 if kind in ["rain","storm"] else .012))
  for material in weather_materials: material.set_shader_parameter("wetness",wetness)
+ var cut=main.battle.blackout_district()
+ if cut!=applied_cut:
+  applied_cut=cut
+  for material in main.bridge.powered.values(): material.set_shader_parameter("power_cut",float(cut))
  flash_timer=maxf(0,flash_timer-delta)
- flash.light_energy=4 if flash_timer>0 else 0
+ var pulse=flash_timer>.22 or (flash_timer<.15 and flash_timer>.04)
+ flash.light_energy=6.0 if pulse else 0.0
+ env.background_energy_multiplier=1.0+(7.0 if pulse else 0.0)
+ env.ambient_light_energy=ambient_base+(.35 if pulse else 0.0)
  if thunder_timer>=0:
   thunder_timer-=delta
   if thunder_timer<=0: main.sound.play("thunder",null,main.weather_volume);thunder_timer=-1
  if kind=="storm":
   storm_timer-=delta
   if storm_timer<=0:
-   flash_timer=.15
+   flash_timer=.3
    thunder_timer=rng.randf_range(.6,2.4)
    storm_timer=rng.randf_range(7,17)
  rain.visible=kind in ["rain","storm"]

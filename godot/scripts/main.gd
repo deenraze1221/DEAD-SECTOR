@@ -144,6 +144,7 @@ func equip(id: String) -> void:
   player.gun.remove_child(child)
   child.queue_free()
  bridge.build_weapon(player.gun,id)
+ for node in player.gun.find_children("*","MeshInstance3D",true,false): node.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_ON
  player.config=bridge.data.weapons[id]
  player.ammo=int(player.config.capacity)
  player.reserve=int(player.config.reserve)
@@ -151,8 +152,8 @@ func equip(id: String) -> void:
  player.cooldown=0
  var zoom=float(player.config.get("viewZoom",1.0))
  player.weapon_camera.fov=rad_to_deg(2*atan(tan(deg_to_rad(45)*.5)/zoom))
- player.gun.scale=Vector3.ONE*(.65 if id=="Pistol" else 1.0)
- player.base_gun=Vector3(.16/zoom,-.16*float(player.config.get("viewLower",1))/zoom,-.48)
+ player.gun.scale=Vector3.ONE
+ player.base_gun=Vector3(.14/zoom,-.115/zoom,-.5)
  player.gun.position=player.base_gun
 
 func setup_environment() -> void:
@@ -162,28 +163,43 @@ func setup_environment() -> void:
  env.background_mode=Environment.BG_SKY
  var sky=Sky.new()
  var sky_material=ProceduralSkyMaterial.new()
- sky_material.sky_top_color=Color("#18232c")
- sky_material.sky_horizon_color=Color("#59636a")
- sky_material.ground_bottom_color=Color("#151d19")
- sky_material.ground_horizon_color=Color("#59636a")
+ sky_material.sky_top_color=Color("#0f171d")
+ sky_material.sky_horizon_color=Color("#424b50")
+ sky_material.ground_bottom_color=Color("#0c1210")
+ sky_material.ground_horizon_color=Color("#424b50")
+ sky_material.sky_curve=.12
  sky.sky_material=sky_material
  env.sky=sky
  env.ambient_light_source=Environment.AMBIENT_SOURCE_COLOR
- env.ambient_light_color=Color("#87959c")
- env.ambient_light_energy=.38
+ env.ambient_light_color=Color("#74828a")
+ env.ambient_light_energy=.46
  env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
+ env.tonemap_exposure=1.0
+ env.tonemap_white=5.0
+ env.adjustment_enabled=true
+ env.adjustment_contrast=1.1
+ env.adjustment_saturation=.8
+ env.adjustment_brightness=1.0
+ env.glow_enabled=true
+ env.glow_intensity=.55
+ env.glow_strength=.9
+ env.glow_bloom=.04
+ env.glow_hdr_threshold=1.05
  env.fog_enabled=true
- env.fog_light_color=Color("#34434a")
- env.fog_density=.009
+ env.fog_light_color=Color("#2e3b42")
+ env.fog_density=.012
+ env.fog_sky_affect=1.0
  world_environment.environment=env
  add_child(world_environment)
  var sun=DirectionalLight3D.new()
  sun.name="Sun"
  sun.rotation_degrees=Vector3(-38,-28,0)
- sun.light_color=Color("#9daeb9")
+ sun.light_color=Color("#8d9fab")
  sun.light_cull_mask=1
- sun.light_energy=.65
+ sun.light_energy=.72
  sun.shadow_enabled=true
+ sun.shadow_blur=1.4
+ sun.directional_shadow_mode=DirectionalLight3D.SHADOW_PARALLEL_4_SPLITS
  sun.directional_shadow_max_distance=90
  add_child(sun)
  var store_light=OmniLight3D.new()
@@ -301,40 +317,99 @@ func open_settings() -> void:
  if is_instance_valid(settings_panel): settings_panel.queue_free()
  settings_panel=PanelContainer.new()
  settings_panel.set_anchors_and_offsets_preset(Control.PRESET_CENTER_RIGHT)
- settings_panel.position=Vector2(-570,-300)
- settings_panel.custom_minimum_size=Vector2(540,550)
+ settings_panel.position=Vector2(-570,-320)
+ settings_panel.custom_minimum_size=Vector2(540,0)
  var theme=screen.theme.duplicate()
  theme.default_font_size=16
  settings_panel.theme=theme
+ # HTML look: dark glass panel, soft outline, thin accent line on top, 14 px corners.
  var backing=StyleBoxFlat.new()
- backing.bg_color=Color(.047,.07,.09,.98)
- backing.set_content_margin_all(20)
+ backing.bg_color=Color(.047,.07,.09,.96)
+ backing.set_content_margin_all(26)
  backing.set_border_width_all(1)
- backing.border_color=Color("#44514e")
- backing.set_corner_radius_all(7)
+ backing.border_width_top=2
+ backing.border_color=Color(.7,.78,.78,.22)
+ backing.set_corner_radius_all(14)
  settings_panel.add_theme_stylebox_override("panel",backing)
  screen.add_child(settings_panel)
+ settings_panel.resized.connect(func(): if reference_ui!=null: reference_ui.layout())
  var column=VBoxContainer.new()
  column.add_theme_constant_override("separation",16)
  settings_panel.add_child(column)
- column.add_child(label("SETTINGS",21))
- var tabs=TabContainer.new()
- tabs.size_flags_vertical=Control.SIZE_EXPAND_FILL
- column.add_child(tabs)
+ var header=HBoxContainer.new()
+ var title_label=reference_ui.tracked_text("SETTINGS",26,Color("#e8eeeb"),3)
+ title_label.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+ header.add_child(title_label)
+ var close_button=Button.new()
+ close_button.text="×"
+ close_button.custom_minimum_size=Vector2(44,44)
+ close_button.add_theme_font_size_override("font_size",26)
+ close_button.pressed.connect(func(): settings_panel.hide())
+ close_button.pressed.connect(func(): if is_instance_valid(sound): sound.play("ui-click"))
+ var close_style=reference_ui.box(Color("#1d2b33"),4,Color("#44575e"))
+ close_style.set_corner_radius_all(8)
+ for state in ["normal","hover","pressed","focus"]: close_button.add_theme_stylebox_override(state,close_style)
+ header.add_child(close_button)
+ column.add_child(header)
+ var divider=ColorRect.new()
+ divider.color=Color(.7,.78,.78,.16)
+ divider.custom_minimum_size.y=1
+ column.add_child(divider)
+ # Segmented tab bar like the browser's AUDIO / CONTROLS / GRAPHICS switch.
+ var tab_frame=PanelContainer.new()
+ var frame_style=reference_ui.box(Color(.035,.055,.07,.9),4,Color(.7,.78,.78,.2))
+ frame_style.set_corner_radius_all(10)
+ tab_frame.add_theme_stylebox_override("panel",frame_style)
+ column.add_child(tab_frame)
+ var tab_row=HBoxContainer.new()
+ tab_row.add_theme_constant_override("separation",4)
+ tab_frame.add_child(tab_row)
+ var pages=VBoxContainer.new()
+ pages.size_flags_vertical=Control.SIZE_EXPAND_FILL
+ pages.custom_minimum_size.y=380
+ column.add_child(pages)
  var panels={}
+ var tab_group=ButtonGroup.new()
  for title in ["Audio","Controls","Graphics","World"]:
   var page=VBoxContainer.new()
   page.name=title
   page.add_theme_constant_override("separation",18)
-  tabs.add_child(page)
-  tabs.set_tab_title(tabs.get_tab_count()-1,title.to_upper())
+  page.visible=(title=="Audio")
+  pages.add_child(page)
   panels[title]=page
- for setting in [["MASTER VOLUME","master_volume"],["MUSIC VOLUME","music_volume"],["WEATHER VOLUME","weather_volume"]]:
+  var tab_button=Button.new()
+  tab_button.text=title.to_upper()
+  tab_button.toggle_mode=true
+  tab_button.button_group=tab_group
+  tab_button.button_pressed=(title=="Audio")
+  tab_button.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+  tab_button.custom_minimum_size.y=40
+  tab_button.add_theme_font_size_override("font_size",13)
+  var plain=reference_ui.box(Color(0,0,0,0),6,Color(0,0,0,0))
+  plain.set_corner_radius_all(8)
+  var selected=reference_ui.box(Color("#2b3839"),6,Color("#2b3839"))
+  selected.set_corner_radius_all(8)
+  selected.border_width_bottom=2
+  selected.border_color=Color("#cddaa1")
+  var hover=reference_ui.box(Color("#1b282e"),6,Color("#1b282e"))
+  hover.set_corner_radius_all(8)
+  tab_button.add_theme_stylebox_override("normal",plain)
+  tab_button.add_theme_stylebox_override("hover",hover)
+  tab_button.add_theme_stylebox_override("pressed",selected)
+  tab_button.add_theme_stylebox_override("hover_pressed",selected)
+  tab_button.add_theme_stylebox_override("focus",plain)
+  tab_button.pressed.connect(func():
+   for key in panels: panels[key].visible=(key==title)
+   if is_instance_valid(sound): sound.play("ui-click"))
+  tab_row.add_child(tab_button)
+ for setting in [["Master volume","master_volume"],["Music volume","music_volume"],["Weather volume","weather_volume"]]:
   var row=HBoxContainer.new()
   var caption=label(setting[0],16)
+  caption.add_theme_font_override("font",reference_ui.sans)
   caption.size_flags_horizontal=Control.SIZE_EXPAND_FILL
   row.add_child(caption)
   var amount=label("%d%%" % int(get(setting[1])*100),16)
+  amount.add_theme_font_override("font",reference_ui.sans)
   row.add_child(amount)
   panels.Audio.add_child(row)
   var slider=HSlider.new()
@@ -389,7 +464,6 @@ Roads and central store stay fixed.
 Buildings and interiors move together.
 
 Interface language: English" % [generation.seed,generation.moved_blocks],15))
- column.add_child(button("CLOSE",func(): settings_panel.hide()))
  reference_ui.layout()
 
 func load_user_settings() -> void:

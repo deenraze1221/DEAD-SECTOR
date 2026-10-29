@@ -106,7 +106,7 @@ func _physics_process(delta: float) -> void:
   if windup==0:
    rig.rotation.x=0
    if type=="vomiter":
-    if distance<=8 and clear: battle.projectile(self,true)
+    if distance<=10 and clear: battle.projectile(self,true)
     cooldown=battle.rng.randf_range(1,2)
    elif type=="eye":
     if clear: battle.projectile(self,false)
@@ -116,7 +116,7 @@ func _physics_process(delta: float) -> void:
     if distance<reach and clear: player.hurt(int(stats.damage))
     cooldown=1.4 if type=="boss" and stage==3 else 1.8 if type=="boss" else 1.05
  var can_attack=distance<stats.radius+1
- if type=="vomiter": can_attack=distance<=8
+ if type=="vomiter": can_attack=distance<=10
  if type=="eye": can_attack=distance<=40
  if can_attack and clear and cooldown<=0 and windup<=0:
   attack_count+=1

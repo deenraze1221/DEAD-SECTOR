@@ -16,7 +16,7 @@ func stream(id: String) -> AudioStream:
   streams[id]=load(path)
  return streams[id]
 
-func play(id: String, at: Variant=null, volume=1.0) -> void:
+func play(id: String, at: Variant=null, volume=1.0, pitch=1.0) -> void:
  var source=stream(id)
  if source==null: return
  var node
@@ -26,6 +26,7 @@ func play(id: String, at: Variant=null, volume=1.0) -> void:
   node.unit_size=4
  else: node=AudioStreamPlayer.new()
  node.stream=source
+ node.pitch_scale=pitch
  node.volume_db=linear_to_db(maxf(.0001,volume))
  add_child(node)
  if at is Vector3: node.global_position=at

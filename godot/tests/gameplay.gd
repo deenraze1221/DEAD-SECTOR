@@ -33,7 +33,7 @@ func run() -> void:
  check(b.number==2 and b.total()==20,"Next wave adds5")
  b.money=100000
  b.completed=0
- check("LOCKED" in b.buy("Helsing"),"Helsing unlock gate")
+ check("LOCKED" in b.buy("MDR-ROSE50"),"MDR unlock gate")
  b.completed=25
  for item in scene.bridge.data.shop_items:
   if item.kind=="weapon":

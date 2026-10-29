@@ -5,6 +5,10 @@ var lights: Array=[]
 var pools: MultiMeshInstance3D
 var ash: CPUParticles3D
 var time=0.0
+var applied_cut=-2
+var mist: Array=[]
+var mist_material: ShaderMaterial
+var mist_scroll=0.0
 
 func haze_texture() -> ImageTexture:
  var image=Image.create(64,64,false,Image.FORMAT_RGBA8)
@@ -42,7 +46,7 @@ func _ready() -> void:
   light.light_cull_mask=1
   light.light_color=Color("#d4bd86")
   light.omni_range=11
-  light.light_energy=.85
+  light.light_energy=1.0
   light.visible=false
   add_child(light)
   lights.append(light)
@@ -69,6 +73,29 @@ func _ready() -> void:
   fog.gravity=Vector3(0,.015,0)
   add_child(fog)
   fog.position=Vector3(hive.x,1,hive.z)
+ # Low ground mist: two scrolling noise sheets that follow the player and take the weather fog colour.
+ var noise=FastNoiseLite.new()
+ noise.noise_type=FastNoiseLite.TYPE_SIMPLEX_SMOOTH
+ noise.frequency=.012
+ noise.fractal_octaves=3
+ var noise_texture=NoiseTexture2D.new()
+ noise_texture.noise=noise
+ noise_texture.width=256
+ noise_texture.height=256
+ noise_texture.seamless=true
+ mist_material=ShaderMaterial.new()
+ mist_material.shader=load("res://shaders/mist.gdshader")
+ mist_material.set_shader_parameter("noise_texture",noise_texture)
+ for height in [.3,1.15]:
+  var sheet=MeshInstance3D.new()
+  var plane=PlaneMesh.new()
+  plane.size=Vector2(90,90)
+  sheet.mesh=plane
+  sheet.material_override=mist_material
+  sheet.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+  sheet.position.y=height
+  add_child(sheet)
+  mist.append(sheet)
  ash=CPUParticles3D.new()
  ash.amount=100
  ash.local_coords=false
@@ -93,13 +120,34 @@ func _process(delta: float) -> void:
  if not main.player.active: return
  time-=delta
  pools.visible=main.graphics_quality>0
+ var night=main.climate!=null and main.climate.night
+ mist_scroll+=delta
+ var fog_amount={"light":.10,"medium":.17,"heavy":.30}[main.climate.fog] if main.climate!=null else .1
+ if main.climate!=null and main.climate.kind=="clear": fog_amount*=.6
+ var env=main.get_node("WorldEnvironment").environment
+ mist_material.set_shader_parameter("scroll",mist_scroll)
+ mist_material.set_shader_parameter("density",fog_amount*(.6 if night else 1.0))
+ mist_material.set_shader_parameter("mist_color",env.fog_light_color.lightened(.12))
+ for sheet in mist:
+  sheet.visible=main.graphics_quality>0
+  sheet.position.x=main.player.position.x
+  sheet.position.z=main.player.position.z
+ pools.multimesh.mesh.material.albedo_color=Color(1,.85,.6,.36 if night else .1)
  ash.emitting=main.graphics_quality>0
  if ash.position.distance_to(main.player.position+Vector3.UP*4)>12: ash.position=main.player.position+Vector3.UP*4
+ var cut=main.battle.blackout_district()
+ if cut!=applied_cut:
+  applied_cut=cut
+  for i in range(lamps.size()):
+   var live=main.battle.district_of(lamps[i].x,lamps[i].z)!=cut
+   pools.multimesh.set_instance_transform(i,Transform3D(Basis().scaled(Vector3.ONE if live else Vector3.ZERO),lamps[i]+Vector3(0,.035,0)))
  if time>0: return
  time=.5
- var nearest=lamps.duplicate()
+ var nearest=lamps.filter(func(l): return main.battle.district_of(l.x,l.z)!=cut)
  nearest.sort_custom(func(a,b): return a.distance_squared_to(main.player.position)<b.distance_squared_to(main.player.position))
  var count=[0,4,8][main.graphics_quality]
  for i in range(lights.size()):
   lights[i].visible=i<count and i<nearest.size() and nearest[i].distance_to(main.player.position)<35
-  if lights[i].visible: lights[i].position=nearest[i]+Vector3.UP*4.7
+  if lights[i].visible:
+   lights[i].position=nearest[i]+Vector3.UP*4.7
+   lights[i].light_energy=2.6 if night else .9

@@ -4,18 +4,6 @@ var gun_id=""
 var flash_mesh: MeshInstance3D
 var casing_count=0
 var base_hands: Dictionary={}
-var profiles={
- "Pistol":{"action":"slide","kick":.075,"load":1},
- "Helsing":{"action":"rack","kick":.035,"load":4},
- "Tikhar":{"action":"bolt","kick":.065,"load":1},
- "Shambler":{"action":"drum","kick":.085,"load":5},
- "Shotgun":{"action":"break","kick":.12,"load":2},
- "Kalash":{"action":"rack","kick":.065,"load":2},
- "VSV":{"action":"bolt","kick":.075,"load":2},
- "Scorpion":{"action":"rack","kick":.042,"load":2},
- "Vector":{"action":"rack","kick":.032,"load":2},
- "G36":{"action":"rack","kick":.055,"load":2}
-}
 func setup(owner_player) -> void: player=owner_player
 
 func bind() -> void:
@@ -38,18 +26,10 @@ func bind() -> void:
  mesh.material_override=material
  mesh.layers=2
  mesh.rotation.x=PI/2
- mesh.position=Vector3(0,-.014,-length()*.5-.06)
+ mesh.position=Vector3(0,.0,float(player.config.tip)-.06)
  player.gun.add_child(mesh)
  flash_mesh=mesh
  flash_mesh.hide()
-
-func length() -> float:
- var part=player.get_parent().bridge.data.weapons[player.config.id].parts[0]
- var positions=player.get_parent().bridge.data.geometries[int(part.geometry)].position
- var min_z=INF
- var max_z=-INF
- for i in range(2,positions.size(),3): min_z=minf(min_z,positions[i]);max_z=maxf(max_z,positions[i])
- return max_z-min_z
 
 func _process(_delta: float) -> void:
  if player==null: return
@@ -57,30 +37,76 @@ func _process(_delta: float) -> void:
  flash_mesh.visible=player.flash.light_energy>1 and player.active
  flash_mesh.rotation.z=randf()*TAU
  var progress=1-player.reloading/float(player.config.reload) if player.reloading>0 else 0.0
- var drop=sin(progress*PI) if player.reloading>0 else 0.0
- var action=profiles[player.config.id].action
- var magazine=player.gun.get_node_or_null("WeaponMagazine")
- if magazine:
-  magazine.position.y=-drop*.22
-  magazine.rotation.x=drop*.2
  var body=player.gun.get_node_or_null("WeaponBody")
+ var pose=reload_pose(str(player.config.reloadStyle),progress,player.reloading>0)
+ var xf: Transform3D=pose.body
  if body:
-  body.rotation.x=drop*.45 if action=="break" else 0.0
-  body.rotation.z=-drop*.25 if action=="drum" else 0.0
+  if not body.has_meta("rest"): body.set_meta("rest",body.transform)
+  body.transform=xf*(body.get_meta("rest") as Transform3D)
+ var grips=player.config.grips
+ var mag=Vector3(player.config.mag[0],player.config.mag[1],player.config.mag[2])
  for name in base_hands:
   var hand=player.gun.get_node_or_null(name)
   if not hand: continue
-  hand.position=base_hands[name]
-  if name=="SupportHand":
-   hand.position+=Vector3(-drop*.04,-drop*.09,drop*.10)
-   if action in ["bolt","rack"]: hand.position.z+=sin(progress*TAU*2)*drop*.04
-  var arm=player.gun.get_node_or_null("SupportForearm" if name=="SupportHand" else "TriggerForearm")
+  var support=name=="SupportHand"
+  var rest: Vector3=base_hands[name]
+  if support:
+   var target=mag+pose.hand_extra
+   hand.position=(xf*rest).lerp(xf*target,pose.mag)+pose.support_extra
+  else:
+   hand.position=xf*rest+pose.trigger_extra
+  var arm=player.gun.get_node_or_null("SupportForearm" if support else "TriggerForearm")
   if arm:
-   var elbow=Vector3(-.29 if name=="SupportHand" else .23,-.28,.27)
+   var elbow=Vector3(-.29 if support else .23,-.28,.27)
    var delta=hand.position-elbow
    arm.position=(hand.position+elbow)*.5
    arm.quaternion=Quaternion(Vector3.UP,delta.normalized())
    arm.scale.y=delta.length()/arm.mesh.height
+
+func ramp(a: float, b: float, x: float) -> float: return smoothstep(a,b,x)
+
+# Magazines are part of the model, so reloads hide the magazine well by turning the weapon away
+# and moving the support hand to the right spot instead of showing a detached magazine.
+func reload_pose(style: String, p: float, active: bool) -> Dictionary:
+ var r={"body":Transform3D.IDENTITY,"mag":0.0,"hand_extra":Vector3.ZERO,"support_extra":Vector3.ZERO,"trigger_extra":Vector3.ZERO}
+ if not active: return r
+ var tilt=ramp(0,.14,p)-ramp(.88,1,p)
+ var roll=0.0
+ var pitch=0.0
+ var lift=Vector3.ZERO
+ match style:
+  "slide","smg","rifle","lmg":
+   roll=-.55*tilt
+   pitch=.16*tilt+.07*sin(clampf((p-.58)/.12,0,1)*PI)
+   lift=Vector3(.03,.025,.03)*tilt
+   r.mag=ramp(.14,.3,p)-ramp(.64,.74,p)
+   r.hand_extra=Vector3(0,-.11*(ramp(.3,.46,p)-ramp(.5,.58,p)),0)
+   var rack=sin(clampf((p-.8)/.15,0,1)*PI)
+   r.support_extra=Vector3(0,0,.1*rack)*(1.0-r.mag)
+   if style=="slide": r.support_extra*=.6
+  "revolver":
+   roll=-.85*tilt
+   pitch=.35*tilt
+   lift=Vector3(.02,.03,.05)*tilt
+   r.mag=ramp(.12,.28,p)-ramp(.78,.9,p)
+   r.hand_extra=Vector3(0,.02*sin(p*TAU*3)*ramp(.3,.4,p),0)
+  "break":
+   roll=-.35*tilt
+   pitch=.7*(ramp(.08,.3,p)-ramp(.74,.8,p))-.12*sin(clampf((p-.8)/.1,0,1)*PI)
+   lift=Vector3(.02,.02,.05)*tilt
+   r.mag=ramp(.2,.36,p)-ramp(.7,.78,p)
+   r.hand_extra=Vector3(0,.04*maxf(0,sin(p*TAU*2.0)),0)
+  "bolt":
+   roll=-.6*tilt
+   pitch=.12*tilt
+   lift=Vector3(.03,.03,.03)*tilt
+   var loads=clampf(float(player.config.capacity),1,5)
+   r.mag=ramp(.3,.4,p)-ramp(.82,.9,p)
+   r.hand_extra=Vector3(0,.035*maxf(0,sin(clampf((p-.4)/.4,0,1)*PI*loads)),0)
+   var bolt=ramp(.12,.24,p)-ramp(.26,.36,p)+ramp(.84,.9,p)-ramp(.9,.96,p)
+   r.trigger_extra=Vector3(0,.03*bolt,.09*bolt)
+ r.body=Transform3D(Basis.from_euler(Vector3(pitch,0,roll)),lift)
+ return r
 
 func fired() -> void:
  if casing_count>=24: return

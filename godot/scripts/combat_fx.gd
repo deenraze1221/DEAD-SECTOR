@@ -3,6 +3,8 @@ var main
 var traces: Array=[]
 var splashes: CPUParticles3D
 var timer=0.0
+var lens_target=0.0
+var lens_rain=0.0
 
 func _ready() -> void:
  # World-space rain impacts, restricted to exposed ground around the player.
@@ -47,7 +49,7 @@ func tracer(from: Vector3,to: Vector3) -> void:
 
 func trail(parent: Node3D,green: bool) -> void:
  var particles=CPUParticles3D.new()
- particles.amount=14
+ particles.amount=24 if green else 14
  particles.lifetime=.28
  particles.local_coords=false
  particles.direction=Vector3.UP
@@ -69,15 +71,20 @@ func _process(delta: float) -> void:
  for trace in traces.duplicate():
   trace.life-=delta
   if trace.life<=0: trace.node.queue_free();traces.erase(trace)
+ lens_rain=move_toward(lens_rain,lens_target,delta*.5)
+ var post=main.screen.get_meta("post_material") if main.screen!=null and main.screen.has_meta("post_material") else null
+ if post!=null: post.set_shader_parameter("rain",lens_rain)
  timer-=delta
  if timer>0: return
  timer=.2
  splashes.emitting=false
+ lens_target=0.0
  if not main.world_running() or main.graphics_quality==0 or main.climate.kind not in ["rain","storm"]: return
  var p=main.player.position
  var key=Vector2i(roundi((p.x+108)/24),roundi((p.z+108)/24))
  if main.climate.roof_cells.has(key):
   var building=main.climate.roof_cells[key]
   if absf(p.x-building.x)<building.w/2+4 and absf(p.z-building.z)<building.d/2+4: return
+ lens_target=1.0 if main.climate.kind=="storm" else .6
  splashes.position=Vector3(p.x,.04,p.z)
  splashes.emitting=true
