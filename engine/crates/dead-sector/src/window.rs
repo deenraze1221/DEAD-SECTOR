@@ -6,7 +6,7 @@ use anyhow::{Context, Result};
 use dead_sector::climate::{Environment, Quality};
 use dead_sector::frame::{CityLights, FrameData};
 use glam::Vec3;
-use sector_render::{Camera, Renderer, connect};
+use sector_render::{Camera, RenderSettings, Renderer, connect};
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -53,6 +53,7 @@ struct Gpu {
     adapter_name: String,
     environment: Environment,
     quality: Quality,
+    settings: RenderSettings,
     fixed_time: Option<f32>,
     started: Instant,
     held: HashSet<KeyCode>,
@@ -101,6 +102,7 @@ impl Gpu {
             adapter_name: info.name,
             environment,
             quality: options.quality,
+            settings: options.render_settings(),
             fixed_time: options.time,
             started: Instant::now(),
             held: HashSet::new(),
@@ -174,7 +176,8 @@ impl Gpu {
         };
         let view = frame.texture.create_view(&Default::default());
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        let frame_data = FrameData::new(lights, camera.position, &self.environment, self.quality, 0.0, false);
+        let frame_data =
+            FrameData::new(lights, camera.position, &self.environment, self.quality, self.settings, 0.0, false);
         let time = self.fixed_time.unwrap_or_else(|| self.started.elapsed().as_secs_f32());
         let inputs = frame_data.inputs(camera, time);
         self.renderer.render(&mut encoder, &view, (self.config.width, self.config.height), &inputs);

@@ -2,10 +2,11 @@
 
 use anyhow::{Context, Result, bail};
 use dead_sector::climate::{FogLevel, Quality, WeatherKind};
+use sector_render::{ContactShadows, RenderSettings, ShadowFilter, Ssao, SunShadows};
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Rust engine, stage 2)
+DEAD SECTOR (Sector Engine, stage 2b)
 
 USAGE: dead-sector [options]
 
@@ -21,6 +22,17 @@ USAGE: dead-sector [options]
   --blackout <0-3>        Cut power to one city quadrant
   --no-fog                Disable fog and mist (debug view of the whole city)
   --time <seconds>        Fixed effect time for screenshots (mist, rain, grain)
+
+Shadow and occlusion overrides (on top of --quality):
+  --sun-shadows on|off    Cascaded sun shadows
+  --shadow-res <px>       Sun shadow map size: 512, 1024, 2048 or 4096
+  --cascades <1-4>        Sun shadow cascades
+  --shadow-distance <m>   Sun shadow distance
+  --shadow-filter <f>     hard, pcf or soft (sun and local)
+  --local-shadows <0-4>   Shadowed point lights (nearest first)
+  --local-shadow-res <px> Point-light shadow face size
+  --contact-shadows on|off
+  --ssao on|off           Screen-space ambient occlusion (off in every preset)
   --screenshot <file.png> Render one frame offscreen, save it and exit
   --bench <frames>        Render frames offscreen and report the average time
   -h, --help              Show this help
@@ -41,6 +53,15 @@ pub struct Options {
     pub night: bool,
     pub blackout: Option<u8>,
     pub time: Option<f32>,
+    pub sun_shadows: Option<bool>,
+    pub shadow_res: Option<u32>,
+    pub cascades: Option<u32>,
+    pub shadow_distance: Option<f32>,
+    pub shadow_filter: Option<ShadowFilter>,
+    pub local_shadows: Option<u32>,
+    pub local_shadow_res: Option<u32>,
+    pub contact_shadows: Option<bool>,
+    pub ssao: Option<bool>,
     pub screenshot: Option<PathBuf>,
     pub bench: Option<u32>,
 }
@@ -59,6 +80,15 @@ impl Default for Options {
             night: false,
             blackout: None,
             time: None,
+            sun_shadows: None,
+            shadow_res: None,
+            cascades: None,
+            shadow_distance: None,
+            shadow_filter: None,
+            local_shadows: None,
+            local_shadow_res: None,
+            contact_shadows: None,
+            ssao: None,
             screenshot: None,
             bench: None,
         }
@@ -108,6 +138,40 @@ impl Options {
                     }
                     options.time = Some(time);
                 }
+                "--sun-shadows" => options.sun_shadows = Some(parse_switch(&value()?)?),
+                "--shadow-res" => options.shadow_res = Some(parse_resolution(&value()?)?),
+                "--cascades" => {
+                    let count: u32 = value()?.parse().context("--cascades expects 1..4")?;
+                    if !(1..=4).contains(&count) {
+                        bail!("--cascades expects 1..4");
+                    }
+                    options.cascades = Some(count);
+                }
+                "--shadow-distance" => {
+                    let metres: f32 = value()?.parse().context("--shadow-distance expects metres")?;
+                    if !(1.0..=1000.0).contains(&metres) {
+                        bail!("--shadow-distance must be 1..1000 m");
+                    }
+                    options.shadow_distance = Some(metres);
+                }
+                "--shadow-filter" => {
+                    options.shadow_filter = Some(match value()?.as_str() {
+                        "hard" => ShadowFilter::Hard,
+                        "pcf" => ShadowFilter::Pcf,
+                        "soft" => ShadowFilter::Soft,
+                        other => bail!("unknown shadow filter {other:?}"),
+                    });
+                }
+                "--local-shadows" => {
+                    let budget: u32 = value()?.parse().context("--local-shadows expects 0..4")?;
+                    if budget > 4 {
+                        bail!("--local-shadows expects 0..4");
+                    }
+                    options.local_shadows = Some(budget);
+                }
+                "--local-shadow-res" => options.local_shadow_res = Some(parse_resolution(&value()?)?),
+                "--contact-shadows" => options.contact_shadows = Some(parse_switch(&value()?)?),
+                "--ssao" => options.ssao = Some(parse_switch(&value()?)?),
                 "--screenshot" => options.screenshot = Some(PathBuf::from(value()?)),
                 "--bench" => {
                     let frames: u32 = value()?.parse().context("--bench expects a frame count")?;
@@ -121,6 +185,53 @@ impl Options {
         }
         Ok(Some(options))
     }
+}
+
+impl Options {
+    /// The quality preset with any shadow/occlusion overrides applied.
+    pub fn render_settings(&self) -> RenderSettings {
+        let mut settings = self.quality.render_settings();
+        let preset_sun = settings.sun_shadows.unwrap_or(SunShadows {
+            resolution: 1024,
+            cascades: 4,
+            distance: 90.0,
+            filter: ShadowFilter::Pcf,
+        });
+        let sun_on = self.sun_shadows.unwrap_or(settings.sun_shadows.is_some());
+        settings.sun_shadows = sun_on.then(|| SunShadows {
+            resolution: self.shadow_res.unwrap_or(preset_sun.resolution),
+            cascades: self.cascades.unwrap_or(preset_sun.cascades),
+            distance: self.shadow_distance.unwrap_or(preset_sun.distance),
+            filter: self.shadow_filter.unwrap_or(preset_sun.filter),
+        });
+        let local = &mut settings.local_shadows;
+        local.budget = self.local_shadows.unwrap_or(local.budget);
+        local.resolution = self.local_shadow_res.unwrap_or(local.resolution);
+        local.filter = self.shadow_filter.unwrap_or(local.filter);
+        if let Some(on) = self.contact_shadows {
+            settings.contact_shadows = on.then(ContactShadows::default);
+        }
+        if let Some(on) = self.ssao {
+            settings.ssao = on.then(Ssao::default);
+        }
+        settings
+    }
+}
+
+fn parse_switch(text: &str) -> Result<bool> {
+    match text {
+        "on" => Ok(true),
+        "off" => Ok(false),
+        _ => bail!("expected on or off, got {text:?}"),
+    }
+}
+
+fn parse_resolution(text: &str) -> Result<u32> {
+    let size: u32 = text.parse().context("shadow resolution expects a number")?;
+    if ![256, 512, 1024, 2048, 4096].contains(&size) {
+        bail!("shadow resolution must be 256, 512, 1024, 2048 or 4096");
+    }
+    Ok(size)
 }
 
 fn parse_size(text: &str) -> Result<(u32, u32)> {
@@ -212,5 +323,27 @@ mod tests {
         assert!(parse(&["--quality", "ultra"]).is_err());
         assert!(parse(&["--blackout", "4"]).is_err());
         assert!(parse(&["--time", "-1"]).is_err());
+        assert!(parse(&["--shadow-res", "1000"]).is_err());
+        assert!(parse(&["--cascades", "5"]).is_err());
+        assert!(parse(&["--ssao", "yes"]).is_err());
+        assert!(parse(&["--local-shadows", "5"]).is_err());
+    }
+
+    #[test]
+    fn shadow_overrides_apply_on_top_of_the_preset() {
+        let options = parse(&["--quality", "low", "--sun-shadows", "on", "--shadow-res", "2048", "--cascades", "2"])
+            .unwrap()
+            .unwrap();
+        let sun = options.render_settings().sun_shadows.unwrap();
+        assert_eq!((sun.resolution, sun.cascades, sun.distance), (2048, 2, 90.0));
+        let options = parse(&["--quality", "high", "--ssao", "on", "--contact-shadows", "off", "--local-shadows", "0"])
+            .unwrap()
+            .unwrap();
+        let settings = options.render_settings();
+        assert!(settings.ssao.is_some() && settings.contact_shadows.is_none());
+        assert_eq!(settings.local_shadows.budget, 0);
+        assert_eq!(settings.sun_shadows.unwrap().resolution, 2048);
+        let medium = parse(&[]).unwrap().unwrap().render_settings();
+        assert_eq!(medium, Quality::Medium.render_settings());
     }
 }

@@ -23,3 +23,13 @@ fn effects_shader_is_valid() {
 fn post_shader_is_valid() {
     validate("post.wgsl", include_str!("../src/post.wgsl"));
 }
+
+#[test]
+fn depth_shader_is_valid() {
+    validate("depth.wgsl", include_str!("../src/depth.wgsl"));
+}
+
+#[test]
+fn occlusion_shader_is_valid() {
+    validate("occlusion.wgsl", include_str!("../src/occlusion.wgsl"));
+}

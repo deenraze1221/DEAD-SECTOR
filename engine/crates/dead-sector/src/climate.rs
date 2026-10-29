@@ -5,7 +5,7 @@
 
 use glam::{EulerRot, Quat, Vec3};
 use sector_assets::color::{parse_hex_color, srgb_to_linear};
-use sector_render::{Lighting, RenderSettings};
+use sector_render::{ContactShadows, Lighting, LocalShadows, RenderSettings, ShadowFilter, SunShadows};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum WeatherKind {
@@ -91,9 +91,32 @@ impl Quality {
     }
 
     /// Engine settings for this preset; the 3D scene is capped at the
-    /// 540-line PSX grid of `pixels.gdshader`.
+    /// 540-line PSX grid of `pixels.gdshader`. Sun shadows follow Godot
+    /// (off on low, 90 m / 120 m on medium / high); SSAO stays off for the
+    /// PSX look and is opt-in.
     pub fn render_settings(self) -> RenderSettings {
-        RenderSettings { max_render_lines: Some(540), post_detail: self.post_detail(), atmosphere: self.atmosphere() }
+        let (sun_shadows, local_shadows, contact_shadows) = match self {
+            Quality::Low => (None, LocalShadows { budget: 0, ..Default::default() }, None),
+            Quality::Medium => (
+                Some(SunShadows { resolution: 1024, cascades: 4, distance: 90.0, filter: ShadowFilter::Pcf }),
+                LocalShadows { budget: 1, resolution: 512, filter: ShadowFilter::Pcf },
+                Some(ContactShadows::default()),
+            ),
+            Quality::High => (
+                Some(SunShadows { resolution: 2048, cascades: 4, distance: 120.0, filter: ShadowFilter::Soft }),
+                LocalShadows { budget: 4, resolution: 1024, filter: ShadowFilter::Pcf },
+                Some(ContactShadows::default()),
+            ),
+        };
+        RenderSettings {
+            max_render_lines: Some(540),
+            post_detail: self.post_detail(),
+            atmosphere: self.atmosphere(),
+            sun_shadows,
+            local_shadows,
+            contact_shadows,
+            ssao: None,
+        }
     }
 }
 
@@ -345,5 +368,11 @@ mod tests {
         assert_eq!(Quality::High.view_distance(), 650.0);
         assert!(!Quality::Low.atmosphere());
         assert_eq!(Quality::parse("ultra"), None);
+        let low = Quality::Low.render_settings();
+        assert!(low.sun_shadows.is_none() && low.local_shadows.budget == 0 && low.contact_shadows.is_none());
+        let high = Quality::High.render_settings();
+        assert_eq!(high.sun_shadows.map(|s| (s.resolution, s.cascades, s.distance)), Some((2048, 4, 120.0)));
+        assert_eq!(Quality::Medium.render_settings().sun_shadows.map(|s| s.resolution), Some(1024));
+        assert!([Quality::Low, Quality::Medium, Quality::High].iter().all(|q| q.render_settings().ssao.is_none()));
     }
 }

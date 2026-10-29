@@ -32,11 +32,99 @@ pub struct RenderSettings {
     pub post_detail: f32,
     /// Draw ground decals and fog sheets.
     pub atmosphere: bool,
+    /// Cascaded sun shadows (`None` = off).
+    pub sun_shadows: Option<SunShadows>,
+    pub local_shadows: LocalShadows,
+    /// Screen-space contact shadows for the sun (`None` = off).
+    pub contact_shadows: Option<ContactShadows>,
+    /// Screen-space ambient occlusion (`None` = off).
+    pub ssao: Option<Ssao>,
 }
 
 impl Default for RenderSettings {
     fn default() -> Self {
-        RenderSettings { max_render_lines: None, post_detail: 1.0, atmosphere: true }
+        RenderSettings {
+            max_render_lines: None,
+            post_detail: 1.0,
+            atmosphere: true,
+            sun_shadows: Some(SunShadows::default()),
+            local_shadows: LocalShadows::default(),
+            contact_shadows: Some(ContactShadows::default()),
+            ssao: None,
+        }
+    }
+}
+
+/// Shadow-map filtering.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ShadowFilter {
+    /// One hardware 2×2 comparison tap: crisp, aliased edges.
+    Hard,
+    /// 3×3 comparison taps.
+    Pcf,
+    /// 16-tap rotated Poisson disc: wide, soft penumbrae.
+    Soft,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct SunShadows {
+    /// Shadow map size per cascade (1024 or 2048 are typical).
+    pub resolution: u32,
+    /// 1..=4 cascades.
+    pub cascades: u32,
+    /// Shadows end (fading out) at this distance from the camera, in metres.
+    pub distance: f32,
+    pub filter: ShadowFilter,
+}
+
+impl Default for SunShadows {
+    fn default() -> Self {
+        SunShadows { resolution: 2048, cascades: 4, distance: 100.0, filter: ShadowFilter::Pcf }
+    }
+}
+
+/// Shadows for point lights flagged with `cast_shadows`.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct LocalShadows {
+    /// How many of the nearest shadow-casting lights get a shadow map (0 = off).
+    pub budget: u32,
+    /// Size of each of the six faces per light.
+    pub resolution: u32,
+    pub filter: ShadowFilter,
+}
+
+impl Default for LocalShadows {
+    fn default() -> Self {
+        LocalShadows { budget: 2, resolution: 512, filter: ShadowFilter::Pcf }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ContactShadows {
+    /// Ray length towards the sun, in metres.
+    pub length: f32,
+    pub steps: u32,
+}
+
+impl Default for ContactShadows {
+    fn default() -> Self {
+        ContactShadows { length: 0.4, steps: 12 }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Ssao {
+    /// Sampling radius in metres.
+    pub radius: f32,
+    /// 0 = no darkening, 1 = full.
+    pub intensity: f32,
+    /// Hemisphere samples per pixel (8..=32).
+    pub samples: u32,
+}
+
+impl Default for Ssao {
+    fn default() -> Self {
+        Ssao { radius: 0.6, intensity: 1.0, samples: 16 }
     }
 }
 

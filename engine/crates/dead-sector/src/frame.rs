@@ -39,7 +39,16 @@ pub struct FrameData {
 }
 
 impl FrameData {
-    pub fn new(city: &CityLights, eye: Vec3, env: &Environment, quality: Quality, hurt: f32, low_health: bool) -> Self {
+    /// `settings` are usually `quality.render_settings()`, possibly with overrides.
+    pub fn new(
+        city: &CityLights,
+        eye: Vec3,
+        env: &Environment,
+        quality: Quality,
+        settings: RenderSettings,
+        hurt: f32,
+        low_health: bool,
+    ) -> Self {
         let mut lights = vec![city.store];
         lights.extend(lamps::street_lights(&city.lamps, eye, quality.lamp_lights(), env.power_cut, env.lamp_energy));
         let outdoors = !lamps::sheltered(&city.buildings, eye);
@@ -47,7 +56,7 @@ impl FrameData {
         FrameData {
             lighting: env.lighting(),
             lights,
-            settings: quality.render_settings(),
+            settings,
             atmosphere: look::atmosphere(env),
             retro: look::retro(lens_rain, hurt, low_health),
             game: env.game_params(),

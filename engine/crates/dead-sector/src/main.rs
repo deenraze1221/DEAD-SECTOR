@@ -92,20 +92,31 @@ fn run_offscreen(options: &Options, loaded: &LoadedCity) -> Result<()> {
     let camera = initial_camera(options, &loaded.city);
     let environment = environment(options, &loaded.city);
     renderer.set_decals(&loaded.lights.pool_decals(&environment));
-    let frame = FrameData::new(&loaded.lights, camera.position, &environment, options.quality, 0.0, false);
+    let settings = options.render_settings();
+    log::info!("render settings: {settings:?}");
+    let frame = FrameData::new(&loaded.lights, camera.position, &environment, options.quality, settings, 0.0, false);
     let inputs = frame.inputs(&camera, options.time.unwrap_or(0.0));
     let size = options.size;
 
     if let Some(frames) = options.bench {
-        renderer.bench(size, &inputs, 1)?; // warm-up
-        let ms = renderer.bench(size, &inputs, frames)?.as_secs_f64() * 1e3 / frames as f64;
+        renderer.bench(size, &inputs, 2)?; // warm-up
+        let result = renderer.bench(size, &inputs, frames)?;
+        let ms = result.frame_ms;
+        let kind = if info.device_type == wgpu::DeviceType::Cpu { "SOFTWARE renderer" } else { "GPU" };
         println!(
-            "bench: {frames} frames at {}x{} on {} — {ms:.2} ms/frame ({:.0} fps, GPU-synchronised, no present)",
+            "bench: {frames} frames at {}x{} on {} [{kind}, {:?}] — {ms:.2} ms/frame ({:.0} fps, GPU-synchronised, no present)",
             size.0,
             size.1,
             info.name,
+            info.backend,
             1e3 / ms
         );
+        if result.gpu_passes.is_empty() {
+            println!("  (per-pass GPU timings unavailable: no timestamp query support)");
+        }
+        for (label, pass_ms) in &result.gpu_passes {
+            println!("  {label:<16} {pass_ms:7.3} ms");
+        }
     }
     if let Some(path) = &options.screenshot {
         let pixels = renderer.capture(size, &inputs)?;

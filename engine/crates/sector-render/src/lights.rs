@@ -11,6 +11,8 @@ pub struct PointLight {
     pub range: f32,
     /// Linear colour × energy.
     pub color: Vec3,
+    /// May receive a shadow map (the nearest casters within the budget do).
+    pub cast_shadows: bool,
 }
 
 /// Godot's OmniLight3D falloff (`get_omni_attenuation`, decay 1); the scene

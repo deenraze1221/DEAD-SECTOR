@@ -36,7 +36,8 @@ fn scene() -> Scene {
 }
 
 fn capture(scene: &mut Scene, camera: &Camera, environment: &Environment, quality: Quality) -> Vec<u8> {
-    let frame = FrameData::new(&scene.lights, camera.position, environment, quality, 0.0, false);
+    let frame =
+        FrameData::new(&scene.lights, camera.position, environment, quality, quality.render_settings(), 0.0, false);
     scene.renderer.capture(SIZE, &frame.inputs(camera, 0.0)).unwrap()
 }
 

@@ -15,6 +15,8 @@ struct PointLight {
     position_range: vec4<f32>,
     // rgb = linear colour × energy.
     color: vec4<f32>,
+    // x = shadow slot (−1 = none).
+    shadow: vec4<f32>,
 };
 
 struct Frame {
@@ -66,10 +68,29 @@ struct SurfaceOutput {
     roughness: f32,
 };
 
+struct Shadows {
+    cascades: array<mat4x4<f32>, 4>,
+    // Far edge of each cascade along the view direction.
+    splits: vec4<f32>,
+    // World size of one texel per cascade.
+    texels: vec4<f32>,
+    // x = cascade count (0 = off), y = filter (0 hard, 1 PCF, 2 soft), z = fade start, w = distance.
+    sun: vec4<f32>,
+    camera_forward: vec4<f32>,
+    // x = filter, y = 1 / face resolution, z = 1 when the occlusion texture is valid.
+    local: vec4<f32>,
+    faces: array<mat4x4<f32>, 24>,
+};
+
 @group(0) @binding(0) var<uniform> frame: Frame;
 @group(1) @binding(0) var<uniform> material: Material;
 @group(1) @binding(1) var label_texture: texture_2d<f32>;
 @group(1) @binding(2) var label_sampler: sampler;
+@group(2) @binding(0) var<uniform> shadows: Shadows;
+@group(2) @binding(1) var sun_shadow_map: texture_depth_2d_array;
+@group(2) @binding(2) var local_shadow_map: texture_depth_2d_array;
+@group(2) @binding(3) var shadow_sampler: sampler_comparison;
+@group(2) @binding(4) var occlusion_map: texture_2d<f32>;
 
 struct VertexIn {
     @location(0) position: vec3<f32>,
@@ -84,7 +105,7 @@ struct VertexIn {
 };
 
 struct VertexOut {
-    @builtin(position) clip: vec4<f32>,
+    @builtin(position) @invariant clip: vec4<f32>,
     @location(0) world: vec3<f32>,
     @location(1) normal: vec3<f32>,
     @location(2) uv: vec2<f32>,
@@ -178,6 +199,103 @@ fn env_brdf(f0: vec3<f32>, roughness: f32, n_dot_v: f32) -> vec3<f32> {
     return f0 * env.x + env.y;
 }
 
+// ---- shadows -----------------------------------------------------------------
+
+// 16-tap Poisson disc.
+const POISSON = array<vec2<f32>, 16>(
+    vec2<f32>(-0.94201624, -0.39906216), vec2<f32>(0.94558609, -0.76890725),
+    vec2<f32>(-0.09418410, -0.92938870), vec2<f32>(0.34495938, 0.29387760),
+    vec2<f32>(-0.91588581, 0.45771432), vec2<f32>(-0.81544232, -0.87912464),
+    vec2<f32>(-0.38277543, 0.27676845), vec2<f32>(0.97484398, 0.75648379),
+    vec2<f32>(0.44323325, -0.97511554), vec2<f32>(0.53742981, -0.47373420),
+    vec2<f32>(-0.26496911, -0.41893023), vec2<f32>(0.79197514, 0.19090188),
+    vec2<f32>(-0.24188840, 0.99706507), vec2<f32>(-0.81409955, 0.91437590),
+    vec2<f32>(0.19984126, 0.78641367), vec2<f32>(0.14383161, -0.14100790),
+);
+
+fn compare(map: texture_depth_2d_array, uv: vec2<f32>, layer: u32, depth: f32) -> f32 {
+    return textureSampleCompareLevel(map, shadow_sampler, uv, i32(layer), depth);
+}
+
+// Filtered lookup: hard (one 2×2 tap), PCF (3×3 taps) or soft (rotated Poisson disc).
+fn filtered(map: texture_depth_2d_array, uv: vec2<f32>, layer: u32, depth: f32, texel: f32, mode: u32, pixel: vec2<f32>) -> f32 {
+    if mode == 0u {
+        return compare(map, uv, layer, depth);
+    }
+    if mode == 1u {
+        var sum = 0.0;
+        for (var y = -1; y <= 1; y++) {
+            for (var x = -1; x <= 1; x++) {
+                sum += compare(map, uv + vec2<f32>(f32(x), f32(y)) * texel, layer, depth);
+            }
+        }
+        return sum / 9.0;
+    }
+    let angle = fract(52.9829189 * fract(dot(pixel, vec2<f32>(0.06711056, 0.00583715)))) * 6.28318531;
+    let rotation = mat2x2<f32>(cos(angle), sin(angle), -sin(angle), cos(angle));
+    var sum = 0.0;
+    for (var i = 0; i < 16; i++) {
+        sum += compare(map, uv + rotation * POISSON[i] * texel * 2.5, layer, depth);
+    }
+    return sum / 16.0;
+}
+
+fn project(m: mat4x4<f32>, world: vec3<f32>) -> vec3<f32> {
+    let clip = m * vec4<f32>(world, 1.0);
+    let ndc = clip.xyz / clip.w;
+    return vec3<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5, ndc.z);
+}
+
+// Sun visibility from the cascades: 1 = lit.
+fn sun_shadow(world: vec3<f32>, n: vec3<f32>, pixel: vec2<f32>) -> f32 {
+    let count = u32(shadows.sun.x);
+    if count == 0u {
+        return 1.0;
+    }
+    let view_depth = dot(world - frame.camera_pos.xyz, shadows.camera_forward.xyz);
+    if view_depth >= shadows.sun.w {
+        return 1.0;
+    }
+    var cascade = count - 1u;
+    for (var i = 0u; i < count; i++) {
+        if view_depth < shadows.splits[i] {
+            cascade = i;
+            break;
+        }
+    }
+    // Normal offset of ~1.5 texels, more on surfaces facing away from the sun.
+    let n_dot_l = clamp(dot(n, frame.sun_dir.xyz), 0.0, 1.0);
+    let offset = shadows.texels[cascade] * (1.0 + 1.5 * (1.0 - n_dot_l));
+    let p = project(shadows.cascades[cascade], world + n * offset);
+    if any(p.xy < vec2<f32>(0.0)) || any(p.xy > vec2<f32>(1.0)) || p.z > 1.0 {
+        return 1.0;
+    }
+    let texel = 1.0 / f32(textureDimensions(sun_shadow_map).x);
+    let lit = filtered(sun_shadow_map, p.xy, cascade, p.z, texel, u32(shadows.sun.y), pixel);
+    // Fade out towards the shadow distance.
+    return mix(lit, 1.0, smoothstep(shadows.sun.z, shadows.sun.w, view_depth));
+}
+
+// Point-light visibility for shadow slot `slot`: 1 = lit.
+fn local_shadow(slot: u32, light: vec3<f32>, world: vec3<f32>, n: vec3<f32>, pixel: vec2<f32>) -> f32 {
+    let d = world - light;
+    let a = abs(d);
+    var face: u32;
+    if a.x >= a.y && a.x >= a.z {
+        face = select(1u, 0u, d.x >= 0.0);
+    } else if a.y >= a.z {
+        face = select(3u, 2u, d.y >= 0.0);
+    } else {
+        face = select(5u, 4u, d.z >= 0.0);
+    }
+    let layer = slot * 6u + face;
+    let distance = length(d);
+    // Offset along the normal by about one face texel at this distance.
+    let offset = distance * shadows.local.y * 2.0 + 0.01;
+    let p = project(shadows.faces[layer], world + n * offset);
+    return filtered(local_shadow_map, p.xy, layer, p.z, shadows.local.y, u32(shadows.local.x), pixel);
+}
+
 fn apply_fog(color: vec3<f32>, world: vec3<f32>) -> vec3<f32> {
     let distance = length(world - frame.camera_pos.xyz);
     let fog = 1.0 - exp(min(0.0, -distance * frame.fog.w));
@@ -212,7 +330,12 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
         let metallic = material.pbr.y;
         let v = normalize(frame.camera_pos.xyz - in.world);
         let f0 = mix(vec3<f32>(0.04), albedo, metallic);
-        let sun = direct_light(n, v, frame.sun_dir.xyz, frame.sun_color.rgb, roughness, f0, metallic);
+        var screen_occlusion = vec2<f32>(1.0);
+        if shadows.local.z > 0.5 {
+            screen_occlusion = textureLoad(occlusion_map, vec2<i32>(in.clip.xy), 0).rg;
+        }
+        let sun_visibility = sun_shadow(in.world, n, in.clip.xy) * screen_occlusion.g;
+        let sun = direct_light(n, v, frame.sun_dir.xyz, frame.sun_color.rgb * sun_visibility, roughness, f0, metallic);
         var diffuse = sun[0];
         var specular = sun[1];
         let count = u32(frame.params.z);
@@ -225,6 +348,9 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
             attenuation *= attenuation;
             attenuation = max(1.0 - attenuation, 0.0);
             attenuation = attenuation * attenuation / max(distance, 0.0001);
+            if attenuation > 0.0 && light.shadow.x >= 0.0 {
+                attenuation *= local_shadow(u32(light.shadow.x), light.position_range.xyz, in.world, n, in.clip.xy);
+            }
             if attenuation > 0.0 {
                 let lit = direct_light(n, v, to_light / distance, light.color.rgb * attenuation, roughness, f0, metallic);
                 diffuse += lit[0];
@@ -234,8 +360,10 @@ fn fs_main(in: VertexOut, @builtin(front_facing) front: bool) -> @location(0) ve
         let n_dot_v = max(dot(n, v), 1e-4);
         // Rough surfaces see a blurred sky: fade the reflection towards the horizon colour.
         let reflected = mix(sky_color(reflect(-v, n)), frame.sky_horizon.rgb, roughness);
-        specular += reflected * env_brdf(f0, roughness, n_dot_v);
-        color = (diffuse + frame.ambient.rgb) * albedo * (1.0 - metallic) + specular + material.emission.rgb;
+        // Ambient occlusion darkens only indirect light, as in Godot (ao_light_affect 0).
+        let ao = screen_occlusion.r;
+        specular += reflected * env_brdf(f0, roughness, n_dot_v) * ao;
+        color = (diffuse + frame.ambient.rgb * ao) * albedo * (1.0 - metallic) + specular + material.emission.rgb;
     }
     return vec4<f32>(apply_fog(color, in.world), material.albedo.a);
 }

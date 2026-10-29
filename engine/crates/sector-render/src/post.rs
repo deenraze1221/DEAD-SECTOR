@@ -1,6 +1,8 @@
 //! Render targets and the post chain: glow mip chain → tonemap → retro pass.
 
-use crate::scene_pass::{DEPTH_FORMAT, HDR_FORMAT, fragment_uniform_entry, sampler_entry, texture_entry};
+use crate::gpu_util::{fragment_uniform_entry, sampler_entry, texture_entry};
+use crate::profiler::GpuProfiler;
+use crate::scene_pass::{DEPTH_FORMAT, HDR_FORMAT};
 use crate::settings::{PostSettings, RetroSettings};
 use bytemuck::{Pod, Zeroable};
 use wgpu::util::DeviceExt;
@@ -155,6 +157,8 @@ struct GlowStep {
 
 /// Every texture and bind group that depends on the output size.
 pub(crate) struct Targets {
+    /// Unique per allocation, so dependent bind groups know when to rebuild.
+    pub id: u64,
     pub output: (u32, u32),
     pub grid: (u32, u32),
     pub max_lines: Option<u32>,
@@ -269,7 +273,9 @@ impl Targets {
             wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
         );
         let pixels_group = bind(&post.pixels_layout, "pixels", &pixels_buffer, &[&ldr], &post.nearest);
-        Targets { output, grid, max_lines, hdr, depth, glow_steps, ldr, tonemap_group, pixels_group, pixels_buffer }
+        static NEXT_ID: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let id = NEXT_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        Targets { id, output, grid, max_lines, hdr, depth, glow_steps, ldr, tonemap_group, pixels_group, pixels_buffer }
     }
 
     pub(crate) fn record(
@@ -279,6 +285,7 @@ impl Targets {
         encoder: &mut wgpu::CommandEncoder,
         output: &wgpu::TextureView,
         pixels: &RetroUniform,
+        profiler: &mut Option<GpuProfiler>,
     ) {
         queue.write_buffer(&self.pixels_buffer, 0, bytemuck::bytes_of(pixels));
         let mut fullscreen =
@@ -295,7 +302,7 @@ impl Targets {
                         },
                     })],
                     depth_stencil_attachment: None,
-                    timestamp_writes: None,
+                    timestamp_writes: profiler.as_mut().and_then(|p| p.pass("post")),
                     occlusion_query_set: None,
                     multiview_mask: None,
                 });

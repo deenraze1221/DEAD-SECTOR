@@ -22,7 +22,12 @@ pub fn district_of(x: f32, z: f32) -> u8 {
 
 /// The warm light over the SECTOR MART terminal.
 pub fn store_light(terminal_x: f32, terminal_z: f32) -> PointLight {
-    PointLight { position: Vec3::new(terminal_x, 2.5, terminal_z), range: 9.0, color: linear("#d5b882") * 1.3 }
+    PointLight {
+        position: Vec3::new(terminal_x, 2.5, terminal_z),
+        range: 9.0,
+        color: linear("#d5b882") * 1.3,
+        cast_shadows: true,
+    }
 }
 
 /// Up to `count` lit street lamps within 35 m of `eye`, nearest first, skipping
@@ -34,7 +39,7 @@ pub fn street_lights(lamps: &[Vec3], eye: Vec3, count: usize, power_cut: Option<
     live.into_iter()
         .take(count)
         .filter(|l| l.distance(eye) < 35.0)
-        .map(|l| PointLight { position: l + Vec3::Y * 4.7, range: 11.0, color })
+        .map(|l| PointLight { position: l + Vec3::Y * 4.7, range: 11.0, color, cast_shadows: true })
         .collect()
 }
 

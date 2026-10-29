@@ -73,7 +73,8 @@ pub async fn request_device(
     let (device, queue) = adapter
         .request_device(&wgpu::DeviceDescriptor {
             label: Some("dead-sector"),
-            required_features: wgpu::Features::empty(),
+            // Pass timings for benchmarks, where the adapter supports them.
+            required_features: adapter.features() & wgpu::Features::TIMESTAMP_QUERY,
             required_limits: wgpu::Limits::default(),
             ..Default::default()
         })

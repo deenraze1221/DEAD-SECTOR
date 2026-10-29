@@ -5,6 +5,7 @@
 struct PointLight {
     position_range: vec4<f32>,
     color: vec4<f32>,
+    shadow: vec4<f32>,
 };
 
 struct Frame {

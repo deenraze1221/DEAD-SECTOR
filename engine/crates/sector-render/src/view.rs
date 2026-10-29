@@ -43,10 +43,19 @@ impl Camera {
     /// View-projection with reversed depth (near = 1, far = 0) for better
     /// precision across a 600 m view distance.
     pub fn view_proj(&self, aspect: f32) -> Mat4 {
-        let view = look_to_mat4(self.position, self.forward(), Vec3::Y);
+        self.projection(aspect) * self.view()
+    }
+
+    /// World → camera space.
+    pub fn view(&self) -> Mat4 {
+        look_to_mat4(self.position, self.forward(), Vec3::Y)
+    }
+
+    /// Camera space → clip space, reversed depth.
+    pub fn projection(&self, aspect: f32) -> Mat4 {
         let proj = directx::perspective(self.fov_y_degrees.to_radians(), aspect, self.near, self.far);
         let reverse = Mat4::from_cols(Vec4::X, Vec4::Y, Vec4::new(0.0, 0.0, -1.0, 0.0), Vec4::new(0.0, 0.0, 1.0, 1.0));
-        reverse * proj * view
+        reverse * proj
     }
 }
 
