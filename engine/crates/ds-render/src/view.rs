@@ -1,6 +1,5 @@
-//! Camera and scene lighting parameters.
+//! First-person camera.
 
-use ds_assets::city::{parse_hex_color, srgb_to_linear};
 use glam::camera::rh::{proj::directx, view::look_to_mat4};
 use glam::{EulerRot, Mat4, Quat, Vec3, Vec4};
 
@@ -51,40 +50,6 @@ impl Camera {
     }
 }
 
-/// Global lighting, all colours linear.
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Lighting {
-    /// Unit vector pointing towards the sun.
-    pub sun_direction: Vec3,
-    /// Colour × energy.
-    pub sun: Vec3,
-    /// Colour × energy.
-    pub ambient: Vec3,
-    pub fog_color: Vec3,
-    pub fog_density: f32,
-}
-
-fn linear(hex: &str) -> Vec3 {
-    let srgb = parse_hex_color(hex).expect("valid built-in colour");
-    Vec3::from(srgb.map(srgb_to_linear))
-}
-
-impl Lighting {
-    /// The environment `godot/scripts/main.gd::setup_environment()` creates
-    /// before weather and the day cycle adjust it.
-    pub fn godot_default() -> Self {
-        // DirectionalLight3D rotation_degrees (-38, -28, 0); it shines along its −Z.
-        let basis = Quat::from_euler(EulerRot::YXZ, (-28f32).to_radians(), (-38f32).to_radians(), 0.0);
-        Lighting {
-            sun_direction: basis * Vec3::Z,
-            sun: linear("#8d9fab") * 0.72,
-            ambient: linear("#74828a") * 0.46,
-            fog_color: linear("#2e3b42"),
-            fog_density: 0.012,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -113,13 +78,5 @@ mod tests {
         assert!((depth(-camera.near) - 1.0).abs() < 1e-4);
         assert!(depth(-camera.far).abs() < 1e-4);
         assert!(depth(-1.0) > depth(-100.0));
-    }
-
-    #[test]
-    fn default_sun_is_overhead_from_behind_left() {
-        let light = Lighting::godot_default();
-        assert!((light.sun_direction.length() - 1.0).abs() < 1e-5);
-        // 38° elevation.
-        assert!((light.sun_direction.y - 38f32.to_radians().sin()).abs() < 1e-5);
     }
 }

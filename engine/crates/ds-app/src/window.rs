@@ -1,9 +1,9 @@
 //! Windowed mode: winit event loop, surface presentation and a free-fly camera.
 
 use crate::options::Options;
-use crate::{LoadedCity, initial_camera, lighting};
+use crate::{LoadedCity, environment, initial_camera};
 use anyhow::{Context, Result};
-use ds_render::{Camera, Lighting, Renderer, connect};
+use ds_render::{Camera, Environment, FrameInputs, Quality, Renderer, connect};
 use glam::Vec3;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -49,7 +49,10 @@ struct Gpu {
     config: wgpu::SurfaceConfiguration,
     renderer: Renderer,
     adapter_name: String,
-    lighting: Lighting,
+    environment: Environment,
+    quality: Quality,
+    fixed_time: Option<f32>,
+    started: Instant,
     held: HashSet<KeyCode>,
     captured: bool,
     last_frame: Instant,
@@ -82,7 +85,7 @@ impl Gpu {
         log::info!("surface: {:?}, {:?}", config.format, config.present_mode);
 
         let started = Instant::now();
-        let renderer = Renderer::new(&device, &queue, config.format, &loaded.scene, &loaded.assets)?;
+        let renderer = Renderer::new(&device, &queue, config.format, &loaded.city, &loaded.scene, &loaded.assets)?;
         log::info!("uploaded scene in {:.0} ms", started.elapsed().as_secs_f64() * 1e3);
         Ok(Gpu {
             window,
@@ -92,7 +95,10 @@ impl Gpu {
             config,
             renderer,
             adapter_name: info.name,
-            lighting: lighting(options),
+            environment: environment(options, &loaded.city),
+            quality: options.quality,
+            fixed_time: options.time,
+            started: Instant::now(),
             held: HashSet::new(),
             captured: false,
             last_frame: Instant::now(),
@@ -164,7 +170,15 @@ impl Gpu {
         };
         let view = frame.texture.create_view(&Default::default());
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        self.renderer.render(&mut encoder, &view, (self.config.width, self.config.height), camera, &self.lighting);
+        let inputs = FrameInputs {
+            camera,
+            environment: &self.environment,
+            quality: self.quality,
+            time: self.fixed_time.unwrap_or_else(|| self.started.elapsed().as_secs_f32()),
+            hurt: 0.0,
+            low_health: false,
+        };
+        self.renderer.render(&mut encoder, &view, (self.config.width, self.config.height), &inputs);
         self.queue.submit([encoder.finish()]);
         self.window.pre_present_notify();
         self.queue.present(frame);

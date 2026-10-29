@@ -529,6 +529,7 @@ dependencies = [
  "ds-assets",
  "glam",
  "log",
+ "naga",
  "pollster",
  "wgpu",
 ]

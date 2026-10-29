@@ -41,10 +41,16 @@ pub struct MaterialParams {
     /// Linear RGB emission already multiplied by its energy.
     pub emission: [f32; 3],
     pub unlit: bool,
+    /// Unlit opaque light/sign that goes dark in a blackout (`powered.gdshader`).
+    pub powered: bool,
     /// Discard fragments whose texture alpha is below 0.5 (Godot alpha scissor).
     pub alpha_test: bool,
     pub texture: Option<u32>,
     pub pass: PassKind,
+    pub roughness: f32,
+    pub metallic: f32,
+    /// Procedural surface kind for `surface.gdshader` (0 = plain material).
+    pub surface: u32,
 }
 
 impl MaterialParams {
@@ -69,9 +75,15 @@ impl MaterialParams {
                     albedo: [linear[0], linear[1], linear[2], opacity],
                     emission,
                     unlit: m.unlit,
+                    // bridge.gd swaps these for the powered shader in the world.
+                    powered: m.unlit && !m.transparent && m.surface == 0,
                     alpha_test: m.texture.is_some(),
                     texture: m.texture,
                     pass,
+                    // surface.gdshader fixes roughness at 0.92 and ignores metalness.
+                    roughness: if m.surface > 0 { 0.92 } else { m.roughness },
+                    metallic: if m.surface > 0 { 0.0 } else { m.metalness },
+                    surface: m.surface,
                 }
             })
             .collect()

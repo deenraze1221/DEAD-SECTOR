@@ -1,41 +1,30 @@
 //! wgpu renderer for the Dead Sector city.
+//!
+//! Frame structure: city + atmosphere into an HDR target at the PSX pixel-grid
+//! resolution (≤ 540 lines), Godot-style glow and filmic tonemap, then the
+//! pixels pass up to the output size.
 
+pub mod environment;
+pub mod lights;
+pub mod noise;
+mod post;
+mod scene_pass;
 pub mod view;
 
-pub use view::{Camera, Lighting};
+pub use environment::{Environment, FogLevel, Quality, Weather, WeatherKind};
+pub use post::grid_size;
+pub use view::Camera;
 
 use anyhow::{Context, Result};
-use bytemuck::{Pod, Zeroable};
-use ds_assets::SceneBuffers;
-use ds_assets::scene::{Instance, PassKind, Vertex};
+use ds_assets::{City, SceneBuffers};
+use glam::Vec3;
+use lights::PointLight;
+use post::{PixelsUniform, PostPipelines, Targets};
+use scene_pass::{Atmosphere, FrameUniform, ScenePass};
 use std::path::Path;
-use wgpu::util::DeviceExt;
 
-pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 /// Format used for offscreen captures.
 pub const CAPTURE_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Rgba8UnormSrgb;
-
-const FLAG_UNLIT: u32 = 1;
-const FLAG_ALPHA_TEST: u32 = 2;
-
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct FrameUniform {
-    view_proj: [f32; 16],
-    camera_pos: [f32; 4],
-    sun_dir: [f32; 4],
-    sun_color: [f32; 4],
-    ambient: [f32; 4],
-    fog: [f32; 4],
-}
-
-#[repr(C)]
-#[derive(Clone, Copy, Pod, Zeroable)]
-struct MaterialUniform {
-    albedo: [f32; 4],
-    emission: [f32; 4],
-    flags: [u32; 4],
-}
 
 /// Per-frame counters shown in the window title and logs.
 #[derive(Debug, Clone, Copy, Default)]
@@ -45,35 +34,17 @@ pub struct SceneStats {
     pub triangles: u64,
 }
 
-struct GpuDraw {
-    pass: PassKind,
-    material: usize,
-    indices: std::ops::Range<u32>,
-    base_vertex: i32,
-    instances: std::ops::Range<u32>,
-}
-
-struct DepthTarget {
-    size: (u32, u32),
-    view: wgpu::TextureView,
-}
-
-pub struct Renderer {
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    color_format: wgpu::TextureFormat,
-    opaque: wgpu::RenderPipeline,
-    double_sided: wgpu::RenderPipeline,
-    transparent: wgpu::RenderPipeline,
-    frame_buffer: wgpu::Buffer,
-    frame_group: wgpu::BindGroup,
-    material_groups: Vec<wgpu::BindGroup>,
-    vertices: wgpu::Buffer,
-    indices: wgpu::Buffer,
-    instances: wgpu::Buffer,
-    draws: Vec<GpuDraw>,
-    depth: Option<DepthTarget>,
-    stats: SceneStats,
+/// Everything that varies from frame to frame.
+#[derive(Debug, Clone, Copy)]
+pub struct FrameInputs<'a> {
+    pub camera: &'a Camera,
+    pub environment: &'a Environment,
+    pub quality: Quality,
+    /// Seconds since start; drives mist scroll, lens rain and grain.
+    pub time: f32,
+    /// 0..1 red damage flash.
+    pub hurt: f32,
+    pub low_health: bool,
 }
 
 /// Backends tried in order when `WGPU_BACKEND` is not set: Vulkan first, then DX12
@@ -156,365 +127,152 @@ pub async fn request_device(
     Ok((adapter, device, queue))
 }
 
+pub struct Renderer {
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    color_format: wgpu::TextureFormat,
+    scene: ScenePass,
+    post: PostPipelines,
+    targets: Option<Targets>,
+    lamps: Vec<Vec3>,
+    store_light: PointLight,
+    buildings: Vec<ds_assets::city::Building>,
+    stats: SceneStats,
+}
+
 impl Renderer {
-    /// Uploads the scene and builds pipelines. `assets` is used to load label textures.
+    /// Uploads the scene and builds pipelines. `color_format` is the format of
+    /// the final output (window surface or [`CAPTURE_FORMAT`]).
     pub fn new(
         device: &wgpu::Device,
         queue: &wgpu::Queue,
         color_format: wgpu::TextureFormat,
+        city: &City,
         scene: &SceneBuffers,
         assets: &Path,
     ) -> Result<Self> {
-        let shader = device.create_shader_module(wgpu::ShaderModuleDescriptor {
-            label: Some("city.wgsl"),
-            source: wgpu::ShaderSource::Wgsl(include_str!("city.wgsl").into()),
-        });
-
-        let frame_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("frame"),
-            entries: &[wgpu::BindGroupLayoutEntry {
-                binding: 0,
-                visibility: wgpu::ShaderStages::VERTEX_FRAGMENT,
-                ty: wgpu::BindingType::Buffer {
-                    ty: wgpu::BufferBindingType::Uniform,
-                    has_dynamic_offset: false,
-                    min_binding_size: None,
-                },
-                count: None,
-            }],
-        });
-        let material_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-            label: Some("material"),
-            entries: &[
-                wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Buffer {
-                        ty: wgpu::BufferBindingType::Uniform,
-                        has_dynamic_offset: false,
-                        min_binding_size: None,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 1,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Texture {
-                        sample_type: wgpu::TextureSampleType::Float { filterable: true },
-                        view_dimension: wgpu::TextureViewDimension::D2,
-                        multisampled: false,
-                    },
-                    count: None,
-                },
-                wgpu::BindGroupLayoutEntry {
-                    binding: 2,
-                    visibility: wgpu::ShaderStages::FRAGMENT,
-                    ty: wgpu::BindingType::Sampler(wgpu::SamplerBindingType::Filtering),
-                    count: None,
-                },
-            ],
-        });
-        let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("city"),
-            bind_group_layouts: &[Some(&frame_layout), Some(&material_layout)],
-            immediate_size: 0,
-        });
-
-        let vertex_attributes =
-            wgpu::vertex_attr_array![0 => Float32x3, 1 => Float32x3, 2 => Float32x2, 3 => Float32x3];
-        let instance_attributes =
-            wgpu::vertex_attr_array![4 => Float32x4, 5 => Float32x4, 6 => Float32x4, 7 => Float32x4, 8 => Float32x4];
-        let buffers = [
-            Some(wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<Vertex>() as u64,
-                step_mode: wgpu::VertexStepMode::Vertex,
-                attributes: &vertex_attributes,
-            }),
-            Some(wgpu::VertexBufferLayout {
-                array_stride: std::mem::size_of::<Instance>() as u64,
-                step_mode: wgpu::VertexStepMode::Instance,
-                attributes: &instance_attributes,
-            }),
-        ];
-        let pipeline = |label: &str, cull: Option<wgpu::Face>, blend: wgpu::BlendState, depth_write: bool| {
-            device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                label: Some(label),
-                layout: Some(&layout),
-                vertex: wgpu::VertexState {
-                    module: &shader,
-                    entry_point: Some("vs_main"),
-                    compilation_options: Default::default(),
-                    buffers: &buffers,
-                },
-                primitive: wgpu::PrimitiveState {
-                    topology: wgpu::PrimitiveTopology::TriangleList,
-                    front_face: wgpu::FrontFace::Ccw,
-                    cull_mode: cull,
-                    ..Default::default()
-                },
-                depth_stencil: Some(wgpu::DepthStencilState {
-                    format: DEPTH_FORMAT,
-                    depth_write_enabled: Some(depth_write),
-                    depth_compare: Some(wgpu::CompareFunction::Greater),
-                    stencil: Default::default(),
-                    bias: Default::default(),
-                }),
-                multisample: Default::default(),
-                fragment: Some(wgpu::FragmentState {
-                    module: &shader,
-                    entry_point: Some("fs_main"),
-                    compilation_options: Default::default(),
-                    targets: &[Some(wgpu::ColorTargetState {
-                        format: color_format,
-                        blend: Some(blend),
-                        write_mask: wgpu::ColorWrites::ALL,
-                    })],
-                }),
-                multiview_mask: None,
-                cache: None,
-            })
-        };
-        let opaque = pipeline("opaque", Some(wgpu::Face::Back), wgpu::BlendState::REPLACE, true);
-        let double_sided = pipeline("double-sided", None, wgpu::BlendState::REPLACE, true);
-        let transparent = pipeline("transparent", None, wgpu::BlendState::ALPHA_BLENDING, false);
-
-        let frame_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("frame"),
-            size: std::mem::size_of::<FrameUniform>() as u64,
-            usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST,
-            mapped_at_creation: false,
-        });
-        let frame_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            label: Some("frame"),
-            layout: &frame_layout,
-            entries: &[wgpu::BindGroupEntry { binding: 0, resource: frame_buffer.as_entire_binding() }],
-        });
-
-        // Label textures use nearest filtering, as in bridge.gd; untextured materials sample white.
-        let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
-            label: Some("label"),
-            mag_filter: wgpu::FilterMode::Nearest,
-            min_filter: wgpu::FilterMode::Nearest,
-            ..Default::default()
-        });
-        let upload = |label: &str, width: u32, height: u32, rgba: &[u8]| {
-            device
-                .create_texture_with_data(
-                    queue,
-                    &wgpu::TextureDescriptor {
-                        label: Some(label),
-                        size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
-                        mip_level_count: 1,
-                        sample_count: 1,
-                        dimension: wgpu::TextureDimension::D2,
-                        format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                        usage: wgpu::TextureUsages::TEXTURE_BINDING,
-                        view_formats: &[],
-                    },
-                    wgpu::util::TextureDataOrder::LayerMajor,
-                    rgba,
-                )
-                .create_view(&Default::default())
-        };
-        let white = upload("white", 1, 1, &[255; 4]);
-        let mut labels = std::collections::HashMap::new();
-        for index in scene.materials.iter().filter_map(|m| m.texture) {
-            if let std::collections::hash_map::Entry::Vacant(slot) = labels.entry(index) {
-                let image = ds_assets::load_label_texture(assets, index)?;
-                slot.insert(upload(&format!("label-{index}"), image.width, image.height, &image.rgba));
-            }
-        }
-
-        let material_groups = scene
-            .materials
-            .iter()
-            .enumerate()
-            .map(|(i, m)| {
-                let flags = if m.unlit { FLAG_UNLIT } else { 0 } | if m.alpha_test { FLAG_ALPHA_TEST } else { 0 };
-                let uniform = MaterialUniform {
-                    albedo: m.albedo,
-                    emission: [m.emission[0], m.emission[1], m.emission[2], 0.0],
-                    flags: [flags, 0, 0, 0],
-                };
-                let buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some(&format!("material-{i}")),
-                    contents: bytemuck::bytes_of(&uniform),
-                    usage: wgpu::BufferUsages::UNIFORM,
-                });
-                let texture = m.texture.map_or(&white, |t| &labels[&t]);
-                device.create_bind_group(&wgpu::BindGroupDescriptor {
-                    label: Some(&format!("material-{i}")),
-                    layout: &material_layout,
-                    entries: &[
-                        wgpu::BindGroupEntry { binding: 0, resource: buffer.as_entire_binding() },
-                        wgpu::BindGroupEntry { binding: 1, resource: wgpu::BindingResource::TextureView(texture) },
-                        wgpu::BindGroupEntry { binding: 2, resource: wgpu::BindingResource::Sampler(&sampler) },
-                    ],
-                })
-            })
-            .collect();
-
-        let buffer = |label: &str, contents: &[u8], usage| {
-            device.create_buffer_init(&wgpu::util::BufferInitDescriptor { label: Some(label), contents, usage })
-        };
-        let vertices = buffer("vertices", bytemuck::cast_slice(&scene.vertices), wgpu::BufferUsages::VERTEX);
-        let indices = buffer("indices", bytemuck::cast_slice(&scene.indices), wgpu::BufferUsages::INDEX);
-        let instances = buffer("instances", bytemuck::cast_slice(&scene.instances), wgpu::BufferUsages::VERTEX);
-
-        let draws = scene
-            .draws
-            .iter()
-            .map(|d| GpuDraw {
-                pass: scene.materials[d.material].pass,
-                material: d.material,
-                indices: d.first_index..d.first_index + d.index_count,
-                base_vertex: d.base_vertex,
-                instances: d.first_instance..d.first_instance + d.instance_count,
-            })
-            .collect();
-        let stats = SceneStats {
-            draws: scene.draws.len(),
-            instances: scene.instances.len(),
-            triangles: scene.triangles_per_frame(),
-        };
-
+        let lamps: Vec<Vec3> = city.lamps().map(Vec3::from).collect();
         Ok(Renderer {
             device: device.clone(),
             queue: queue.clone(),
             color_format,
-            opaque,
-            double_sided,
-            transparent,
-            frame_buffer,
-            frame_group,
-            material_groups,
-            vertices,
-            indices,
-            instances,
-            draws,
-            depth: None,
-            stats,
+            scene: ScenePass::new(device, queue, scene, lamps.clone(), assets)?,
+            post: PostPipelines::new(device, color_format),
+            targets: None,
+            lamps,
+            store_light: lights::store_light(city.terminal.x, city.terminal.z),
+            buildings: city.buildings.clone(),
+            stats: SceneStats {
+                draws: scene.draws.len(),
+                instances: scene.instances.len(),
+                triangles: scene.triangles_per_frame(),
+            },
         })
     }
 
     pub fn stats(&self) -> SceneStats {
-        self.stats
+        SceneStats { draws: self.scene.draw_count(), ..self.stats }
     }
 
     pub fn color_format(&self) -> wgpu::TextureFormat {
         self.color_format
     }
 
-    fn depth_view(&mut self, size: (u32, u32)) -> wgpu::TextureView {
-        if self.depth.as_ref().is_none_or(|d| d.size != size) {
-            let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-                label: Some("depth"),
-                size: wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 },
-                mip_level_count: 1,
-                sample_count: 1,
-                dimension: wgpu::TextureDimension::D2,
-                format: DEPTH_FORMAT,
-                usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
-                view_formats: &[],
-            });
-            self.depth = Some(DepthTarget { size, view: texture.create_view(&Default::default()) });
-        }
-        self.depth.as_ref().expect("depth target just created").view.clone()
+    /// Point lights for this frame: the store light plus the nearest street lamps.
+    fn frame_lights(&self, eye: Vec3, env: &Environment, quality: Quality) -> Vec<PointLight> {
+        let mut lights = vec![self.store_light];
+        lights.extend(lights::street_lights(&self.lamps, eye, quality.lamp_lights(), env.power_cut, env.lamp_energy));
+        lights
     }
 
-    /// Records the city into `target` (which must use the renderer's colour format).
+    /// Records a full frame into `output` (which must use the renderer's colour format).
     pub fn render(
         &mut self,
         encoder: &mut wgpu::CommandEncoder,
-        target: &wgpu::TextureView,
-        size: (u32, u32),
-        camera: &Camera,
-        lighting: &Lighting,
+        output: &wgpu::TextureView,
+        output_size: (u32, u32),
+        inputs: &FrameInputs,
     ) {
-        let aspect = size.0 as f32 / size.1.max(1) as f32;
-        let frame = FrameUniform {
-            view_proj: camera.view_proj(aspect).to_cols_array(),
-            camera_pos: camera.position.extend(1.0).to_array(),
-            sun_dir: lighting.sun_direction.normalize().extend(0.0).to_array(),
-            sun_color: lighting.sun.extend(0.0).to_array(),
-            ambient: lighting.ambient.extend(0.0).to_array(),
-            fog: lighting.fog_color.extend(lighting.fog_density).to_array(),
-        };
-        self.queue.write_buffer(&self.frame_buffer, 0, bytemuck::bytes_of(&frame));
-        let depth = self.depth_view(size);
-        let fog = lighting.fog_color;
-
-        let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-            label: Some("city"),
-            color_attachments: &[Some(wgpu::RenderPassColorAttachment {
-                view: target,
-                depth_slice: None,
-                resolve_target: None,
-                // Godot fogs the sky completely (fog_sky_affect = 1), so the background is the fog colour.
-                ops: wgpu::Operations {
-                    load: wgpu::LoadOp::Clear(wgpu::Color {
-                        r: fog.x as f64,
-                        g: fog.y as f64,
-                        b: fog.z as f64,
-                        a: 1.0,
-                    }),
-                    store: wgpu::StoreOp::Store,
-                },
-            })],
-            depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
-                view: &depth,
-                depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: wgpu::StoreOp::Discard }),
-                stencil_ops: None,
-            }),
-            timestamp_writes: None,
-            occlusion_query_set: None,
-            multiview_mask: None,
-        });
-        pass.set_bind_group(0, &self.frame_group, &[]);
-        pass.set_vertex_buffer(0, self.vertices.slice(..));
-        pass.set_vertex_buffer(1, self.instances.slice(..));
-        pass.set_index_buffer(self.indices.slice(..), wgpu::IndexFormat::Uint32);
-        let mut current: Option<(PassKind, usize)> = None;
-        for draw in &self.draws {
-            if current.map(|c| c.0) != Some(draw.pass) {
-                pass.set_pipeline(match draw.pass {
-                    PassKind::Opaque => &self.opaque,
-                    PassKind::OpaqueDoubleSided => &self.double_sided,
-                    PassKind::Transparent => &self.transparent,
-                });
-            }
-            if current.map(|c| c.1) != Some(draw.material) {
-                pass.set_bind_group(1, &self.material_groups[draw.material], &[]);
-            }
-            current = Some((draw.pass, draw.material));
-            pass.draw_indexed(draw.indices.clone(), draw.base_vertex, draw.instances.clone());
+        if self.targets.as_ref().is_none_or(|t| t.output != output_size) {
+            self.targets = Some(Targets::new(&self.device, &self.post, output_size));
         }
+        let targets = self.targets.as_ref().expect("targets just created");
+        let (camera, env) = (inputs.camera, inputs.environment);
+        let aspect = targets.grid.0 as f32 / targets.grid.1 as f32;
+        let lights = self.frame_lights(camera.position, env, inputs.quality);
+        let frame = FrameUniform::new(camera.view_proj(aspect), camera.position, inputs.time, env, &lights);
+        self.scene.prepare(&frame, env, inputs.time);
+
+        let atmosphere = Atmosphere {
+            pools: inputs.quality.atmosphere() && env.pool_alpha > 0.0,
+            mist: inputs.quality.atmosphere() && env.mist_density > 0.0,
+        };
+        {
+            let fog = env.fog_color;
+            let mut pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                label: Some("scene"),
+                color_attachments: &[Some(wgpu::RenderPassColorAttachment {
+                    view: &targets.hdr,
+                    depth_slice: None,
+                    resolve_target: None,
+                    // Godot fogs the sky completely (fog_sky_affect = 1): the background is the fog colour.
+                    ops: wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: fog.x as f64,
+                            g: fog.y as f64,
+                            b: fog.z as f64,
+                            a: 1.0,
+                        }),
+                        store: wgpu::StoreOp::Store,
+                    },
+                })],
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &targets.depth,
+                    depth_ops: Some(wgpu::Operations { load: wgpu::LoadOp::Clear(0.0), store: wgpu::StoreOp::Discard }),
+                    stencil_ops: None,
+                }),
+                timestamp_writes: None,
+                occlusion_query_set: None,
+                multiview_mask: None,
+            });
+            self.scene.record(&mut pass, &atmosphere);
+        }
+
+        let outdoors = !lights::sheltered(&self.buildings, camera.position);
+        let lens_rain = if inputs.quality.atmosphere() && outdoors { env.lens_rain } else { 0.0 };
+        let pixels = PixelsUniform {
+            output: [output_size.0 as f32, output_size.1 as f32, inputs.time, inputs.quality.post_detail()],
+            effects: [
+                lens_rain,
+                inputs.hurt,
+                if inputs.low_health { 1.0 } else { 0.0 },
+                if self.color_format.is_srgb() { 1.0 } else { 0.0 },
+            ],
+        };
+        targets.record(&self.queue, &self.post, encoder, output, &pixels);
     }
 
-    /// Renders `frames` offscreen frames, waiting for the GPU after each one, and
-    /// returns the total time. No readback, so it measures render cost only.
-    pub fn bench(
-        &mut self,
-        size: (u32, u32),
-        camera: &Camera,
-        lighting: &Lighting,
-        frames: u32,
-    ) -> Result<std::time::Duration> {
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("bench"),
+    fn output_texture(&self, size: (u32, u32), usage: wgpu::TextureUsages) -> wgpu::Texture {
+        self.device.create_texture(&wgpu::TextureDescriptor {
+            label: Some("offscreen"),
             size: wgpu::Extent3d { width: size.0, height: size.1, depth_or_array_layers: 1 },
             mip_level_count: 1,
             sample_count: 1,
             dimension: wgpu::TextureDimension::D2,
             format: self.color_format,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
+            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | usage,
             view_formats: &[],
-        });
-        let view = texture.create_view(&Default::default());
+        })
+    }
+
+    /// Renders `frames` offscreen frames, waiting for the GPU after each one, and
+    /// returns the total time. No readback, so it measures render cost only.
+    pub fn bench(&mut self, size: (u32, u32), inputs: &FrameInputs, frames: u32) -> Result<std::time::Duration> {
+        let view = self.output_texture(size, wgpu::TextureUsages::empty()).create_view(&Default::default());
         let started = std::time::Instant::now();
         for _ in 0..frames {
             let mut encoder = self.device.create_command_encoder(&Default::default());
-            self.render(&mut encoder, &view, size, camera, lighting);
+            self.render(&mut encoder, &view, size, inputs);
             self.queue.submit([encoder.finish()]);
             self.device.poll(wgpu::PollType::wait_indefinitely())?;
         }
@@ -523,19 +281,10 @@ impl Renderer {
 
     /// Renders one frame offscreen and returns tightly packed sRGB RGBA8 pixels.
     /// The renderer must have been created with [`CAPTURE_FORMAT`].
-    pub fn capture(&mut self, size: (u32, u32), camera: &Camera, lighting: &Lighting) -> Result<Vec<u8>> {
+    pub fn capture(&mut self, size: (u32, u32), inputs: &FrameInputs) -> Result<Vec<u8>> {
         anyhow::ensure!(self.color_format == CAPTURE_FORMAT, "capture needs a renderer created with CAPTURE_FORMAT");
         let (width, height) = size;
-        let texture = self.device.create_texture(&wgpu::TextureDescriptor {
-            label: Some("capture"),
-            size: wgpu::Extent3d { width, height, depth_or_array_layers: 1 },
-            mip_level_count: 1,
-            sample_count: 1,
-            dimension: wgpu::TextureDimension::D2,
-            format: CAPTURE_FORMAT,
-            usage: wgpu::TextureUsages::RENDER_ATTACHMENT | wgpu::TextureUsages::COPY_SRC,
-            view_formats: &[],
-        });
+        let texture = self.output_texture(size, wgpu::TextureUsages::COPY_SRC);
         let row = width * 4;
         let padded_row = row.div_ceil(wgpu::COPY_BYTES_PER_ROW_ALIGNMENT) * wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
         let readback = self.device.create_buffer(&wgpu::BufferDescriptor {
@@ -545,7 +294,7 @@ impl Renderer {
             mapped_at_creation: false,
         });
         let mut encoder = self.device.create_command_encoder(&Default::default());
-        self.render(&mut encoder, &texture.create_view(&Default::default()), size, camera, lighting);
+        self.render(&mut encoder, &texture.create_view(&Default::default()), size, inputs);
         encoder.copy_texture_to_buffer(
             texture.as_image_copy(),
             wgpu::TexelCopyBufferInfo {

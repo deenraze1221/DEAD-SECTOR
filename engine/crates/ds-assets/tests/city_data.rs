@@ -27,6 +27,11 @@ fn counts_match_export() {
     assert_eq!(city.instance_count(), 63_969);
     assert_eq!(city.colliders.len(), 7_268);
     assert_eq!((city.spawn.x, city.spawn.y, city.spawn.z), (10.35, 0.0, 17.1));
+    assert_eq!(city.buildings.len(), 100);
+    assert_eq!(city.source_assets.len(), 2608);
+    assert_eq!(city.lamps().count(), 106);
+    assert_eq!(city.lamps().next(), Some([-116.35, 0.0, -84.0]));
+    assert_eq!((city.terminal.x, city.terminal.z), (7.25, 10.9));
 }
 
 #[test]
@@ -44,6 +49,10 @@ fn scene_buffers_cover_every_instance_and_triangle() {
     let passes = |kind| scene.materials.iter().filter(|m| m.pass == kind).count();
     assert_eq!(passes(PassKind::Transparent), 1);
     assert_eq!(passes(PassKind::OpaqueDoubleSided), 1);
+    // 41 unlit materials, one of them the transparent glass.
+    assert_eq!(scene.materials.iter().filter(|m| m.powered).count(), 40);
+    assert_eq!(scene.materials.iter().filter(|m| m.surface > 0).count(), 11);
+    assert!(scene.materials.iter().filter(|m| m.surface > 0).all(|m| m.roughness == 0.92 && m.metallic == 0.0));
 
     // Every draw stays inside the shared buffers.
     for d in &scene.draws {

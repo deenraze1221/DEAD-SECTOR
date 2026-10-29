@@ -15,6 +15,44 @@ pub struct City {
     pub materials: Vec<Material>,
     pub batches: Vec<Batch>,
     pub colliders: Vec<Collider>,
+    /// One main building per 24 m plot (10 × 10 grid).
+    pub buildings: Vec<Building>,
+    /// Every placed asset (buildings, props, furniture) with its type name.
+    pub source_assets: Vec<SourceAsset>,
+    /// The SECTOR MART store terminal.
+    pub terminal: Terminal,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct Building {
+    #[serde(rename = "type")]
+    pub kind: String,
+    /// Footprint centre and size.
+    pub x: f32,
+    pub z: f32,
+    pub w: f32,
+    pub d: f32,
+    pub h: f32,
+    /// Plot centre.
+    pub cx: f32,
+    pub cz: f32,
+    pub district: String,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+pub struct SourceAsset {
+    #[serde(rename = "type")]
+    pub kind: String,
+    pub x: f32,
+    #[serde(default)]
+    pub y: f32,
+    pub z: f32,
+}
+
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct Terminal {
+    pub x: f32,
+    pub z: f32,
 }
 
 #[derive(Debug, Clone, Copy, Deserialize)]
@@ -131,6 +169,11 @@ impl City {
         let city: City = serde_json::from_slice(bytes)?;
         city.validate()?;
         Ok(city)
+    }
+
+    /// Ground positions of all street lamps.
+    pub fn lamps(&self) -> impl Iterator<Item = [f32; 3]> + '_ {
+        self.source_assets.iter().filter(|a| a.kind == "lamp").map(|a| [a.x, a.y, a.z])
     }
 
     pub fn instance_count(&self) -> usize {
@@ -262,6 +305,10 @@ mod tests {
          "transforms": [[1,0,0,0, 0,1,0,0, 0,0,1,0, 0,0,0,1], [1,0,0,0, 0,1,0,0, 0,0,1,0, 0,3,0,1]], "colors": [1,0,0, 0,1,0]}
       ],
       "colliders": [{"minX": 0, "maxX": 1, "minY": 0, "maxY": 1, "minZ": 0, "maxZ": 1, "kind": "structure"}],
+      "buildings": [{"id": 0, "type": "shop", "x": 1, "z": 2, "w": 3, "d": 4, "h": 5, "cx": 0, "cz": 0, "district": "market"}],
+      "source_assets": [{"id": "asset-1", "type": "lamp", "x": 4, "y": 0, "z": 5, "yaw": 0, "w": 0.3, "h": 5, "d": 0.3},
+                        {"id": 2, "type": "bench", "x": 6, "z": 7, "yaw": 0, "w": 1, "h": 1, "d": 1}],
+      "terminal": {"x": 7.25, "z": 10.9},
       "creatures": {}
     }"##;
 
@@ -279,6 +326,8 @@ mod tests {
     fn tiny_city_builds_grouped_draws() {
         let city = City::parse(TINY.as_bytes()).unwrap();
         assert_eq!(city.spawn.y, 0.0);
+        assert_eq!(city.lamps().collect::<Vec<_>>(), vec![[4.0, 0.0, 5.0]]);
+        assert_eq!(city.buildings[0].district, "market");
         let scene = SceneBuffers::build(&city);
         assert_eq!(scene.vertices.len(), 4);
         // v is flipped for texture sampling.
@@ -296,6 +345,9 @@ mod tests {
         // Unlit materials get no emission, matching bridge.gd's powered/unshaded split.
         assert_eq!(scene.materials[1].emission, [0.0; 3]);
         assert_eq!(scene.materials[1].albedo[3], 0.3);
+        // Transparent unlit materials stay plain unshaded; only opaque unlit ones are powered.
+        assert!(!scene.materials[1].powered && !scene.materials[0].powered);
+        assert_eq!((scene.materials[0].roughness, scene.materials[0].metallic), (1.0, 0.0));
         assert_eq!(scene.triangles_per_frame(), 2 + 2 * 2);
     }
 

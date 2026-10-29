@@ -4,8 +4,9 @@ Native Rust + wgpu (Vulkan first, DX12 fallback on Windows) rewrite of Dead Sect
 It is developed in stages next to the existing HTML and Godot versions, which are
 not modified.
 
-**Stage 1 (current):** a window that renders the existing city from
-`godot/assets/city.json` with a free-fly camera. No gameplay yet.
+**Stage 2 (current):** the existing city from `godot/assets/city.json` with the
+Godot version's look (lighting, weather, surfaces, lamps, mist, PSX post
+pass) and a free-fly camera. No gameplay yet.
 
 ## Build and run (Windows)
 
@@ -33,7 +34,13 @@ Options (`dead-sector --help`):
 | `--size 1920x1080` | Window / capture size |
 | `--no-vsync` | Uncapped FPS (use this to measure performance) |
 | `--camera x,y,z,yaw,pitch` | Start pose (metres, degrees; yaw 0 looks along −Z) |
-| `--no-fog` | Debug view without fog |
+| `--quality low\|medium\|high` | Graphics quality (default medium, as in Godot) |
+| `--weather overcast\|rain\|storm\|clear` | Weather (default: the seeded wave 1 roll) |
+| `--fog-level light\|medium\|heavy` | Fog level (default: the seeded wave 1 roll) |
+| `--night` | Night lighting |
+| `--blackout 0..3` | Cut power to one city quadrant |
+| `--no-fog` | Debug view without fog or mist |
+| `--time 3.5` | Fixed effect time (mist, lens rain, grain) for repeatable screenshots |
 | `--screenshot out.png` | Render one frame offscreen and exit |
 | `--bench 300` | Render N offscreen frames and print the average time |
 
@@ -45,7 +52,7 @@ Vulkan → DX12 order.
 | Crate | Purpose |
 |---|---|
 | `crates/ds-assets` | Typed `city.json` loader, validation, GPU-ready scene buffers (no GPU code) |
-| `crates/ds-render` | wgpu renderer: instanced draws, materials, camera, lighting, offscreen capture |
+| `crates/ds-render` | wgpu renderer: instanced city, Godot lighting, weather/quality tables, glow, tonemap, PSX pass, offscreen capture |
 | `crates/ds-app` | `dead-sector` executable: window, input, command line |
 
 ## Tests
@@ -66,13 +73,31 @@ rustup target add x86_64-pc-windows-gnu    # plus the mingw-w64 package
 cargo build --release --target x86_64-pc-windows-gnu -p ds-app
 ```
 
-## Stage 1 scope
+## Rendering
 
-Included: all 313 batches / 63,969 instances / ~865k triangles of the exported
-city in one instanced draw per batch, per-instance and per-vertex colours,
-label textures with alpha cutout, double-sided and transparent materials, the
-default sun/ambient/fog of `main.gd`, reversed-Z depth.
+Each frame: the city and atmosphere layers render into an HDR target at the
+PSX pixel grid (at most 540 lines, like `pixels.gdshader`), then Godot-style
+glow, filmic tonemap and colour adjustments, then the pixels pass scales up to
+the window. The 3D cost does not grow with window resolution.
 
-Not yet: procedural surface detail (`surface.gdshader`), the PSX post pass,
-tonemapping/glow, shadows, street and store lights, per-seed city regeneration,
-weather and day cycle, player, weapons, enemies, UI, audio, networking.
+Ported from the Godot version (`godot/scripts`, `godot/shaders`):
+
+- Lighting: Burley diffuse, GGX specular, ambient colour, sky reflections,
+  exponential fog, sun and environment from `climate.gd` (weather roll, day and
+  night, wet asphalt).
+- Surfaces: `surface.gdshader` (brick, tile, wood, grime, rain streaks);
+  `powered.gdshader` lights and signs with blackouts.
+- Lights: store light and the 4 (medium) or 8 (high) nearest street lamps,
+  with Godot's omni falloff; additive light pools; ground mist sheets.
+- Post: glow levels 3 and 5, filmic tonemap (white 5), contrast 1.1,
+  saturation 0.8, and `pixels.gdshader` (grid, lens rain, sharpening, grade,
+  vignette, scanlines, grain).
+
+Not yet: sun shadows, the player flashlight, lightning, rain/ash/hive
+particles, per-seed city regeneration, player, weapons, enemies, UI, audio,
+networking.
+
+Known approximations: the mist noise is generated in Rust (FastNoiseLite is
+not reproduced bit for bit); sky reflections blur by roughness instead of a
+filtered radiance map; Godot eases weather changes over a few seconds, the
+viewer shows the settled state.

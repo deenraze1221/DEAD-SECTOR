@@ -1,10 +1,11 @@
 //! Command-line options.
 
 use anyhow::{Context, Result, bail};
+use ds_render::{FogLevel, Quality, WeatherKind};
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Rust engine, stage 1)
+DEAD SECTOR (Rust engine, stage 2)
 
 USAGE: dead-sector [options]
 
@@ -13,7 +14,13 @@ USAGE: dead-sector [options]
   --camera <x,y,z,yaw,pitch>
                           Start camera: position in metres, angles in degrees
   --no-vsync              Present without vsync (uncapped FPS)
-  --no-fog                Disable fog (debug view of the whole city)
+  --quality <q>           Graphics quality: low, medium (default), high
+  --weather <w>           overcast, rain, storm or clear (default: seeded wave 1 roll)
+  --fog-level <f>         light, medium or heavy (default: seeded wave 1 roll)
+  --night                 Night lighting (default: day, as in wave 1)
+  --blackout <0-3>        Cut power to one city quadrant
+  --no-fog                Disable fog and mist (debug view of the whole city)
+  --time <seconds>        Fixed effect time for screenshots (mist, rain, grain)
   --screenshot <file.png> Render one frame offscreen, save it and exit
   --bench <frames>        Render frames offscreen and report the average time
   -h, --help              Show this help
@@ -28,13 +35,33 @@ pub struct Options {
     pub camera: Option<[f32; 5]>,
     pub vsync: bool,
     pub fog: bool,
+    pub quality: Quality,
+    pub weather: Option<WeatherKind>,
+    pub fog_level: Option<FogLevel>,
+    pub night: bool,
+    pub blackout: Option<u8>,
+    pub time: Option<f32>,
     pub screenshot: Option<PathBuf>,
     pub bench: Option<u32>,
 }
 
 impl Default for Options {
     fn default() -> Self {
-        Options { assets: None, size: (1280, 720), camera: None, vsync: true, fog: true, screenshot: None, bench: None }
+        Options {
+            assets: None,
+            size: (1280, 720),
+            camera: None,
+            vsync: true,
+            fog: true,
+            quality: Quality::Medium,
+            weather: None,
+            fog_level: None,
+            night: false,
+            blackout: None,
+            time: None,
+            screenshot: None,
+            bench: None,
+        }
     }
 }
 
@@ -52,6 +79,35 @@ impl Options {
                 "--camera" => options.camera = Some(parse_camera(&value()?)?),
                 "--no-vsync" => options.vsync = false,
                 "--no-fog" => options.fog = false,
+                "--quality" => {
+                    let text = value()?;
+                    options.quality = Quality::parse(&text).with_context(|| format!("unknown quality {text:?}"))?;
+                }
+                "--weather" => {
+                    let text = value()?;
+                    options.weather =
+                        Some(WeatherKind::parse(&text).with_context(|| format!("unknown weather {text:?}"))?);
+                }
+                "--fog-level" => {
+                    let text = value()?;
+                    options.fog_level =
+                        Some(FogLevel::parse(&text).with_context(|| format!("unknown fog level {text:?}"))?);
+                }
+                "--night" => options.night = true,
+                "--blackout" => {
+                    let quadrant: u8 = value()?.parse().context("--blackout expects 0..3")?;
+                    if quadrant > 3 {
+                        bail!("--blackout expects 0..3");
+                    }
+                    options.blackout = Some(quadrant);
+                }
+                "--time" => {
+                    let time: f32 = value()?.parse().context("--time expects seconds")?;
+                    if !time.is_finite() || time < 0.0 {
+                        bail!("--time must be a non-negative number");
+                    }
+                    options.time = Some(time);
+                }
                 "--screenshot" => options.screenshot = Some(PathBuf::from(value()?)),
                 "--bench" => {
                     let frames: u32 = value()?.parse().context("--bench expects a frame count")?;
@@ -104,6 +160,17 @@ mod tests {
             "1,2,3,90,-10",
             "--no-vsync",
             "--no-fog",
+            "--quality",
+            "high",
+            "--weather",
+            "storm",
+            "--fog-level",
+            "heavy",
+            "--night",
+            "--blackout",
+            "2",
+            "--time",
+            "4.5",
             "--screenshot",
             "a.png",
             "--bench",
@@ -116,6 +183,12 @@ mod tests {
         assert_eq!(options.camera, Some([1.0, 2.0, 3.0, 90.0, -10.0]));
         assert!(!options.vsync);
         assert!(!options.fog);
+        assert_eq!(options.quality, Quality::High);
+        assert_eq!(options.weather, Some(WeatherKind::Storm));
+        assert_eq!(options.fog_level, Some(FogLevel::Heavy));
+        assert!(options.night);
+        assert_eq!(options.blackout, Some(2));
+        assert_eq!(options.time, Some(4.5));
         assert_eq!(options.screenshot, Some(PathBuf::from("a.png")));
         assert_eq!(options.bench, Some(5));
     }
@@ -135,5 +208,9 @@ mod tests {
         assert!(parse(&["--bench", "0"]).is_err());
         assert!(parse(&["--assets"]).is_err());
         assert!(parse(&["--bogus"]).is_err());
+        assert!(parse(&["--weather", "snow"]).is_err());
+        assert!(parse(&["--quality", "ultra"]).is_err());
+        assert!(parse(&["--blackout", "4"]).is_err());
+        assert!(parse(&["--time", "-1"]).is_err());
     }
 }
