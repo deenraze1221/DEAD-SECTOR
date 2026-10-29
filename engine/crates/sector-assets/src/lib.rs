@@ -6,6 +6,7 @@ pub mod materials;
 pub mod modular;
 pub mod rng;
 pub mod scene;
+pub mod texgen;
 
 pub use scene::{Instance, MaterialParams, Mesh, PassKind, SceneBuffers, SceneBuilder, Vertex};
 

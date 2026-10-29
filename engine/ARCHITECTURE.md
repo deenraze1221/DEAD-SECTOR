@@ -28,8 +28,9 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | Camera | `sector-render::view::Camera` | Position, yaw/pitch, FOV, near/far, reversed-Z projection |
 | Lighting | `sector-render::Lighting`, `PointLight` | Sun, ambient, exponential fog, sky gradient; up to 16 point lights per frame with Godot's omni falloff |
 | Shading | `scene.wgsl` | Burley diffuse, GGX specular, sky reflections, fog, HDR output |
+| Texture synthesis | `sector-assets::texgen` | Periodic value noise, fBm and Voronoi, wrap-around blur, normals from height (DirectX), cavity AO, a seam metric and 3 × 3 tiling previews: anything built from them tiles seamlessly |
 | Material packs | `sector-assets::materials` | `.smat` files: colour (BC1 sRGB), tangent normal XY (BC5, DirectX +Y = +v) and AO + roughness (BC5), each with a full mip chain; encode (mips in linear light, normals renormalised) and decode (fallback) |
-| Surface maps | `RendererConfig::surface_maps`, `MaterialParams::{surface_map, tiling, surface_faces}` | Any number of packs as three shared texture arrays (one layer each), 16× anisotropic trilinear sampler; world-space box projection on the face's dominant axis (no stretching on scaled instances), tangent frame from the projection, AO on indirect light only, face mask (up / down / sides). BC when the adapter has it, else decoded to ≤ 1024². `max_map_size` drops top mips. Shadows use the face normal |
+| Surface maps | `RendererConfig::surface_maps`, `MaterialParams::{surface_map, tiling, surface_faces}` | Any number of packs as three shared texture arrays (one layer each; packs of different sizes share the smallest size, larger ones contributing from their matching mip), 16× anisotropic trilinear sampler; world-space box projection on the face's dominant axis (no stretching on scaled instances), tangent frame from the projection, AO on indirect light only, face mask (up / down / sides). BC when the adapter has it, else decoded to ≤ 1024². `max_map_size` drops top mips. Shadows use the face normal |
 | Glass | `MaterialParams::glass` (transparent pass) | Front faces only (one layer per pane), Schlick-Fresnel opacity, reflections not dimmed by the blend, no screen-space occlusion from what is behind; like all transparent draws, not a shadow caster and not in the depth prepass |
 | Surface hook | `RendererConfig::surface_hook` | Game WGSL `surface_hook(shading, input)` changes albedo/roughness per material, with per-frame `frame.game` values |
 | Sun shadows | `shadows.rs`, `shadow_maps.rs` | Cascaded shadow maps, 1–4 cascades, 1024–4096 maps, distance, hard / PCF / soft filtering, texel-snapped stable cascades, per-cascade caster culling (instances fetched from a storage buffer by index) |
@@ -51,7 +52,8 @@ on the game. Engine growth is driven by what Dead Sector actually needs.
 | `citygen.rs` | Seeded plot layout (`city_generator.gd`) |
 | `buildings.rs` | Seeded modular buildings: storeys, facades, door, slabs, switchback stairwell with guard rails, roof |
 | `surfaces.rs` | Loads `engine/assets/materials/library.json` and the packs it names, and assigns them to city materials by colour or generated name |
-| `examples/import_materials.rs` | Converts PBR texture folders (colour, normal, ambient, specular) into `.smat` packs |
+| `examples/import_materials.rs` | Converts PBR texture folders (colour, normal, ambient, roughness or specular) into `.smat` packs |
+| `examples/generate_materials.rs` | The 16 stylized materials, procedurally (recipes per material), with seam checks and previews |
 | `emit.rs` | Adds generated instances to the existing batch with the same geometry and materials, and colliders |
 | `interiors.rs` | Seeded floor plans and furniture (`interior_layout.gd`), on every storey |
 | `player.rs` | First-person player with `player.gd`'s tuning on a fixed 60 Hz step; the city's collision world |
@@ -258,6 +260,40 @@ cities add two batches (named stairs and roof materials). `--no-textures`
 renders exactly as Stage 5.1 (pixel-identical to the baseline);
 `--texture-size 512|1024` uploads smaller mips.
 
+## Stylized material library (Stage 6B)
+
+No image-generation model was available, so the new materials are
+procedural: `examples/generate_materials.rs` builds each from a height
+field and painted colour rules with `sector-assets::texgen`, then derives
+the normal (DirectX), AO and roughness maps, and writes albedo, normal,
+roughness, AO and height PNGs at 1024² plus 3 × 3 tiled previews (plain and
+lit). Generation fails if any map has a seam: the step across the wrap must
+be no stronger than the strongest ordinary line in the map, which passes
+structural lines that fall on the wrap (mortar, board edges) and fails a real
+seam; a test also checks the shipped, compressed data.
+
+Art direction (Valorant-like, not photoreal, not PSX): readable shapes
+(bricks, pavers, planks, boards, ribs, rolls, pebbles, grass clumps),
+bevelled edges with a painted top light per element, value bands instead of
+pixel noise, clean chip shapes with lighter rims, subtle baked occlusion
+(AO never below 0.55, since the city is lit mostly by ambient light), and
+no distinctive one-off marks on large surfaces (they make the tiling
+readable; wear comes from the game's world-space grime).
+
+16 materials: Asphalt, Sidewalk, Grass, Dirt, Concrete, BrickRed,
+BrickPainted, Plaster, PaintedSiding, MetalPanel, PaintedMetal, Rust,
+WoodPlanks, InteriorFloor, Roof, FloorTiles. Texel density: 1024 px per
+3 m (341 px/m) for buildings and ground, per 2 m (512 px/m) for small
+props. 3.5 MB each, 56 MB in all (the 12 photoreal packs: 117 MB).
+
+`library.json` (the default set) assigns them: roads, sidewalks, lawns (tops
+only), rubble, industrial walls (metal panels), market walls (red brick),
+brick (painted brick), residential walls (siding), civic walls and concrete,
+plaster and interior walls, ground floors (tiles, tops only), wood, rust and
+steel props, and the generated roof (tops only), stairs and `upper_floor`
+(wood, tops only) materials. The original 12 photoreal packs are untouched
+and used by `library-photoreal.json` (`--materials photoreal`).
+
 ## Planned engine systems (not built yet)
 
 These have no user in the code yet, so they will be added when a Dead Sector
@@ -274,6 +310,15 @@ stage needs them, not before:
   predicted on clients in the co-op stage.
 - **Audio** (sound effects, music, 3D sound, volume buses): audio stage.
 - **Mesh and animation import (glTF)**: weapons stage.
+
+## Limitations (Stage 6B)
+
+- Procedural, not hand-painted or AI-generated: shapes are clean but simpler
+  than an artist's.
+- One material per surface: no per-building variation or decals yet, so large
+  areas of one material can still look uniform from the air.
+- Height maps are generated and used for normals and AO, but not packed
+  (no parallax).
 
 ## Limitations (Stage 6)
 

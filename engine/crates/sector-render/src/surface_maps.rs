@@ -52,18 +52,14 @@ impl SurfaceMaps {
         let upload = |label: &str, pick: fn(&MaterialPack) -> &Map| -> Result<(wgpu::TextureView, u32)> {
             let first = pick(&packs[0]);
             for p in packs {
-                let m = pick(p);
-                ensure!(
-                    m.size == first.size && m.format == first.format,
-                    "{}: {label} differs from {}",
-                    p.name,
-                    packs[0].name
-                );
+                ensure!(pick(p).format == first.format, "{}: {label} format differs from {}", p.name, packs[0].name);
             }
-            // Drop top mips until the map fits the cap.
-            let skip = (0..first.levels.len()).find(|&l| first.level_size(l) <= cap).unwrap_or(first.levels.len() - 1);
-            let levels = first.levels.len() - skip;
-            let size = first.level_size(skip);
+            // One array size for every layer: the smallest pack's map, capped.
+            // Larger packs contribute from the mip of that size (their chains are complete).
+            let smallest = packs.iter().map(|p| pick(p).size).min().unwrap();
+            // Largest power of two within the cap.
+            let size = smallest.min(1 << cap.ilog2());
+            let levels = size.ilog2() as usize + 1;
             let format = match (first.format, compressed) {
                 (MapFormat::Bc1Srgb, true) => wgpu::TextureFormat::Bc1RgbaUnormSrgb,
                 (MapFormat::Bc5, true) => wgpu::TextureFormat::Bc5RgUnorm,
@@ -74,6 +70,7 @@ impl SurfaceMaps {
                 .iter()
                 .map(|p| {
                     let m = pick(p);
+                    let skip = (m.size / size).ilog2() as usize;
                     (skip..m.levels.len()).map(|l| if compressed { m.levels[l].clone() } else { m.decode(l) }).collect()
                 })
                 .collect();

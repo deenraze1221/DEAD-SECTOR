@@ -109,7 +109,7 @@ impl Materials {
         };
         Materials {
             unit_box: city.geometries.iter().position(|g| g.position.len() == 72 && g.index.len() == 36).unwrap_or(0),
-            floor: by_color("#9a9380"),
+            floor: city.materials.iter().position(|m| m.name.as_deref() == Some("upper_floor")).unwrap_or(0),
             glass: city.materials.iter().position(|m| m.glass).expect("glass material added"),
             wood: by_color("#806448"),
             concrete: city.materials.iter().position(|m| m.name.as_deref() == Some("stairs")).unwrap_or(0),
@@ -125,7 +125,7 @@ pub fn rebuild(city: &mut City, emit: &mut Emitter, seed: u64) -> Report {
     }
     // Stairs and roofs get their own named materials (concrete and dark
     // roofing colours), so surface maps can be assigned to them separately.
-    for (name, hex) in [("stairs", "#8b8e7e"), ("roof", "#303c35")] {
+    for (name, hex) in [("stairs", "#8b8e7e"), ("roof", "#303c35"), ("upper_floor", "#9a9380")] {
         if !city.materials.iter().any(|m| m.name.as_deref() == Some(name)) {
             let color = parse_hex_color(hex).unwrap();
             let base = city.materials.iter().find(|m| m.color == color && m.texture.is_none()).cloned();

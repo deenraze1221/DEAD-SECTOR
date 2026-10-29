@@ -68,9 +68,10 @@ struct Rule {
 }
 
 impl SurfaceLibrary {
-    /// Reads `library.json` and the packs it assigns from `dir`.
-    pub fn load(dir: &Path) -> Result<SurfaceLibrary> {
-        let path = dir.join(LIBRARY_FILE);
+    /// Reads a library file (`library.json`, or `library-<set>.json` for a
+    /// named set) and the packs it assigns from `dir`.
+    pub fn load(dir: &Path, set: Option<&str>) -> Result<SurfaceLibrary> {
+        let path = dir.join(set.map_or(LIBRARY_FILE.to_string(), |s| format!("library-{s}.json")));
         let text = std::fs::read_to_string(&path).with_context(|| format!("reading {}", path.display()))?;
         let file: LibraryFile = serde_json::from_str(&text).with_context(|| format!("parsing {}", path.display()))?;
         let mut library = SurfaceLibrary::default();
@@ -182,7 +183,7 @@ mod tests {
         std::fs::create_dir_all(&dir).unwrap();
         std::fs::write(dir.join(LIBRARY_FILE), r#"{"materials": {}, "surfaces": [{"name": "x", "material": "Nope"}]}"#)
             .unwrap();
-        let error = SurfaceLibrary::load(&dir).unwrap_err().to_string();
+        let error = SurfaceLibrary::load(&dir, None).unwrap_err().to_string();
         assert!(error.contains("unknown material"), "{error}");
         std::fs::remove_dir_all(dir).ok();
     }

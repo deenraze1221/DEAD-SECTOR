@@ -6,7 +6,7 @@ use sector_render::{ContactShadows, RenderSettings, ShadowFilter, Ssao, SunShado
 use std::path::PathBuf;
 
 pub const USAGE: &str = "\
-DEAD SECTOR (Sector Engine, stage 6)
+DEAD SECTOR (Sector Engine, stage 6B)
 
 USAGE: dead-sector [options]
 
@@ -25,6 +25,8 @@ USAGE: dead-sector [options]
   --no-fog                Disable fog and mist (debug view of the whole city)
   --no-textures           Flat procedural surfaces (the look before stage 6)
   --texture-size <px>     Largest material map side: 512, 1024 or 2048 (default 2048)
+  --materials <set>       Material set library-<set>.json: photoreal = the original
+                          2048 materials (default: library.json, stylized)
   --time <seconds>        Fixed effect time for screenshots (mist, rain, grain)
 
 Shadow and occlusion overrides (on top of --quality):
@@ -55,6 +57,7 @@ pub struct Options {
     pub fog: bool,
     pub textures: bool,
     pub texture_size: u32,
+    pub material_set: Option<String>,
     pub quality: Quality,
     pub seed: Option<u64>,
     pub weather: Option<WeatherKind>,
@@ -85,6 +88,7 @@ impl Default for Options {
             fog: true,
             textures: true,
             texture_size: 2048,
+            material_set: None,
             quality: Quality::Medium,
             seed: None,
             weather: None,
@@ -122,6 +126,7 @@ impl Options {
                 "--no-vsync" => options.vsync = false,
                 "--no-fog" => options.fog = false,
                 "--no-textures" => options.textures = false,
+                "--materials" => options.material_set = Some(value()?),
                 "--texture-size" => {
                     let size: u32 = value()?.parse().context("--texture-size expects 512, 1024 or 2048")?;
                     if ![512, 1024, 2048].contains(&size) {

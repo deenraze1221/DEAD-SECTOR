@@ -125,3 +125,27 @@ fn normal_maps_follow_the_directx_convention() {
     assert!(tilted_above < flat_above * 0.8, "downward-tilted normals should darken light from above");
     assert!(tilted_below > flat_below * 1.2, "downward-tilted normals should catch light from below");
 }
+
+#[test]
+#[ignore = "needs a Vulkan/DX12 adapter"]
+fn packs_of_different_sizes_share_the_arrays() {
+    // A 16² and a 32² pack: the larger one contributes from its 16² mip.
+    let e = |x: f32| ((x * 0.5 + 0.5) * 255.0).round() as u8;
+    let fill = |px: [u8; 4], size: u32| (0..size * size).flat_map(|_| px).collect::<Vec<u8>>();
+    let big = MaterialPack::encode(
+        "big",
+        &SourceMaps {
+            size: 32,
+            albedo: &fill([30, 200, 30, 255], 32),
+            normal: &fill([e(0.0), e(0.0), 255, 255], 32),
+            orm: &fill([255, 200, 0, 255], 32),
+            orm_size: 32,
+        },
+    )
+    .unwrap();
+    let small = pack([200, 30, 30], [0.0, 0.0, 1.0]);
+    let green = render(vec![big.clone(), small.clone()], true, 1.5);
+    let red = render(vec![small, big], true, 1.5);
+    eprintln!("layer 0 = big {green:?}, layer 0 = small {red:?}");
+    assert!(green[1] > green[0] + 60.0 && red[0] > red[1] + 60.0);
+}

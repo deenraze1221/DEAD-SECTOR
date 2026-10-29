@@ -4,7 +4,8 @@
 //!
 //! `<source>` holds one folder per material, `Name/Name.png` (colour) plus
 //! `Name_normal.png` (DirectX convention), `Name_ambient.png` (occlusion) and
-//! `Name_specular.png`. Displacement maps are not used. Each folder becomes
+//! `Name_roughness.png` or `Name_specular.png` (converted to roughness).
+//! Height and displacement maps are not packed. Each folder becomes
 //! `<output>/Name.smat`; add it to `library.json` to use it.
 
 use anyhow::{Context, Result, bail};
@@ -35,14 +36,16 @@ fn convert(dir: &Path, name: &str, out: &Path, orm_size: u32) -> Result<()> {
         orm_size,
         FilterType::Triangle,
     );
-    let specular = image::imageops::resize(
-        &load(&dir.join(format!("{name}_specular.png")))?,
-        orm_size,
-        orm_size,
-        FilterType::Triangle,
-    );
-    let orm: Vec<u8> =
-        ambient.pixels().zip(specular.pixels()).flat_map(|(a, s)| [a[0], roughness(s[0]), 0, 255]).collect();
+    // Roughness directly when given, else converted from specular.
+    let rough_path = dir.join(format!("{name}_roughness.png"));
+    let (gloss_path, convert) =
+        if rough_path.is_file() { (rough_path, false) } else { (dir.join(format!("{name}_specular.png")), true) };
+    let gloss = image::imageops::resize(&load(&gloss_path)?, orm_size, orm_size, FilterType::Triangle);
+    let orm: Vec<u8> = ambient
+        .pixels()
+        .zip(gloss.pixels())
+        .flat_map(|(a, g)| [a[0], if convert { roughness(g[0]) } else { g[0] }, 0, 255])
+        .collect();
     let maps = SourceMaps { size, albedo: albedo.as_raw(), normal: normal.as_raw(), orm: &orm, orm_size };
     let pack = MaterialPack::encode(name, &maps)?;
     let path = out.join(format!("{name}.smat"));

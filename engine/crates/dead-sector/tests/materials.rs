@@ -7,6 +7,7 @@ use dead_sector::content::{build_scene, locate_assets};
 use dead_sector::surfaces::{self, SurfaceLibrary};
 use sector_assets::color::parse_hex_color;
 use sector_assets::scene::{FACES_ALL, FACES_UP};
+use sector_assets::texgen::seam_ratio;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -24,17 +25,18 @@ fn library() -> &'static SurfaceLibrary {
     static LIBRARY: OnceLock<SurfaceLibrary> = OnceLock::new();
     LIBRARY.get_or_init(|| {
         let dir = surfaces::locate(&assets()).expect("engine/assets/materials/library.json in the checkout");
-        SurfaceLibrary::load(&dir).unwrap()
+        SurfaceLibrary::load(&dir, None).unwrap()
     })
 }
 
 #[test]
 fn every_pack_has_full_mip_chains_and_upward_normals() {
     let packs = &library().packs;
-    assert!(packs.len() >= 12, "{} packs", packs.len());
+    assert_eq!(packs.len(), 16, "stylized set");
     for p in packs {
-        assert_eq!((p.albedo.size, p.albedo.levels.len()), (2048, 12), "{}", p.name);
-        assert_eq!((p.normal.size, p.normal.levels.len()), (2048, 12), "{}", p.name);
+        assert!(p.name.starts_with("Stylized"), "{}: only the stylized set ships", p.name);
+        assert_eq!((p.albedo.size, p.albedo.levels.len()), (1024, 11), "{}", p.name);
+        assert_eq!((p.normal.size, p.normal.levels.len()), (1024, 11), "{}", p.name);
         assert_eq!((p.orm.size, p.orm.levels.len()), (1024, 11), "{}", p.name);
         // A 32² mip of a tangent normal map points mostly out of the surface.
         let level = p.normal.decode(6);
@@ -66,21 +68,24 @@ fn library_textures_the_city_surfaces() {
         city.materials.iter().position(|m| m.color == c && m.texture.is_none() && !m.unlit).unwrap()
     };
     let name_of = |i: usize| maps.iter().find(|m| m.0 == i).map(|m| library().packs[m.1 as usize].name.as_str());
-    assert_eq!(name_of(by_color("#343c37")), Some("Asphalt"));
-    assert_eq!(name_of(by_color("#808574")), Some("TilesFloorSquare"));
-    assert_eq!(name_of(by_color("#727e62")), Some("Grass"));
-    assert_eq!(name_of(by_color("#9b725c")), Some("RedBricks"));
-    assert_eq!(name_of(by_color("#786f60")), Some("GrayBricks"));
-    // Floors are textured on top only (their undersides are ceilings).
+    assert_eq!(name_of(by_color("#343c37")), Some("StylizedAsphalt"));
+    assert_eq!(name_of(by_color("#808574")), Some("StylizedSidewalk"));
+    assert_eq!(name_of(by_color("#727e62")), Some("StylizedGrass"));
+    assert_eq!(name_of(by_color("#9b725c")), Some("StylizedBrickRed"));
+    assert_eq!(name_of(by_color("#786f60")), Some("StylizedMetalPanel"));
+    assert_eq!(name_of(by_color("#a6a58c")), Some("StylizedPlaster"));
+    assert_eq!(name_of(by_color("#806448")), Some("StylizedWoodPlanks"));
+    // Floors and lawns are textured on top only (floor undersides are ceilings).
     let floor = maps.iter().find(|m| m.0 == by_color("#9a9380")).unwrap();
     assert_eq!(floor.2, FACES_UP);
+    assert_eq!(maps.iter().find(|m| m.0 == by_color("#727e62")).unwrap().2, FACES_UP);
     assert_eq!(maps.iter().find(|m| m.0 == by_color("#343c37")).unwrap().2, FACES_ALL);
     // Signs, glass-like and unlit materials keep their own look.
     for (i, _, _) in &maps {
         let m = &city.materials[*i];
         assert!(m.texture.is_none() && !m.transparent && !m.unlit);
     }
-    assert_eq!(maps.len(), 11);
+    assert!(maps.len() >= 15, "{} textured materials", maps.len());
 }
 
 #[test]
@@ -90,10 +95,34 @@ fn seeded_buildings_texture_roofs_and_stairs_but_not_glass() {
     let maps = textured(&city);
     let named = |n: &str| city.materials.iter().position(|m| m.name.as_deref() == Some(n)).unwrap();
     let pack_of = |i: usize| maps.iter().find(|m| m.0 == i).map(|m| library().packs[m.1 as usize].name.clone());
-    assert_eq!(pack_of(named("roof")).as_deref(), Some("ConcreteGray"));
-    assert_eq!(pack_of(named("stairs")).as_deref(), Some("TilesFloorGray"));
+    assert_eq!(pack_of(named("roof")).as_deref(), Some("StylizedRoof"));
+    assert_eq!(pack_of(named("stairs")).as_deref(), Some("StylizedConcrete"));
+    assert_eq!(pack_of(named("upper_floor")).as_deref(), Some("StylizedInteriorFloor"));
     assert_eq!(pack_of(named("glass")), None);
     // Every one of the shipped packs is used somewhere.
     let used: std::collections::BTreeSet<u32> = maps.iter().map(|m| m.1).collect();
     assert_eq!(used.len(), library().packs.len());
+}
+
+#[test]
+fn shipped_stylized_maps_tile_seamlessly() {
+    // Checked on the compressed data actually shipped, at 256² (mip 2).
+    for p in &library().packs {
+        for (map, what) in [(&p.albedo, "colour"), (&p.normal, "normal"), (&p.orm, "AO/roughness")] {
+            let level = map.decode(2);
+            let ratio = seam_ratio(&level, map.level_size(2) as usize);
+            assert!(ratio <= 1.1, "{} {what}: seam ratio {ratio}", p.name);
+        }
+    }
+}
+
+#[test]
+fn photoreal_set_still_loads_unchanged() {
+    let dir = surfaces::locate(&assets()).unwrap();
+    let photoreal = SurfaceLibrary::load(&dir, Some("photoreal")).unwrap();
+    assert_eq!(photoreal.packs.len(), 12);
+    assert!(photoreal.packs.iter().all(|p| p.albedo.size == 2048 && !p.name.starts_with("Stylized")));
+    let mut scene = build_scene(city());
+    assert!(photoreal.apply(city(), &mut scene) >= 11);
+    assert!(SurfaceLibrary::load(&dir, Some("missing")).is_err());
 }

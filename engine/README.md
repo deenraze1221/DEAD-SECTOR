@@ -5,9 +5,13 @@ Windows); Dead Sector is its first game, migrated in stages from the Godot
 version. The HTML and Godot versions are not modified. See
 [ARCHITECTURE.md](ARCHITECTURE.md) for what is engine and what is game.
 
-**Stage 6 (current):** PBR textures (colour, normal, AO, roughness) on roads,
-sidewalks, grass, brick and concrete walls, floors, roofs and stairs, from a
-data-driven material library (`assets/materials/library.json`).
+**Stage 6B (current):** 16 stylized, seamless PBR materials (procedurally
+generated, Valorant-like) on roads, sidewalks, lawns, walls, props, floors,
+roofs and stairs, from a data-driven library (`assets/materials/library.json`).
+`--materials photoreal` switches to the original 12 photoreal materials.
+
+**Stage 6:** PBR textures (colour, normal, AO, roughness) from a data-driven
+material library.
 
 **Stage 5:** the existing city with the Godot version's look,
 cascaded sun shadows, local-light shadows, contact shadows and optional SSAO,
@@ -44,6 +48,7 @@ Options (`dead-sector --help`):
 | `--size 1920x1080` | Window / capture size |
 | `--no-vsync` | Uncapped FPS (use this to measure performance) |
 | `--camera x,y,z,yaw,pitch` | Start pose (metres, degrees; yaw 0 looks along −Z) |
+| `--materials photoreal` | The original 2048² photoreal material set (default: stylized) |
 | `--no-textures` | Flat procedural surfaces (the look before stage 6) |
 | `--texture-size 512\|1024\|2048` | Largest material map side (default 2048) |
 | `--seed <n>` | Generate the city layout, modular buildings and interiors from a seed (default: the exported seed-42 city, unchanged) |

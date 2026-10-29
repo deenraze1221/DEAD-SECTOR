@@ -79,7 +79,7 @@ fn load(options: &Options) -> Result<LoadedCity> {
         match surfaces::locate(&assets) {
             Some(dir) => {
                 let started = Instant::now();
-                let library = SurfaceLibrary::load(&dir)?;
+                let library = SurfaceLibrary::load(&dir, options.material_set.as_deref())?;
                 let assigned = library.apply(&city, &mut scene);
                 log::info!(
                     "surface materials: {} packs from {} on {assigned} city materials in {:.0} ms",
