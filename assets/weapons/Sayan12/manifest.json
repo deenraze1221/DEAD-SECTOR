@@ -1,0 +1,47 @@
+{
+  "id": "sayan12",
+  "title": "SAYAN-12",
+  "cubes": 62,
+  "groups": {
+    "Body": 52,
+    "Bolt": 3,
+    "Magazine": 6,
+    "Trigger": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -0.9,
+      0,
+      -7.5
+    ],
+    "Muzzle": [
+      -73.6,
+      0,
+      -2.6
+    ],
+    "Sight": [
+      -64.5,
+      0,
+      1.4
+    ],
+    "Breech": [
+      -8.0,
+      2.4,
+      -3.6
+    ],
+    "Butt": [
+      35.4,
+      0,
+      -7.0
+    ]
+  },
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb",
+  "source": "Sayan12.bbmodel",
+  "validation": "PASS"
+}

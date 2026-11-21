@@ -1,0 +1,147 @@
+{
+  "id": "katangamg1",
+  "title": "KATANGA MG-1",
+  "status": "author-reviewed FBX installed in UE5",
+  "category": "Rifle",
+  "cubes": 64,
+  "groups": {
+    "Body": 54,
+    "Bolt": 3,
+    "Magazine": 5,
+    "Trigger": 1,
+    "SupportHand (reference, not exported)": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, quarters only for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -1.03125,
+      0.0,
+      -7.5625
+    ],
+    "Muzzle": [
+      -82.7687484741211,
+      0.0,
+      -2.0625
+    ],
+    "Sight": [
+      -73.5625,
+      0.0,
+      2.75
+    ],
+    "RearSight": [
+      4.125,
+      0.0,
+      2.6125
+    ],
+    "Breech": [
+      -4.125,
+      2.5438,
+      -3.4375
+    ],
+    "Butt": [
+      37.8125,
+      0.0,
+      -5.5
+    ],
+    "SupportGrip": [
+      -26.125,
+      0.0,
+      -6.875
+    ],
+    "MagWell": [
+      -9.625,
+      -4.8125,
+      -5.5
+    ]
+  },
+  "group_pivots_texels": {
+    "Trigger": [
+      -0.75,
+      0,
+      -5.5
+    ],
+    "Magazine": [
+      -7,
+      -3.5,
+      -4
+    ],
+    "Bolt": [
+      -3,
+      1.85,
+      -2.9
+    ],
+    "SupportHand": [
+      -19,
+      0,
+      -5
+    ]
+  },
+  "source": "KatangaMg1_author.fbx (author review), KatangaMg1.bbmodel synced",
+  "contacts": {
+    "Body": {
+      "cubes": 56,
+      "loose": [],
+      "touches_body": true
+    },
+    "Bolt": {
+      "cubes": 3,
+      "loose": [],
+      "touches_body": true
+    },
+    "Magazine": {
+      "cubes": 5,
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "SupportHand": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "proposed_stats": {
+    "role": "belt-fed machine gun: 100-round box, steady fire, strong hits, slow to move, very slow reload",
+    "magazine": 100,
+    "fire_mode": "Auto",
+    "rpm": 550,
+    "damage": [
+      38,
+      26
+    ],
+    "falloff_m": [
+      35,
+      80
+    ],
+    "max_range_m": 180,
+    "reload_s": 5.5,
+    "reload_kind": "Magazine (ammo box drops)",
+    "move_speed": 0.82,
+    "ads_s": 0.42,
+    "bolt_travel_cm": 5,
+    "sights": "post + rear leaf"
+  },
+  "validation": "PASS",
+  "author_edits": {
+    "moved": [
+      "Barrel"
+    ],
+    "added": [],
+    "removed": [
+      "Grip panel L",
+      "Grip panel R"
+    ]
+  },
+  "reunwrapped_by_block_uv": [],
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb (shared long-gun arm, Taiga12SupportV2)"
+}

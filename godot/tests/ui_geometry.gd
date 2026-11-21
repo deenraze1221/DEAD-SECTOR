@@ -34,8 +34,8 @@ func run() -> void:
   for i in range(3): await process_frame
   check(bounds.encloses(main.store_panel.get_global_rect()),"Store in bounds "+str(size))
   check(main.store_grid.get_child_count()==9,"Nine weapon cards")
-  check(main.store_grid.get_child(0).name=="CardShotgun","Weapons sorted by price")
-  check(main.store_grid.get_child(8).name=="CardHelsing","Most expensive weapon last")
+  check(main.store_grid.get_child(0).name=="CardKureyka","Weapons sorted by price")
+  check(main.store_grid.get_child(14).name=="CardKatanga","Most expensive weapon last")
   var bottom=main.store_grid.get_child(8).get_global_rect().end.y
   check(bottom<main.store_panel.get_global_rect().end.y-20,"All nine cards fit without scrolling "+str(size))
   main.store_tab="supplies"
@@ -51,9 +51,9 @@ func run() -> void:
  main.battle.completed=25
  main.open_store()
  main.render_store()
- var buy=main.store_grid.get_node("CardShotgun").find_children("*","Button",true,false)[0]
+ var buy=main.store_grid.get_node("CardKureyka").find_children("*","Button",true,false)[0]
  buy.pressed.emit()
- check(main.battle.primary=="Shotgun","Actual weapon purchase button buys its own card")
+ check(main.battle.primary=="Kureyka","Actual weapon purchase button buys its own card")
  check(main.battle.money==98000,"Correct UI purchase price")
  check(ui.carried_ammo()==92,"HUD counts holstered pistol ammo")
  main.close_store()

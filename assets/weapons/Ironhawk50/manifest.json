@@ -1,0 +1,19 @@
+{
+  "name": "IRONHAWK .50",
+  "cubes": 75,
+  "groups": [
+    "frame",
+    "slide",
+    "barrel",
+    "trigger",
+    "magazine",
+    "sights"
+  ],
+  "textures": [
+    128,
+    128
+  ],
+  "units": "cm",
+  "magazine": 7,
+  "source": "Ironhawk50.bbmodel"
+}

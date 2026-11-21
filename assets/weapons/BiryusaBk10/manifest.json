@@ -1,0 +1,156 @@
+{
+  "id": "biryusabk10",
+  "title": "BIRYUSA BK-10",
+  "status": "author-reviewed FBX installed in UE5",
+  "category": "Rifle",
+  "cubes": 84,
+  "groups": {
+    "Body": 68,
+    "Bolt": 1,
+    "Magazine": 13,
+    "Trigger": 1,
+    "SupportHand (reference, not exported)": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, quarters only for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -3.7312498092651367,
+      0.0,
+      -7.5625
+    ],
+    "Muzzle": [
+      -53.8937484741211,
+      0.0,
+      -2.0625
+    ],
+    "Sight": [
+      -39.875,
+      0.0,
+      3.4375
+    ],
+    "RearSight": [
+      1.7188,
+      0.0,
+      2.6125
+    ],
+    "Breech": [
+      -6.1875,
+      2.2,
+      -1.925
+    ],
+    "Butt": [
+      24.0625,
+      0.0,
+      -3.4375
+    ],
+    "SupportGrip": [
+      -26.125,
+      0.0,
+      -6.875
+    ],
+    "MagWell": [
+      -10.3125,
+      0.0,
+      -8.9375
+    ]
+  },
+  "group_pivots_texels": {
+    "Trigger": [
+      -0.75,
+      0,
+      -5.5
+    ],
+    "Magazine": [
+      -7.5,
+      0,
+      -6.5
+    ],
+    "Bolt": [
+      -4.5,
+      1.6,
+      -1.4
+    ],
+    "SupportHand": [
+      -19,
+      0,
+      -5
+    ]
+  },
+  "source": "BiryusaBk10_author.fbx (author review), BiryusaBk10.bbmodel synced",
+  "contacts": {
+    "Body": {
+      "cubes": 73,
+      "loose": [],
+      "touches_body": true
+    },
+    "Bolt": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "Magazine": {
+      "cubes": 13,
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "SupportHand": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "proposed_stats": {
+    "role": "carbine all-rounder: quick, moderate recoil, flexible range",
+    "magazine": 30,
+    "fire_mode": "Auto",
+    "rpm": 750,
+    "damage": [
+      28,
+      19
+    ],
+    "falloff_m": [
+      20,
+      55
+    ],
+    "max_range_m": 130,
+    "reload_s": 2.5,
+    "reload_kind": "Magazine",
+    "move_speed": 0.95,
+    "ads_s": 0.24,
+    "bolt_travel_cm": 3,
+    "sights": "stepped front post + flip-up rear aperture"
+  },
+  "validation": "PASS",
+  "author_edits": {
+    "moved": [
+      "Trigger guard front",
+      "Trigger guard bow",
+      "Grip upper",
+      "Grip middle",
+      "Grip lower",
+      "Grip heel",
+      "Trigger"
+    ],
+    "added": [],
+    "removed": [
+      "Grip cap",
+      "Grip panel L",
+      "Grip panel R",
+      "Rear sling loop",
+      "Takedown pin L"
+    ]
+  },
+  "reunwrapped_by_block_uv": [],
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb (shared long-gun arm, Taiga12SupportV2)"
+}

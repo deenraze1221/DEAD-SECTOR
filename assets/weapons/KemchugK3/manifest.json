@@ -1,0 +1,156 @@
+{
+  "id": "kemchugk3",
+  "title": "KEMCHUG K-3",
+  "status": "author-reviewed FBX installed in UE5",
+  "category": "Rifle",
+  "cubes": 39,
+  "groups": {
+    "Body": 30,
+    "Bolt": 2,
+    "Magazine": 4,
+    "Trigger": 1,
+    "ScopeLens": 1,
+    "SupportHand (reference, not exported)": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, quarters only for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -1.03125,
+      0.0,
+      -7.5625
+    ],
+    "Muzzle": [
+      -30.518748474121093,
+      0.0,
+      -2.75
+    ],
+    "Sight": [
+      -8.25,
+      0.0,
+      3.7812
+    ],
+    "ScopeEye": [
+      -8.1813,
+      0.0,
+      3.7812
+    ],
+    "Breech": [
+      13.0625,
+      0.0,
+      -7.7
+    ],
+    "Butt": [
+      22.6875,
+      0.0,
+      -4.125
+    ],
+    "SupportGrip": [
+      -22.0,
+      0.0,
+      -4.125
+    ],
+    "MagWell": [
+      0.0,
+      0.0,
+      1.0312
+    ]
+  },
+  "group_pivots_texels": {
+    "Trigger": [
+      -0.75,
+      0,
+      -5.5
+    ],
+    "Magazine": [
+      0,
+      0,
+      0.75
+    ],
+    "Bolt": [
+      -11.5,
+      2.4,
+      -1.9
+    ],
+    "SupportHand": [
+      -16,
+      0,
+      -3
+    ],
+    "ScopeLens": [
+      -6,
+      0,
+      2.75
+    ]
+  },
+  "source": "KemchugK3_author.fbx (author review), KemchugK3.bbmodel synced",
+  "contacts": {
+    "Body": {
+      "cubes": 30,
+      "loose": [],
+      "touches_body": true
+    },
+    "ScopeLens": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "Bolt": {
+      "cubes": 2,
+      "loose": [],
+      "touches_body": true
+    },
+    "Magazine": {
+      "cubes": 4,
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "SupportHand": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "proposed_stats": {
+    "role": "bullpup PDW SMG: 50-round top magazine, very fast fire, light recoil, short range, built-in reflex sight",
+    "magazine": 50,
+    "fire_mode": "Auto",
+    "rpm": 900,
+    "damage": [
+      18,
+      11
+    ],
+    "falloff_m": [
+      12,
+      35
+    ],
+    "max_range_m": 70,
+    "reload_s": 3.3,
+    "reload_kind": "Magazine (top, slides back and up)",
+    "move_speed": 1.0,
+    "ads_s": 0.18,
+    "bolt_travel_cm": 2.5,
+    "sights": "built-in reflex (PiP, ScopeMagnification=1)",
+    "support_arm": "SmgSupportV2"
+  },
+  "validation": "PASS",
+  "author_edits": {
+    "moved": [
+      "Shell seam R"
+    ],
+    "added": [],
+    "removed": []
+  },
+  "reunwrapped_by_block_uv": [],
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb (shared long-gun arm, Taiga12SupportV2)"
+}

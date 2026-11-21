@@ -1,0 +1,136 @@
+{
+  "id": "chulymc5",
+  "title": "CHULYM C-5",
+  "status": "review concept, not installed in UE5",
+  "category": "Rifle",
+  "cubes": 71,
+  "groups": {
+    "Body": 50,
+    "Bolt": 3,
+    "Magazine": 16,
+    "Trigger": 1,
+    "SupportHand": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, quarters only for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -0.3438,
+      0.0,
+      -7.5625
+    ],
+    "Muzzle": [
+      -59.2625,
+      0.0,
+      -2.0625
+    ],
+    "Sight": [
+      -52.25,
+      0.0,
+      2.0625
+    ],
+    "RearSight": [
+      -13.0625,
+      0.0,
+      2.0625
+    ],
+    "Breech": [
+      -5.5,
+      2.3375,
+      -2.4062
+    ],
+    "Butt": [
+      37.125,
+      0.0,
+      -7.5625
+    ],
+    "SupportGrip": [
+      -26.125,
+      0.0,
+      -6.875
+    ],
+    "MagWell": [
+      -8.9375,
+      0.0,
+      -7.5625
+    ]
+  },
+  "group_pivots_texels": {
+    "Trigger": [
+      -0.25,
+      0,
+      -5.5
+    ],
+    "Magazine": [
+      -6.5,
+      0,
+      -5.5
+    ],
+    "Bolt": [
+      -5,
+      1.65,
+      -1.5
+    ],
+    "SupportHand": [
+      -19,
+      0,
+      -5
+    ]
+  },
+  "support_hand": "reference block only; the game uses the shared BlockHands Taiga12SupportV2 arm",
+  "source": "ChulymC5.bbmodel",
+  "contacts": {
+    "Body": {
+      "cubes": 50,
+      "loose": [],
+      "touches_body": true
+    },
+    "Bolt": {
+      "cubes": 3,
+      "loose": [],
+      "touches_body": true
+    },
+    "Magazine": {
+      "cubes": 16,
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "SupportHand": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "proposed_stats": {
+    "role": "classic gas-piston rifle: harder hits than BEREG, stronger recoil, slower fire",
+    "magazine": 30,
+    "fire_mode": "Auto",
+    "rpm": 600,
+    "damage": [
+      33,
+      22
+    ],
+    "falloff_m": [
+      25,
+      55
+    ],
+    "max_range_m": 140,
+    "reload_s": 2.8,
+    "reload_kind": "Magazine (rock-in)",
+    "move_speed": 0.93,
+    "ads_s": 0.28,
+    "bolt_travel_cm": 5,
+    "sights": "hooded front post + tangent rear notch"
+  },
+  "validation": "PASS"
+}

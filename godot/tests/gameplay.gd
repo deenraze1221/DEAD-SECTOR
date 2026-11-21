@@ -33,7 +33,7 @@ func run() -> void:
  check(b.number==2 and b.total()==20,"Next wave adds5")
  b.money=100000
  b.completed=0
- check("LOCKED" in b.buy("Helsing"),"Helsing unlock gate")
+ check("LOCKED" in b.buy("Katanga"),"Katanga unlock gate")
  b.completed=25
  for item in scene.bridge.data.shop_items:
   if item.kind=="weapon":
@@ -78,6 +78,6 @@ func run() -> void:
  var before=b.money
  b._physics_process(0)
  check(b.money>before,"Automatic shared-style cash collection")
- if failures.is_empty(): print("PASS GAMEPLAY: wave timing, clearance, cash, nine weapons, slot replacement, unlocks, medicine, ammo, repairs, battery, poison, creatures and skins")
+ if failures.is_empty(): print("PASS GAMEPLAY: wave timing, clearance, cash, sixteen weapons, slot replacement, unlocks, medicine, ammo, repairs, battery, poison, creatures and skins")
  scene.set_playing(false)
  quit(0 if failures.is_empty() else 1)

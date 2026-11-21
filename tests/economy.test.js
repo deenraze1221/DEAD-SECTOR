@@ -4,9 +4,9 @@ import {Rifle} from '../weapons.js';import {MoneyDrops} from '../loot.js';import
 const audio={play(){},shot(){}};
 test('starter pistol only, two weapon slots, exact prices and replacement preserve universal ammunition',()=>{
  const a=createInventory();assert.deepEqual(Object.keys(a.weapons),['Pistol']);assert.equal(a.money,0);assert.equal(totalAmmo(a),92);
- const expected={Helsing:6500,Tikhar:4000,Shambler:3500,Shotgun:2000,Kalash:4500,VSV:6000,Scorpion:5000,Vector:3000,G36:5500};
+ const expected={Kureyka:2000,USP:2500,Kemchug:3000,Blackthorn:3500,Taiga:3500,Ironhawk:4000,Angara:4000,Biryusa:4500,Bereg:5000,Sayan:5000,Chulym:5500,Vetluga:5500,Sisim:6000,Kazyr:7000,Katanga:8000};
  a.completedWave=25;a.money=100000;for(const [id,price]of Object.entries(expected)){assert.equal(SHOP_ITEMS.find(i=>i.id===id).price,price);const before=a.money;assert.equal(buy(a,id).ok,true);assert.equal(a.money,before-price);assert.deepEqual(Object.keys(a.weapons).sort(),['Pistol',id].sort());assert.equal(a.equipped,id);assert.equal(equipWeapon(a,'Pistol'),true);assert.equal(totalAmmo(a),92);}
- a.weapons.G36.ammo=10;a.reserve-=10;buy(a,'Vector');assert.equal(totalAmmo(a),92);assert.equal(a.weapons.G36,undefined);
+ a.weapons.Katanga.ammo=10;a.reserve-=10;buy(a,'Kemchug');assert.equal(totalAmmo(a),92);assert.equal(a.weapons.Katanga,undefined);
 });
 test('full ammo packs respect 500 total including both magazines; medkits and repairs charge only valid purchases',()=>{
  const a=createInventory();a.money=10000;assert.equal(buy(a,'ammo').ok,true);assert.equal(totalAmmo(a),142);a.reserve=442;assert.equal(buy(a,'ammo').ok,true);assert.equal(totalAmmo(a),500);a.reserve=443;const cash=a.money;assert.equal(buy(a,'ammo').ok,false);assert.equal(a.money,cash);a.reserve=492;let before=a.money;assert.equal(buy(a,'ammo').ok,false);assert.equal(a.money,before);
@@ -14,10 +14,10 @@ test('full ammo packs respect 500 total including both magazines; medkits and re
  before=a.money;assert.equal(buy(a,'repair').ok,false);assert.equal(a.money,before);a.weapons.Pistol.durability=70;assert.equal(buy(a,'repair').ok,true);assert.equal(a.weapons.Pistol.durability,100);assert.equal(a.money,before-500);
 });
 test('wear applies per actual 100 shots, broken guns cannot fire, repair restores firing and pistol stays separate',()=>{
- const a=createInventory();a.completedWave=25;a.money=10000;buy(a,'Helsing');const gun=new Rifle(audio);gun.bindInventory(a);gun.step(1.5);a.reserve=0;
- for(let shot=1;shot<=2000;shot++){a.weapons.Helsing.ammo=1;assert.equal(gun.fire(),true);gun.step(gun.config.interval+.001);if(shot===99)assert.equal(gun.durability,100);if(shot===100)assert.equal(gun.durability,95);}
- assert.equal(gun.durability,0);assert.equal(a.weapons.Pistol.durability,100);a.weapons.Helsing.ammo=1;assert.equal(gun.fire(),false);assert.equal(buy(a,'repair').ok,true);assert.equal(gun.durability,50);assert.equal(gun.fire(),true);
- const stale=structuredClone(a);a.revision++;a.weapons.Helsing.durability=100;syncCombat(a,stale);assert.equal(a.weapons.Helsing.durability,100);
+ const a=createInventory();a.completedWave=25;a.money=10000;buy(a,'Katanga');const gun=new Rifle(audio);gun.bindInventory(a);gun.step(1.5);a.reserve=0;
+ for(let shot=1;shot<=2000;shot++){a.weapons.Katanga.ammo=1;assert.equal(gun.fire(),true);gun.step(gun.config.interval+.001);if(shot===99)assert.equal(gun.durability,100);if(shot===100)assert.equal(gun.durability,95);}
+ assert.equal(gun.durability,0);assert.equal(a.weapons.Pistol.durability,100);a.weapons.Katanga.ammo=1;assert.equal(gun.fire(),false);assert.equal(buy(a,'repair').ok,true);assert.equal(gun.durability,50);assert.equal(gun.fire(),true);
+ const stale=structuredClone(a);a.revision++;a.weapons.Katanga.durability=100;syncCombat(a,stale);assert.equal(a.weapons.Katanga.durability,100);
 });
 test('zombies leave collectable cash, not free ammo or medicine, with monotonic HP rewards and one pickup',()=>{
  assert.deepEqual([125,250,300,600].map(rewardForHP),[15,30,40,100]);assert.equal(rewardForHP(0),15);assert.equal(rewardForHP(10000),100);

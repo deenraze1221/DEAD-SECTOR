@@ -7,14 +7,20 @@ Average kill payout: $28.5.
 | Weapon | Shots/kill incl. misses | Ammo + repair/kill | Net cash/kill |
 | --- | --- | --- | --- |
 | Pistol | 8.9 | $13.4 | $15.1 |
-| Helsing | 11.6 | $17.4 | $11.1 |
-| Tikhar | 3.2 | $4.7 | $23.8 |
-| Shambler | 6.2 | $9.3 | $19.2 |
-| Shotgun | 4.8 | $7.2 | $21.3 |
-| Kalash | 7.6 | $11.4 | $17.1 |
-| VSV | 5.7 | $8.5 | $20.0 |
-| Scorpion | 8.9 | $13.4 | $15.1 |
-| Vector | 10.2 | $15.3 | $13.2 |
-| G36 | 10.2 | $15.3 | $13.2 |
+| Kureyka | 4.4 | $6.6 | $21.9 |
+| USP | 7.5 | $11.3 | $17.2 |
+| Blackthorn | 4.8 | $7.2 | $21.3 |
+| Kemchug | 19.3 | $29.0 | $-0.5 |
+| Ironhawk | 3.2 | $4.7 | $23.8 |
+| Biryusa | 12.1 | $18.1 | $10.4 |
+| Taiga | 4.4 | $6.6 | $21.9 |
+| Angara | 5.8 | $8.7 | $19.8 |
+| Bereg | 10.7 | $16.0 | $12.5 |
+| Sisim | 11.7 | $17.5 | $11.0 |
+| Chulym | 8.9 | $13.4 | $15.1 |
+| Sayan | 7.4 | $11.1 | $17.4 |
+| Vetluga | 7.5 | $11.3 | $17.2 |
+| Kazyr | 5.7 | $8.5 | $20.0 |
+| Katanga | 8.9 | $13.4 | $15.1 |
 
 Wave-clear bonus is $75 + $25 × wave number; each fifth wave pays $500 instead. Shared missions roll with15% chance from wave3 and pay300–600 per player. Early-wave zombies/runners average $26 per kill. First-wave expected kill income plus clear bonus is15 × $26 + $100 ≈ $490, before ammunition/repair and healing costs. New ammunition packs contain50 rounds for $50. The first two waves have no missions. No automatic ammo or health gifts are introduced.

@@ -42,11 +42,11 @@ export class GameAudio {
   }
   shot(id){
     const c=this.context;if(!c||c.state!=='running')return;
-    const p={Pistol:[.12,1700,160,.12],Helsing:[.09,2100,180,.13],Tikhar:[.21,620,95,.17],Shambler:[.25,1100,70,.2],Shotgun:[.32,800,55,.23],Kalash:[.17,1550,110,.18],VSV:[.23,760,80,.2],Scorpion:[.075,3300,230,.12],Vector:[.08,2750,210,.13],G36:[.16,2050,125,.17]}[id];if(!p)return;
+    const p={Pistol:[.12,1700,160,.12],USP:[.09,900,120,.07],Kureyka:[.32,800,55,.23],Blackthorn:[.22,950,75,.2],Kemchug:[.075,3000,220,.12],Ironhawk:[.26,720,65,.22],Biryusa:[.13,2000,140,.14],Taiga:[.3,820,58,.22],Angara:[.3,780,56,.22],Bereg:[.14,1800,120,.15],Sisim:[.07,1100,110,.06],Chulym:[.17,1500,100,.18],Sayan:[.24,860,70,.2],Vetluga:[.14,1900,130,.15],Kazyr:[.2,1000,85,.2],Katanga:[.17,1300,90,.2]}[id];if(!p)return;
     const [duration,frequency,bass,volume]=p,t=c.currentTime,g=c.createGain();g.connect(this.master||c.destination);g.gain.setValueAtTime(volume,t);g.gain.exponentialRampToValueAtTime(.001,t+duration);
     const buffer=c.createBuffer(1,Math.ceil(c.sampleRate*duration),c.sampleRate);const data=buffer.getChannelData(0);for(let i=0;i<data.length;i++)data[i]=Math.random()*2-1;
     const noise=c.createBufferSource();noise.buffer=buffer;const filter=c.createBiquadFilter();filter.type='lowpass';filter.frequency.value=frequency;noise.connect(filter);filter.connect(g);noise.start();noise.stop(t+duration);
-    const osc=c.createOscillator();osc.type=['Scorpion','Vector','Helsing'].includes(id)?'square':'triangle';osc.frequency.setValueAtTime(bass,t);osc.frequency.exponentialRampToValueAtTime(35,t+duration);osc.connect(g);osc.start();osc.stop(t+duration);
+    const osc=c.createOscillator();osc.type=['Kemchug','Sisim','Biryusa'].includes(id)?'square':'triangle';osc.frequency.setValueAtTime(bass,t);osc.frequency.exponentialRampToValueAtTime(35,t+duration);osc.connect(g);osc.start();osc.stop(t+duration);
   }
   play(kind, volume=1) {
     const c=this.context;if(!c||c.state!=='running')return;

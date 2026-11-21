@@ -1,0 +1,67 @@
+{
+  "id": "berega24",
+  "title": "BEREG A-24",
+  "cubes": 103,
+  "groups": {
+    "Body": 82,
+    "Bolt": 4,
+    "Magazine": 16,
+    "Trigger": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, halves for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -1.0312,
+      0.0,
+      -7.5625
+    ],
+    "Muzzle": [
+      -59.2625,
+      0.0,
+      -2.0625
+    ],
+    "Sight": [
+      -39.875,
+      0.0,
+      3.4375
+    ],
+    "Breech": [
+      -8.25,
+      2.475,
+      -1.7188
+    ],
+    "Butt": [
+      35.75,
+      0.0,
+      -5.5
+    ]
+  },
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb",
+  "source": "BeregA24.bbmodel",
+  "contacts": {
+    "Body": {
+      "loose": [],
+      "touches_body": true
+    },
+    "Bolt": {
+      "loose": [],
+      "touches_body": true
+    },
+    "Magazine": {
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "replaces": "review_v1 (155 parts, 54 meshes)",
+  "validation": "PASS"
+}

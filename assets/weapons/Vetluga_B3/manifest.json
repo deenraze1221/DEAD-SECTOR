@@ -1,0 +1,14 @@
+{
+  "id": "vetlugab3",
+  "title": "VETLUGA B-3",
+  "category": "Rifle",
+  "fire_mode": "Burst",
+  "burst_length": 3,
+  "magazine": 30,
+  "rpm": 780,
+  "damage": 29,
+  "reload_seconds": 2.5,
+  "model_cubes": 92,
+  "optic": "1x holographic",
+  "status": "Game integration"
+}

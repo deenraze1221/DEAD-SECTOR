@@ -1,0 +1,160 @@
+{
+  "id": "kazyrbr62",
+  "title": "KAZYR BR-62",
+  "status": "author-reviewed FBX installed in UE5",
+  "category": "Rifle",
+  "cubes": 72,
+  "groups": {
+    "Body": 57,
+    "Bolt": 3,
+    "Magazine": 10,
+    "Trigger": 1,
+    "ScopeLens": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, quarters only for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      1.03125,
+      0.0,
+      -7.5625
+    ],
+    "Muzzle": [
+      -73.1437484741211,
+      0.0,
+      -2.0625
+    ],
+    "Sight": [
+      -15.125,
+      0.0,
+      4.8125
+    ],
+    "ScopeEye": [
+      15.8813,
+      0.0,
+      4.8125
+    ],
+    "Breech": [
+      -2.0625,
+      2.5438,
+      -2.0625
+    ],
+    "Butt": [
+      38.5,
+      0.0,
+      -6.875
+    ],
+    "SupportGrip": [
+      -26.125,
+      0.0,
+      -6.875
+    ],
+    "MagWell": [
+      -4.8125,
+      0.0,
+      -8.9375
+    ]
+  },
+  "group_pivots_texels": {
+    "Trigger": [
+      0.75,
+      0,
+      -5.5
+    ],
+    "Magazine": [
+      -3.5,
+      0,
+      -6.5
+    ],
+    "Bolt": [
+      -1.5,
+      1.85,
+      -1.5
+    ],
+    "SupportHand": [
+      -19,
+      0,
+      -5
+    ],
+    "ScopeLens": [
+      11.5,
+      0,
+      3.5
+    ]
+  },
+  "source": "KazyrBR62_author.fbx (author review), KazyrBR62.bbmodel synced",
+  "contacts": {
+    "Body": {
+      "cubes": 63,
+      "loose": [],
+      "touches_body": true
+    },
+    "ScopeLens": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "Bolt": {
+      "cubes": 3,
+      "loose": [],
+      "touches_body": true
+    },
+    "Magazine": {
+      "cubes": 10,
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "SupportHand": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "proposed_stats": {
+    "role": "battle rifle: heavy hits, slower fire, long range, 2x scope",
+    "magazine": 20,
+    "fire_mode": "Auto",
+    "rpm": 480,
+    "damage": [
+      46,
+      34
+    ],
+    "falloff_m": [
+      40,
+      90
+    ],
+    "max_range_m": 220,
+    "reload_s": 3.2,
+    "reload_kind": "Magazine",
+    "move_speed": 0.86,
+    "ads_s": 0.34,
+    "bolt_travel_cm": 5,
+    "sights": "fixed 2x scope (PiP, ScopeMagnification=2)"
+  },
+  "validation": "PASS",
+  "author_edits": {
+    "moved": [],
+    "added": [],
+    "removed": [
+      "BR62 mark 0",
+      "BR62 mark 1",
+      "BR62 mark 2",
+      "BR62 mark 3",
+      "Selector mark 0",
+      "Selector mark 1",
+      "Support hand (reference)"
+    ]
+  },
+  "reunwrapped_by_block_uv": [],
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb (shared long-gun arm, Taiga12SupportV2)"
+}

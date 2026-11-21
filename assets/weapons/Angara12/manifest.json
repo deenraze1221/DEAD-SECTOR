@@ -1,0 +1,57 @@
+{
+  "id": "sayan12",
+  "title": "ANGARA-12",
+  "cubes": 58,
+  "groups": {
+    "Body": 28,
+    "Pump": 27,
+    "ShellLoad": 2,
+    "Trigger": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -3.3,
+      0,
+      -6.6
+    ],
+    "Muzzle": [
+      -68.2,
+      0,
+      -2.05
+    ],
+    "Sight": [
+      -67.3,
+      0,
+      -0.7
+    ],
+    "Breech": [
+      -10.5,
+      2.3,
+      -2.9
+    ],
+    "Butt": [
+      37.4,
+      0,
+      -7.0
+    ],
+    "HandTip": [
+      -27.0,
+      -1.2,
+      -9.2
+    ],
+    "PortHand": [
+      -10.0,
+      -0.6,
+      -10.6
+    ]
+  },
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb",
+  "source": "Angara12.bbmodel",
+  "validation": "PASS"
+}

@@ -1,0 +1,60 @@
+{
+  "name": "BLACKTHORN .357",
+  "status": "Blockbench author review; not installed in UE5",
+  "cubes": 119,
+  "speedloader_cubes": 14,
+  "chambers": 6,
+  "groups": {
+    "frame": 32,
+    "barrel": 41,
+    "crane": 4,
+    "cylinder": 19,
+    "extractor": 3,
+    "hammer": 5,
+    "trigger": 3,
+    "cartridges": 12
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "maps": [
+    "albedo",
+    "normal",
+    "orm"
+  ],
+  "units": "1 Blockbench unit = 1 cm",
+  "pivots_cm": {
+    "crane": [
+      1.9,
+      10.7,
+      0
+    ],
+    "cylinder": [
+      -1.5,
+      14,
+      0
+    ],
+    "extractor": [
+      -1.5,
+      14,
+      0
+    ],
+    "hammer": [
+      7.2,
+      13.2,
+      0
+    ],
+    "trigger": [
+      2,
+      10,
+      0
+    ]
+  },
+  "blender_preview_frames": {
+    "closed": 1,
+    "open": 48
+  },
+  "source": "Blackthorn357.bbmodel",
+  "validation": "PASS"
+}

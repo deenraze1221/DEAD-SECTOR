@@ -1,0 +1,176 @@
+{
+  "id": "kureyka12",
+  "title": "KUREYKA-12",
+  "status": "author-reviewed FBX installed in UE5",
+  "category": "Rifle",
+  "cubes": 45,
+  "groups": {
+    "Barrels": 11,
+    "Body": 25,
+    "Lever": 1,
+    "Trigger": 2,
+    "Extractor": 1,
+    "ShellLower": 2,
+    "ShellUpper": 2,
+    "SupportHand (reference, not exported)": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, quarters only for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "Hinge": [
+      -13.75,
+      0.0,
+      -6.5312
+    ],
+    "LeverPivot": [
+      -1.375,
+      0.0,
+      -1.375
+    ],
+    "TriggerPivot": [
+      -3.78125,
+      0.0,
+      -8.25
+    ],
+    "Muzzle": [
+      -55.2687484741211,
+      0.0,
+      -3.4375
+    ],
+    "Sight": [
+      -53.9688,
+      0.0,
+      -1.0312
+    ],
+    "Breech": [
+      -13.75,
+      2.2,
+      -3.4375
+    ],
+    "Butt": [
+      44.0,
+      0.0,
+      -7.5625
+    ]
+  },
+  "group_pivots_texels": {
+    "Barrels": [
+      -10,
+      0,
+      -4.75
+    ],
+    "Extractor": [
+      -10,
+      0,
+      -4.75
+    ],
+    "ShellLower": [
+      -10,
+      0,
+      -4.75
+    ],
+    "ShellUpper": [
+      -10,
+      0,
+      -4.75
+    ],
+    "Lever": [
+      -1,
+      0,
+      -1
+    ],
+    "Trigger": [
+      -3.75,
+      0,
+      -6
+    ],
+    "SupportHand": [
+      -19,
+      0,
+      -5
+    ]
+  },
+  "source": "Kureyka12_author.fbx (author review), Kureyka12.bbmodel synced",
+  "contacts": {
+    "Barrels": {
+      "cubes": 11,
+      "loose": [],
+      "touches_body": true
+    },
+    "Body": {
+      "cubes": 27,
+      "loose": [],
+      "touches_body": true
+    },
+    "Lever": {
+      "cubes": 2,
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "cubes": 3,
+      "loose": [],
+      "touches_body": true
+    },
+    "Extractor": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "ShellLower": {
+      "cubes": 2,
+      "loose": [],
+      "touches_body": true
+    },
+    "ShellUpper": {
+      "cubes": 2,
+      "loose": [],
+      "touches_body": true
+    },
+    "SupportHand": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "proposed_stats": {
+    "role": "side-by-side coach gun: 2 shells, widest and hardest close hit, quick reload, short reach",
+    "magazine": 2,
+    "fire_mode": "Semi (one barrel per press, right then left)",
+    "pellets": 10,
+    "damage_per_pellet": [
+      15,
+      5
+    ],
+    "falloff_m": [
+      5,
+      15
+    ],
+    "max_range_m": 30,
+    "rpm": 320,
+    "reload_s": 2.2,
+    "reload_kind": "BreakAction",
+    "move_speed": 0.96,
+    "ads_s": 0.22,
+    "sights": "brass bead on a flat rib",
+    "versus_taiga12": "TAIGA: over-under, tighter and longer reach"
+  },
+  "validation": "PASS",
+  "author_edits": {
+    "moved": [],
+    "added": [],
+    "removed": [
+      "Front trigger",
+      "Grip checkering L",
+      "Grip checkering R",
+      "Lever thumb piece"
+    ]
+  },
+  "reunwrapped_by_block_uv": [],
+  "support_hand": "BlockHands/Taiga12_SupportHand.glb (shared long-gun arm, Taiga12SupportV2)"
+}

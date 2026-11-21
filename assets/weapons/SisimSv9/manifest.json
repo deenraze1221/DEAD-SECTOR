@@ -1,0 +1,137 @@
+{
+  "id": "sisimsv9",
+  "title": "SISIM SV-9",
+  "status": "review concept, not installed in UE5",
+  "category": "Rifle",
+  "cubes": 72,
+  "groups": {
+    "Body": 57,
+    "Bolt": 3,
+    "Magazine": 10,
+    "Trigger": 1,
+    "SupportHand": 1
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "grid": "texel, quarters only for thin details",
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "TriggerPivot": [
+      -0.3438,
+      0.0,
+      -7.5625
+    ],
+    "Muzzle": [
+      -50.325,
+      0.0,
+      -2.0625
+    ],
+    "Sight": [
+      -45.375,
+      0.0,
+      3.0938
+    ],
+    "RearSight": [
+      3.4375,
+      0.0,
+      2.4062
+    ],
+    "Breech": [
+      -4.125,
+      2.2,
+      -2.0625
+    ],
+    "Butt": [
+      32.3125,
+      0.0,
+      -4.8125
+    ],
+    "SupportGrip": [
+      -26.125,
+      0.0,
+      -6.875
+    ],
+    "MagWell": [
+      -8.25,
+      0.0,
+      -7.5625
+    ]
+  },
+  "group_pivots_texels": {
+    "Trigger": [
+      -0.25,
+      0,
+      -5.5
+    ],
+    "Magazine": [
+      -6,
+      0,
+      -5.5
+    ],
+    "Bolt": [
+      -3,
+      1.6,
+      -1.5
+    ],
+    "SupportHand": [
+      -19,
+      0,
+      -5
+    ]
+  },
+  "support_hand": "reference block only; the game uses the shared BlockHands Taiga12SupportV2 arm",
+  "source": "SisimSv9.bbmodel",
+  "contacts": {
+    "Body": {
+      "cubes": 57,
+      "loose": [],
+      "touches_body": true
+    },
+    "Bolt": {
+      "cubes": 3,
+      "loose": [],
+      "touches_body": true
+    },
+    "Magazine": {
+      "cubes": 10,
+      "loose": [],
+      "touches_body": true
+    },
+    "Trigger": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    },
+    "SupportHand": {
+      "cubes": 1,
+      "loose": [],
+      "touches_body": true
+    }
+  },
+  "proposed_stats": {
+    "role": "integrally suppressed rifle: quiet, very fast fire, heavy hits up close, steep falloff",
+    "magazine": 20,
+    "fire_mode": "Auto",
+    "rpm": 900,
+    "damage": [
+      36,
+      16
+    ],
+    "falloff_m": [
+      10,
+      35
+    ],
+    "max_range_m": 80,
+    "reload_s": 2.4,
+    "reload_kind": "Magazine",
+    "move_speed": 0.97,
+    "ads_s": 0.22,
+    "bolt_travel_cm": 4,
+    "sights": "front post on the suppressor + rear notch; left optic rail",
+    "suppressed": "small flash, quiet shot (a suppressed sound / lower volume at install)"
+  },
+  "validation": "PASS"
+}

@@ -1,0 +1,59 @@
+{
+  "id": "taiga12",
+  "title": "TAIGA-12",
+  "cubes": 54,
+  "groups": {
+    "Body": 23,
+    "Barrels": 22,
+    "Lever": 2,
+    "Trigger": 2,
+    "Extractor": 1,
+    "ShellLower": 2,
+    "ShellUpper": 2
+  },
+  "texture_size": [
+    128,
+    128
+  ],
+  "texel_cm": 1.375,
+  "units": "1 Blockbench unit = 1 cm; Blender space of the block arms",
+  "markers_cm": {
+    "Hinge": [
+      -13.3,
+      0,
+      -7.0
+    ],
+    "LeverPivot": [
+      -1.0,
+      0,
+      -1.3
+    ],
+    "TriggerPivot": [
+      -5.3,
+      0,
+      -8.2
+    ],
+    "Muzzle": [
+      -73.2,
+      0,
+      -5.0
+    ],
+    "Sight": [
+      -72.1,
+      0,
+      -0.9
+    ],
+    "Breech": [
+      -12.0,
+      1.6,
+      -4.0
+    ],
+    "Butt": [
+      36.4,
+      0,
+      -7.0
+    ]
+  },
+  "source": "Taiga12.bbmodel",
+  "validation": "PASS"
+}

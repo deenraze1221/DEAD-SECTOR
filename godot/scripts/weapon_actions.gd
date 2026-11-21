@@ -6,15 +6,21 @@ var casing_count=0
 var base_hands: Dictionary={}
 var profiles={
  "Pistol":{"action":"slide","kick":.075,"load":1},
- "Helsing":{"action":"rack","kick":.035,"load":4},
- "Tikhar":{"action":"bolt","kick":.065,"load":1},
- "Shambler":{"action":"drum","kick":.085,"load":5},
- "Shotgun":{"action":"break","kick":.12,"load":2},
- "Kalash":{"action":"rack","kick":.065,"load":2},
- "VSV":{"action":"bolt","kick":.075,"load":2},
- "Scorpion":{"action":"rack","kick":.042,"load":2},
- "Vector":{"action":"rack","kick":.032,"load":2},
- "G36":{"action":"rack","kick":.055,"load":2}
+ "USP":{"action":"slide","kick":.05,"load":1},
+ "Ironhawk":{"action":"slide","kick":.11,"load":1},
+ "Blackthorn":{"action":"drum","kick":.1,"load":5},
+ "Kureyka":{"action":"break","kick":.12,"load":2},
+ "Taiga":{"action":"break","kick":.11,"load":2},
+ "Angara":{"action":"rack","kick":.1,"load":5},
+ "Sayan":{"action":"rack","kick":.08,"load":2},
+ "Kemchug":{"action":"rack","kick":.03,"load":2},
+ "Biryusa":{"action":"rack","kick":.05,"load":2},
+ "Bereg":{"action":"rack","kick":.055,"load":2},
+ "Sisim":{"action":"rack","kick":.04,"load":2},
+ "Chulym":{"action":"rack","kick":.07,"load":2},
+ "Vetluga":{"action":"rack","kick":.05,"load":2},
+ "Kazyr":{"action":"bolt","kick":.085,"load":2},
+ "Katanga":{"action":"rack","kick":.06,"load":4}
 }
 func setup(owner_player) -> void: player=owner_player
 

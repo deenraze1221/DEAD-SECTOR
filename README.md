@@ -4,7 +4,7 @@ The existing HTML game remains in the repository root. The separate **Godot 4.6 
 
 # DEAD SECTOR
 
-Browser wave-survival FPS with seeded 250 × 250 m towns, English/Russian UI and private four-player lobbies. All environment models are original procedural geometry. Weapon models come from the user's updated `gunsv2.fbx`, with the original pistol retained.
+Browser wave-survival FPS with seeded 250 × 250 m towns, English/Russian UI and private four-player lobbies. All environment models are original procedural geometry. Weapon models are 16 Blockbench GLB exports in `assets/weapons/`, converted by `node scripts/import-weapons.js` into `assets/models/weapons.json`.
 
 ## Play
 
@@ -22,16 +22,22 @@ SECTOR MART is a unique grocery building in the central quarter. Its large termi
 
 | Weapon | Magazine | Damage | Fire interval | Reload | Mode | Price |
 | --- | --- | --- | --- | --- | --- | --- |
-| Pistol | 8 | 45 | 0.28 s | 1.15 s | single press | starter |
-| Helsing | 60 | 35 | 0.075 s | 4 s | automatic | $6,500 |
-| Tikhar | 1 | 130 | 0.45 s | 3 s | single press | $4,000 |
-| Shambler | 5 | 65 | 0.50 s | 3 s | single press | $3,500 |
-| Shotgun | 2 | 90 | 0.60 s | 2 s | single press | $2,000 |
-| Kalash | 30 | 50 | 0.14 s | 3 s | automatic | $4,500 |
-| VSV | 12 | 80 | 0.24 s | 6 s | automatic | $6,000 |
-| Scorpion | 35 | 45 | 0.10 s | 4 s | automatic | $5,000 |
-| Vector | 20 | 40 | 0.09 s | 3 s | automatic | $3,000 |
-| G36 | 35 | 40 | 0.14 s | 4 s | automatic | $5,500 |
+| G17 | 8 | 45 | 0.28 s | 1.15 s | single press | starter |
+| KUREYKA-12 | 2 | 100 | 0.4 s | 2.2 s | single press | $2,000 |
+| USP-S | 12 | 55 | 0.3 s | 1.3 s | single press | $2,500 |
+| BLACKTHORN .357 | 6 | 95 | 0.5 s | 2.6 s | single press | $3,500 |
+| KEMCHUG K-3 | 50 | 20 | 0.067 s | 3.3 s | automatic | $3,000 |
+| IRONHAWK .50 | 7 | 130 | 0.6 s | 2 s | single press | $4,000 |
+| BIRYUSA BK-10 | 30 | 32 | 0.08 s | 2.5 s | automatic | $4,500 |
+| TAIGA-12 | 2 | 105 | 0.4 s | 2.4 s | single press | $3,500 |
+| ANGARA-12 | 6 | 75 | 0.7 s | 3 s | single press | $4,000 |
+| BEREG A-24 | 30 | 38 | 0.09 s | 2.6 s | automatic | $5,000 |
+| SISIM SV-9 | 20 | 34 | 0.075 s | 2.4 s | automatic | $6,000 |
+| CHULYM C-5 | 30 | 46 | 0.1 s | 2.8 s | automatic | $5,500 |
+| SAYAN-12 | 8 | 62 | 0.22 s | 3.2 s | single press | $5,000 |
+| VETLUGA B-3 | 30 | 55 | 0.15 s | 2.5 s | single press | $5,500 |
+| KAZYR BR-62 | 20 | 82 | 0.125 s | 3.2 s | automatic | $7,000 |
+| KATANGA MG-1 | 100 | 46 | 0.11 s | 5.5 s | automatic | $8,000 |
 
 The table reflects the latest balance; pistol remains45 damage. There is no aiming mode. Each weapon has a distinct synthesized report.
 
@@ -41,7 +47,7 @@ The table reflects the latest balance; pistol remains45 damage. There is no aimi
 - Every weapon has **100 condition**, losing **5 condition after each 100 shots actually fired**. Empty clicks do not cause wear. At zero condition it cannot shoot.
 - Repair: **$500 for +50 condition** on the equipped weapon, capped at 100. Repairing an already intact weapon is refused without charging.
 
-The updated FBX uses painted metal, brown stock/grip and blue pneumatic accents on appropriate parts, stored as vertex colors rather than stretched image textures. Authored normals are retained, and each model has individual trigger/support grip anchors and forearm endpoints. New guns are single-piece meshes; reload moves the gun and hand without detaching an invented magazine. Pistol retains its separate original magazine. `node scripts/import-weapons.js` rebuilds normalized geometry, colors and grip metadata.
+Each GLB's albedo texel is baked into vertex colors at import (flat low-poly look). Magazines are separate parts so reload animation works; hand grips are derived from each model's Trigger part. Handguns are drawn 1.8x so the fixed-size hands fit.
 
 ## City generation
 
@@ -163,11 +169,11 @@ Generator and growth are now full shared missions in Operations, alongside packa
 
 Enemy voices now use distinct layered procedural living/death sounds for zombies, runners, brutes/bosses and eyes, distance attenuated within25m/30m. Hosts and guests play living calls locally; replicated deaths sound once per enemy, without replay on repeated snapshots.
 
-Primary weapons unlock after completing waves: Shotgun2, Vector5, Shambler8, Tikhar10, Kalash10, Scorpion15, G3618, VSV20, Helsing25. Locked cards show the requirement; the server validates completed-wave progress for all players. The first Warden on wave5 has1800HP; each subsequent five-wave encounter adds600HP (wave10:2400, wave15:3000). Its actual maximum HP replicates to guests.
+Primary weapons unlock after completing waves: KUREYKA-12 2, USP-S 3, BLACKTHORN .357 4, KEMCHUG K-3 5, IRONHAWK .50 6, BIRYUSA BK-10 7, TAIGA-12 8, ANGARA-12 12, BEREG A-24 10, SISIM SV-9 14, CHULYM C-5 15, SAYAN-12 16, VETLUGA B-3 18, KAZYR BR-62 22, KATANGA MG-1 25. Locked cards show the requirement; the server validates completed-wave progress for all players. The first Warden on wave5 has1800HP; each subsequent five-wave encounter adds600HP (wave10:2400, wave15:3000). Its actual maximum HP replicates to guests.
 
 Locked weapon cards are darkened with a lock over the silhouette; the price remains visible and a footer states the required completed wave.
 
-Warden size is tripled (scale3.3, radius2.1m, height6.6m) with matching navigation and melee reach. First-person view magnification: Shambler×1.5, Kalash×1.4, Scorpion×1.3, G36×1.25, Vector×1.2; Helsing combines×1.1 proximity with×1.4 size (×1.54). World camera and third-person gun sizes are unchanged. Weapon/utility switching takes1.5s:0.75s lowering,0.75s raising, with firing/reloading blocked until completion.
+Warden size is tripled (scale3.3, radius2.1m, height6.6m) with matching navigation and melee reach. First-person view magnification is set per weapon by `viewZoom` in `weapon-config.js`. World camera and third-person gun sizes are unchanged. Weapon/utility switching takes1.5s:0.75s lowering,0.75s raising, with firing/reloading blocked until completion.
 
 City expansion adds residential highrise24m, corporate tower32m, hospital tower21m and communications tower28m plus rooftop aerial. Ten street props: ATM, vending machine, bicycle rack, extinguisher, sandbags, survey tripod, construction light, notice board, water tank and concrete pipe. The five calm/five tense scores now include Cold Dawn and Blackout.
 

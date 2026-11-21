@@ -1,9 +1,9 @@
 import {WEAPONS,WEAPON_BY_ID} from './weapon-config.js';
 export const AMMO_LIMIT=500,AMMO_PACK=50,FLASHLIGHT_DURATION=120;
 export const STORE={x:10.35,z:9.95,w:9.4,d:9.4,terminal:{x:7.25,z:10.9},spawn:{x:10.35,y:0,z:17.1}};
-const prices={Helsing:6500,Tikhar:4000,Shambler:3500,Shotgun:2000,Kalash:4500,VSV:6000,Scorpion:5000,Vector:3000,G36:5500};
+const prices={Kureyka:2000,USP:2500,Kemchug:3000,Blackthorn:3500,Taiga:3500,Ironhawk:4000,Angara:4000,Biryusa:4500,Bereg:5000,Sayan:5000,Chulym:5500,Vetluga:5500,Sisim:6000,Kazyr:7000,Katanga:8000};
 export const SHOP_ITEMS=[...WEAPONS.filter(w=>w.id!=='Pistol').map(w=>({id:w.id,kind:'weapon',name:w.label,price:prices[w.id]})),{id:'ammo',kind:'ammo',name:'50 универсальных патронов',price:50},{id:'smallMedkit',kind:'medkit',name:'Малая аптечка · +25 HP',price:100},{id:'largeMedkit',kind:'medkit',name:'Большая аптечка · +75 HP',price:250},{id:'flashlight',kind:'equipment',name:'Фонарик · 120 секунд',price:300},{id:'battery',kind:'equipment',name:'Батарея · 120 секунд',price:150},{id:'trap',kind:'equipment',name:'Капкан · 300 урона',price:200},{id:'repair',kind:'repair',name:'Починить · +50 прочности',price:500}];
-export function createInventory(){return {revision:0,completedWave:0,money:0,health:100,equipped:'Pistol',reserve:84,weapons:{Pistol:{ammo:8,durability:100,wearShots:0}},smallMedkit:0,largeMedkit:0,flashlight:false,flashlightCharge:0,batteries:0,traps:0};}
+export function createInventory(){return {revision:0,completedWave:0,money:0,health:100,equipped:'Pistol',reserve:WEAPON_BY_ID.Pistol.reserve,weapons:{Pistol:{ammo:WEAPON_BY_ID.Pistol.capacity,durability:100,wearShots:0}},smallMedkit:0,largeMedkit:0,flashlight:false,flashlightCharge:0,batteries:0,traps:0};}
 export function totalAmmo(a){return a.reserve+Object.values(a.weapons).reduce((n,w)=>n+w.ammo,0);}
 export function rewardForHP(hp){return Math.round(Math.max(15,Math.min(100,5+(hp-125)/5)));}
 export function equipWeapon(a,id){if(!a.weapons[id])return false;a.equipped=id;return true;}

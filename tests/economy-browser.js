@@ -29,7 +29,7 @@ try{
  await p.locator('[data-shop-tab=gear]').click();assert.equal(await p.locator('.supply-silhouette svg').count(),7);
  for(const id of ['flashlight','battery','trap']){await p.locator(`[data-shop-action=buy][data-item=${id}]`).click();await wait(s=>id==='flashlight'?s.inventory.flashlight:id==='battery'?s.inventory.batteries===1:s.inventory.traps===1,'buy '+id);}
  for(const id of ['smallMedkit','largeMedkit']){await p.locator(`[data-shop-action=buy][data-item=${id}]`).click();await wait(s=>s.inventory[id]===1,'buy '+id);}
- room.host.account.health=10;room.host.pose.hp=10;room.host.account.weapons.G36.durability=30;room.host.account.reserve=492;pushAccount();await wait(s=>s.hp===10&&s.durability===30&&s.totalAmmo===500,'condition and ammo fixture');
+ room.host.account.health=10;room.host.pose.hp=10;room.host.account.weapons.Bereg.durability=30;room.host.account.reserve=492;pushAccount();await wait(s=>s.hp===10&&s.durability===30&&s.totalAmmo===500,'condition and ammo fixture');
  await p.locator('[data-shop-action=buy][data-item=smallMedkit]').click();await wait(s=>s.hp===35,'purchase immediately heals');await p.locator('[data-shop-action=buy][data-item=largeMedkit]').click();await wait(s=>s.hp===100,'large purchase heals to cap');room.host.account.health=10;room.host.pose.hp=10;pushAccount();await wait(s=>s.hp===10,'stored kit fixture');
  assert.equal(await p.locator('[data-shop-action=buy][data-item=ammo]').isDisabled(),true);
  await p.locator('[data-shop-action=buy][data-item=repair]').click();await wait(s=>s.durability===80,'repair +50');
@@ -37,7 +37,7 @@ try{
  const artifacts=process.env.ARTIFACT_DIR;if(artifacts){await mkdir(artifacts,{recursive:true});await p.screenshot({path:artifacts+'/market-terminal.png'});}
  await p.locator('#close-shop').click();await wait(s=>s.running&&!s.shopOpen,'return to play');
  assert.equal(await p.locator('#flashlight-battery').getAttribute('aria-valuemax'),'120');assert.equal(await p.locator('#flashlight-battery').isVisible(),true);await p.keyboard.press('KeyF');await wait(s=>s.flashlightOn&&s.inventory.flashlightCharge<120,'flashlight drains');await p.keyboard.press('KeyF');await p.keyboard.press('KeyB');await wait(s=>s.inventory.batteries===0&&s.inventory.flashlightCharge===120,'battery refill');await p.keyboard.press('Digit3');await wait(s=>s.trapSelected,'select trap');await wait(s=>s.selectionReady,'selection animation');const ammoBefore=(await read()).ammo;await p.mouse.click(600,400);await wait(s=>s.inventory.traps===0&&s.operations.traps.some(t=>!t.used),'trap underfoot');assert.equal((await read()).ammo,ammoBefore);await wait(s=>!s.trapSelected,'empty trap returns to gun');await p.keyboard.press('Digit3');assert.equal((await read()).trapSelected,false);
- await p.keyboard.press('Digit2');await wait(s=>s.weapon==='Pistol','slot 2 pistol');await p.keyboard.press('Digit1');await wait(s=>s.weapon==='G36','slot 1 primary');
+ await p.keyboard.press('Digit2');await wait(s=>s.weapon==='Pistol','slot 2 pistol');await p.keyboard.press('Digit1');await wait(s=>s.weapon==='Bereg','slot 1 primary');
  await wait(s=>s.selectionReady,'selection animation');await p.keyboard.press('KeyR');await wait(s=>s.reloading,'reload starts');await wait(s=>!s.reloading&&s.ammo===35,'reload from universal pool',120000);
  await p.mouse.down();await wait(s=>s.ammo<=28,'automatic primary fires');await p.mouse.up();
  await p.keyboard.press('KeyH');await wait(s=>s.hp===35,'small medkit');await p.keyboard.press('KeyJ');await wait(s=>s.hp===100,'large medkit');
