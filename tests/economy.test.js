@@ -4,7 +4,7 @@ import {Rifle} from '../weapons.js';import {MoneyDrops} from '../loot.js';import
 const audio={play(){},shot(){}};
 test('starter pistol only, two weapon slots, exact prices and replacement preserve universal ammunition',()=>{
  const a=createInventory();assert.deepEqual(Object.keys(a.weapons),['Pistol']);assert.equal(a.money,0);assert.equal(totalAmmo(a),92);
- const expected={Kureyka:2000,USP:2500,Kemchug:3000,Blackthorn:3500,Taiga:3500,Ironhawk:4000,Angara:4000,Biryusa:4500,Bereg:5000,Sayan:5000,Chulym:5500,Vetluga:5500,Sisim:6000,Kazyr:7000,Katanga:8000};
+ const expected={USP:500,Blackthorn:1000,Ironhawk:1500,Kureyka:2000,Kemchug:2500,Biryusa:3000,Taiga:3500,Bereg:4000,Angara:4000,Sisim:4500,Chulym:5000,Sayan:5500,Vetluga:6000,Kazyr:7000,Katanga:8000};
  a.completedWave=25;a.money=100000;for(const [id,price]of Object.entries(expected)){assert.equal(SHOP_ITEMS.find(i=>i.id===id).price,price);const before=a.money;assert.equal(buy(a,id).ok,true);assert.equal(a.money,before-price);assert.deepEqual(Object.keys(a.weapons).sort(),['Pistol',id].sort());assert.equal(a.equipped,id);assert.equal(equipWeapon(a,'Pistol'),true);assert.equal(totalAmmo(a),92);}
  a.weapons.Katanga.ammo=10;a.reserve-=10;buy(a,'Kemchug');assert.equal(totalAmmo(a),92);assert.equal(a.weapons.Katanga,undefined);
 });

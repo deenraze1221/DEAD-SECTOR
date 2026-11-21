@@ -23,19 +23,19 @@ SECTOR MART is a unique grocery building in the central quarter. Its large termi
 | Weapon | Magazine | Damage | Fire interval | Reload | Mode | Price |
 | --- | --- | --- | --- | --- | --- | --- |
 | G17 | 8 | 45 | 0.28 s | 1.15 s | single press | starter |
+| USP-S | 12 | 55 | 0.3 s | 1.3 s | single press | $500 |
+| BLACKTHORN .357 | 6 | 95 | 0.5 s | 2.6 s | single press | $1,000 |
+| IRONHAWK .50 | 7 | 130 | 0.6 s | 2 s | single press | $1,500 |
 | KUREYKA-12 | 2 | 100 | 0.4 s | 2.2 s | single press | $2,000 |
-| USP-S | 12 | 55 | 0.3 s | 1.3 s | single press | $2,500 |
-| BLACKTHORN .357 | 6 | 95 | 0.5 s | 2.6 s | single press | $3,500 |
-| KEMCHUG K-3 | 50 | 20 | 0.067 s | 3.3 s | automatic | $3,000 |
-| IRONHAWK .50 | 7 | 130 | 0.6 s | 2 s | single press | $4,000 |
-| BIRYUSA BK-10 | 30 | 32 | 0.08 s | 2.5 s | automatic | $4,500 |
+| KEMCHUG K-3 | 50 | 20 | 0.067 s | 3.3 s | automatic | $2,500 |
+| BIRYUSA BK-10 | 30 | 32 | 0.08 s | 2.5 s | automatic | $3,000 |
 | TAIGA-12 | 2 | 105 | 0.4 s | 2.4 s | single press | $3,500 |
+| BEREG A-24 | 30 | 38 | 0.09 s | 2.6 s | automatic | $4,000 |
 | ANGARA-12 | 6 | 75 | 0.7 s | 3 s | single press | $4,000 |
-| BEREG A-24 | 30 | 38 | 0.09 s | 2.6 s | automatic | $5,000 |
-| SISIM SV-9 | 20 | 34 | 0.075 s | 2.4 s | automatic | $6,000 |
-| CHULYM C-5 | 30 | 46 | 0.1 s | 2.8 s | automatic | $5,500 |
-| SAYAN-12 | 8 | 62 | 0.22 s | 3.2 s | single press | $5,000 |
-| VETLUGA B-3 | 30 | 55 | 0.15 s | 2.5 s | single press | $5,500 |
+| SISIM SV-9 | 20 | 34 | 0.075 s | 2.4 s | automatic | $4,500 |
+| CHULYM C-5 | 30 | 46 | 0.1 s | 2.8 s | automatic | $5,000 |
+| SAYAN-12 | 8 | 62 | 0.22 s | 3.2 s | single press | $5,500 |
+| VETLUGA B-3 | 30 | 55 | 0.15 s | 2.5 s | single press | $6,000 |
 | KAZYR BR-62 | 20 | 82 | 0.125 s | 3.2 s | automatic | $7,000 |
 | KATANGA MG-1 | 100 | 46 | 0.11 s | 5.5 s | automatic | $8,000 |
 
@@ -169,7 +169,7 @@ Generator and growth are now full shared missions in Operations, alongside packa
 
 Enemy voices now use distinct layered procedural living/death sounds for zombies, runners, brutes/bosses and eyes, distance attenuated within25m/30m. Hosts and guests play living calls locally; replicated deaths sound once per enemy, without replay on repeated snapshots.
 
-Primary weapons unlock after completing waves: KUREYKA-12 2, USP-S 3, BLACKTHORN .357 4, KEMCHUG K-3 5, IRONHAWK .50 6, BIRYUSA BK-10 7, TAIGA-12 8, ANGARA-12 12, BEREG A-24 10, SISIM SV-9 14, CHULYM C-5 15, SAYAN-12 16, VETLUGA B-3 18, KAZYR BR-62 22, KATANGA MG-1 25. Locked cards show the requirement; the server validates completed-wave progress for all players. The first Warden on wave5 has1800HP; each subsequent five-wave encounter adds600HP (wave10:2400, wave15:3000). Its actual maximum HP replicates to guests.
+Primary weapons unlock after completing waves: USP-S 2, BLACKTHORN .357 3, IRONHAWK .50 4, KUREYKA-12 5, KEMCHUG K-3 6, BIRYUSA BK-10 7, TAIGA-12 8, BEREG A-24 10, ANGARA-12 12, SISIM SV-9 14, CHULYM C-5 15, SAYAN-12 16, VETLUGA B-3 18, KAZYR BR-62 22, KATANGA MG-1 25.357 4, KEMCHUG K-3 5, IRONHAWK .50 6, BIRYUSA BK-10 7, TAIGA-12 8, ANGARA-12 12, BEREG A-24 10, SISIM SV-9 14, CHULYM C-5 15, SAYAN-12 16, VETLUGA B-3 18, KAZYR BR-62 22, KATANGA MG-1 25. Locked cards show the requirement; the server validates completed-wave progress for all players. The first Warden on wave5 has1800HP; each subsequent five-wave encounter adds600HP (wave10:2400, wave15:3000). Its actual maximum HP replicates to guests.
 
 Locked weapon cards are darkened with a lock over the silhouette; the price remains visible and a footer states the required completed wave.
 

@@ -7,15 +7,15 @@ Average kill payout: $28.5.
 | Weapon | Shots/kill incl. misses | Ammo + repair/kill | Net cash/kill |
 | --- | --- | --- | --- |
 | Pistol | 8.9 | $13.4 | $15.1 |
-| Kureyka | 4.4 | $6.6 | $21.9 |
 | USP | 7.5 | $11.3 | $17.2 |
 | Blackthorn | 4.8 | $7.2 | $21.3 |
-| Kemchug | 19.3 | $29.0 | $-0.5 |
 | Ironhawk | 3.2 | $4.7 | $23.8 |
+| Kureyka | 4.4 | $6.6 | $21.9 |
+| Kemchug | 19.3 | $29.0 | $-0.5 |
 | Biryusa | 12.1 | $18.1 | $10.4 |
 | Taiga | 4.4 | $6.6 | $21.9 |
-| Angara | 5.8 | $8.7 | $19.8 |
 | Bereg | 10.7 | $16.0 | $12.5 |
+| Angara | 5.8 | $8.7 | $19.8 |
 | Sisim | 11.7 | $17.5 | $11.0 |
 | Chulym | 8.9 | $13.4 | $15.1 |
 | Sayan | 7.4 | $11.1 | $17.4 |
