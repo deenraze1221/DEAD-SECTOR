@@ -172,6 +172,13 @@ func setup_environment() -> void:
  env.ambient_light_color=Color("#87959c")
  env.ambient_light_energy=.38
  env.tonemap_mode=Environment.TONE_MAPPER_FILMIC
+ env.glow_enabled=true
+ env.glow_intensity=.55
+ env.glow_bloom=.06
+ env.glow_hdr_threshold=1.1
+ env.adjustment_enabled=true
+ env.adjustment_contrast=1.07
+ env.adjustment_saturation=1.06
  env.fog_enabled=true
  env.fog_light_color=Color("#34434a")
  env.fog_density=.009

@@ -213,6 +213,12 @@ func setup_weapon_view() -> void:
  key_light.light_energy=1.2
  key_light.position=Vector3(-.2,.45,.1)
  weapon_camera.add_child(key_light)
+ var rim=DirectionalLight3D.new()
+ rim.light_cull_mask=2
+ rim.light_energy=.55
+ rim.light_color=Color("#9fb6c9")
+ rim.rotation_degrees=Vector3(-20,155,0)
+ weapon_viewport.add_child(rim)
  var fill=DirectionalLight3D.new()
  fill.light_cull_mask=2
  fill.light_energy=.5

@@ -8,14 +8,14 @@ export class Rifle {
   constructor(audio, random = Math.random) {
     this.audio=audio;this.random=random;this.scene=new THREE.Scene();this.camera=new THREE.PerspectiveCamera(45,1,.01,10);
     this.scene.add(new THREE.HemisphereLight('#aebfc0','#333c34',1.7));
-    const light=new THREE.DirectionalLight('#c3d0cc',1.5);light.position.set(-2,3,2);this.scene.add(light);
+    const light=new THREE.DirectionalLight('#c3d0cc',1.5);light.position.set(-2,3,2);this.scene.add(light);const rim=new THREE.DirectionalLight('#8fa6bb',.9);rim.position.set(2.5,1,-3);this.scene.add(rim);
     this.model=new THREE.Group();this.model.scale.setScalar(.8);this.scene.add(this.model);
     this.variants=weaponModels.map(record=>{
       const group=new THREE.Group();group.name=record.id;
       const make=part=>{
         const materials=part.materials.map((m,i)=>new THREE.MeshStandardMaterial({
           vertexColors:Boolean(m.vertexColors),color:m.vertexColors?'#ffffff':record.id==='Pistol'?(m.name==='Gun_metal'?'#495654':i===1?'#77816e':'#bd9254'):new THREE.Color(m.color).lerp(new THREE.Color('#73776d'),.08),
-          metalness:.32,roughness:.8,flatShading:record.id==='Pistol',
+          metalness:.42,roughness:.62,flatShading:record.id==='Pistol',
         }));
         return new THREE.Mesh(new THREE.BufferGeometryLoader().parse(part.geometry),materials.length===1?materials[0]:materials);
       };
@@ -38,7 +38,7 @@ export class Rifle {
     });
     this.flash=new THREE.Mesh(new THREE.ConeGeometry(.065,.18,5),new THREE.MeshBasicMaterial({color:'#ffe790'}));
     this.action=new THREE.Mesh(new THREE.BoxGeometry(.018,.025,.09),new THREE.MeshStandardMaterial({color:'#8d9993',metalness:.6,roughness:.45}));this.model.add(this.action);this.casings=[];this.casingGeometry=new THREE.CylinderGeometry(.007,.007,.03,6);this.casingMaterial=new THREE.MeshStandardMaterial({color:'#b99b55',metalness:.6,roughness:.5});
-    this.flash.rotation.x=-Math.PI/2;this.model.add(this.flash);this.reset('Pistol');
+    this.flash.rotation.x=-Math.PI/2;this.flashLight=new THREE.PointLight('#ffd27a',0,1.6);this.flash.add(this.flashLight);this.model.add(this.flash);this.reset('Pistol');
   }
   get ammo(){return this.inventory?this.inventory.weapons[this.config.id].ammo:this._ammo;}
   set ammo(v){if(this.inventory)this.inventory.weapons[this.config.id].ammo=v;else this._ammo=v;}
@@ -62,7 +62,7 @@ export class Rifle {
     this.switchTime=Math.max(0,(this.switchTime||0)-dt);
     for(const c of this.casings){c.life-=dt;c.velocity.y-=2.5*dt;c.mesh.position.addScaledVector(c.velocity,dt);c.mesh.rotation.x+=dt*11;c.mesh.rotation.z+=dt*8;}
     this.casings=this.casings.filter(c=>{if(c.life>0)return true;this.scene.remove(c.mesh);return false;});
-    this.cooldown=Math.max(0,this.cooldown-dt);this.flashTime=Math.max(0,this.flashTime-dt);this.flash.visible=this.flashTime>0;this.recoil=Math.max(0,this.recoil-dt*1.8);
+    this.cooldown=Math.max(0,this.cooldown-dt);this.flashTime=Math.max(0,this.flashTime-dt);this.flash.visible=this.flashTime>0;this.flashLight.intensity=this.flashTime>0?5:0;this.recoil=Math.max(0,this.recoil-dt*1.8);
     if(this.reloadTime>0){this.reloadTime=Math.max(0,this.reloadTime-dt);if(!this.reloadTime){const n=Math.min(this.config.capacity-this.ammo,this.reserve);this.ammo+=n;this.reserve-=n;this.audio.play('reload');}}
   }
   fire(){if(this.switchTime>0||this.reloadTime||this.cooldown||this.durability<=0)return false;if(!this.ammo){this.cooldown=.25;this.audio.play('empty');return false;}if(this.inventory)recordShot(this.inventory);else{this.ammo--;this.wearShots++;if(this.wearShots>=100){this._durability=Math.max(0,this._durability-5);this.wearShots=0;}}this.cooldown=this.config.interval;this.recoil=MOTION[this.config.id].kick;const shell=new THREE.Mesh(this.casingGeometry,this.casingMaterial);shell.position.set(.27,-.17,-.39);this.scene.add(shell);this.casings.push({mesh:shell,life:.7,velocity:new THREE.Vector3(.5,.35,.12)});if(this.casings.length>24)this.scene.remove(this.casings.shift().mesh);this.flashTime=.045;this.audio.shot?.(this.config.id);return true;}

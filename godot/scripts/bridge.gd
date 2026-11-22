@@ -112,14 +112,6 @@ func build_weapon(parent: Node3D, id: String) -> void:
   instance.name="WeaponBody" if part_index==0 else "WeaponMagazine"
   part_index+=1
   instance.mesh=make_mesh(part)
-  if id=="Pistol":
-   instance.mesh=instance.mesh.duplicate()
-   for surface in range(instance.mesh.get_surface_count()):
-    var source: StandardMaterial3D=instance.mesh.surface_get_material(surface)
-    var finish=source.duplicate()
-    finish.albedo_color=[Color("#495654"),Color("#77816e"),Color("#bd9254")][mini(surface,2)]
-    finish.roughness=.72
-    instance.mesh.surface_set_material(surface,finish)
   instance.transform=matrix(part.transform)
   instance.layers=2
   instance.cast_shadow=GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
